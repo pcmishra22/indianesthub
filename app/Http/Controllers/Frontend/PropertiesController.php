@@ -1,0 +1,246 @@
+<?php
+
+namespace App\Http\Controllers\Frontend;
+
+use App\Http\Controllers\Controller;
+use App\Models\Property;
+use Illuminate\Http\Request;
+
+class PropertiesController extends Controller
+{
+    /**
+     * Auto-complete suggestions for search fields.
+     */
+    public function autocomplete(Request $request)
+    {
+        $term = $request->get('term', '');
+        $results = Property::query()
+            ->where('status', 'Available')
+            ->where(function ($q) use ($term) {
+                $q->where('city', 'like', "%{$term}%")
+                  ->orWhere('locality', 'like', "%{$term}%")
+                  ->orWhere('landmark', 'like', "%{$term}%")
+                  ->orWhere('title', 'like', "%{$term}%")
+                  ->orWhere('address', 'like', "%{$term}%");
+            })
+            ->limit(10)
+            ->get(['city', 'locality', 'landmark', 'title', 'address']);
+        $suggestions = [];
+        foreach ($results as $row) {
+            foreach (['city', 'locality', 'landmark', 'title', 'address'] as $field) {
+                if (!empty($row[$field]) && stripos($row[$field], $term) !== false) {
+                    $suggestions[] = $row[$field];
+                }
+            }
+        }
+        $suggestions = array_unique($suggestions);
+        return response()->json(array_values($suggestions));
+    }
+
+    /**
+     * All known locations with their center coordinates (from Dhakoli reference point).
+     * Used by locationSearch() to build 10 km bounding box queries.
+     */
+    public function getLocationMap(): array
+    {
+        return [
+            'dhakoli'          => ['label' => 'Dhakoli',           'lat' => 30.6400, 'lng' => 76.8190],
+            'zirakpur'         => ['label' => 'Zirakpur',          'lat' => 30.6525, 'lng' => 76.8371],
+            'derabassi'        => ['label' => 'Derabassi',         'lat' => 30.5952, 'lng' => 76.8378],
+            'panchkula'        => ['label' => 'Panchkula',         'lat' => 30.6942, 'lng' => 76.8606],
+            'chandigarh'       => ['label' => 'Chandigarh',        'lat' => 30.7333, 'lng' => 76.7794],
+            'mohali'           => ['label' => 'Mohali',            'lat' => 30.6967, 'lng' => 76.7356],
+            'manimajra'        => ['label' => 'Manimajra',         'lat' => 30.7313, 'lng' => 76.8740],
+            'banur'            => ['label' => 'Banur',             'lat' => 30.5664, 'lng' => 76.7200],
+            'landran'          => ['label' => 'Landran',           'lat' => 30.7594, 'lng' => 76.7000],
+            'mullanpur'        => ['label' => 'Mullanpur',         'lat' => 30.7831, 'lng' => 76.7109],
+            'kharar'           => ['label' => 'Kharar',            'lat' => 30.7447, 'lng' => 76.6479],
+            'gharuan'          => ['label' => 'Gharuan',           'lat' => 30.7083, 'lng' => 76.5128],
+            'kurali'           => ['label' => 'Kurali',            'lat' => 30.8336, 'lng' => 76.6072],
+            'morinda'          => ['label' => 'Morinda',           'lat' => 30.7883, 'lng' => 76.4897],
+            'fatehgarh-sahib'  => ['label' => 'Fatehgarh Sahib',   'lat' => 30.6481, 'lng' => 76.3894],
+            'pinjore'          => ['label' => 'Pinjore',           'lat' => 30.7987, 'lng' => 76.9153],
+            'kalka'            => ['label' => 'Kalka',             'lat' => 30.8467, 'lng' => 76.9453],
+            'solan'            => ['label' => 'Solan',             'lat' => 30.9097, 'lng' => 77.0993],
+            'baddi'            => ['label' => 'Baddi',             'lat' => 30.9597, 'lng' => 76.7898],
+            'barotiwala'       => ['label' => 'Barotiwala',        'lat' => 30.9467, 'lng' => 76.7878],
+            'nalagarh'         => ['label' => 'Nalagarh',          'lat' => 31.0424, 'lng' => 76.7155],
+            'rajpura'          => ['label' => 'Rajpura',           'lat' => 30.4831, 'lng' => 76.5917],
+            'ambala'           => ['label' => 'Ambala',            'lat' => 30.3783, 'lng' => 76.7767],
+            'ropar'            => ['label' => 'Ropar',             'lat' => 30.9641, 'lng' => 76.5311],
+            'rupnagar'         => ['label' => 'Ropar / Rupnagar',  'lat' => 30.9641, 'lng' => 76.5311],
+            'patiala'          => ['label' => 'Patiala',           'lat' => 30.3398, 'lng' => 76.3869],
+        ];
+    }
+
+    /**
+     * Properties in a specific location — shows that city + anything within 10 km.
+     * URL: /properties/in/{location}  e.g. /properties/in/dhakoli
+     */
+    public function locationSearch(Request $request, string $location)
+    {
+        $locations = $this->getLocationMap();
+        $slug = strtolower(trim($location));
+
+        if (!isset($locations[$slug])) {
+            abort(404);
+        }
+
+        $loc      = $locations[$slug];
+        $radius   = 10; // km
+        $latDelta = $radius / 111.0;
+        $lngDelta = $radius / 96.5;
+
+        $minLat = $loc['lat'] - $latDelta;
+        $maxLat = $loc['lat'] + $latDelta;
+        $minLng = $loc['lng'] - $lngDelta;
+        $maxLng = $loc['lng'] + $lngDelta;
+
+        $query = Property::with(['images', 'dealer', 'builder'])
+            ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
+            ->whereNotNull('price')
+            ->where('price', '>', 0)
+            ->where(function ($q) use ($loc, $minLat, $maxLat, $minLng, $maxLng) {
+                // Coordinate-based: bounding box ≈ 10 km radius
+                $q->where(function ($inner) use ($minLat, $maxLat, $minLng, $maxLng) {
+                    $inner->whereNotNull('latitude')
+                          ->whereNotNull('longitude')
+                          ->whereBetween('latitude',  [$minLat, $maxLat])
+                          ->whereBetween('longitude', [$minLng, $maxLng]);
+                })
+                // Fallback: city/locality name match (catches older listings without coords)
+                ->orWhere('city',     'like', '%' . $loc['label'] . '%')
+                ->orWhere('locality', 'like', '%' . $loc['label'] . '%');
+            });
+
+        // Common filters (reused from index)
+        if ($request->filled('property_type')) $query->where('property_type', $request->property_type);
+        if ($request->filled('looking_for')) {
+            $lf = $request->looking_for;
+            if (in_array($lf, ['Sale', 'Buy', 'buy', 'sale'])) {
+                $query->whereIn('looking_for', ['Sale', 'Sell', 'Buy', 'sell', 'buy', 'sale']);
+            } else {
+                $query->where('looking_for', $lf);
+            }
+        }
+        if ($request->filled('bhk_type'))          $query->where('bhk_type',          $request->bhk_type);
+        if ($request->filled('min_price'))          $query->where('price', '>=',       $request->min_price);
+        if ($request->filled('max_price'))          $query->where('price', '<=',       $request->max_price);
+        if ($request->filled('min_area'))           $query->where('area',  '>=',       $request->min_area);
+        if ($request->filled('max_area'))           $query->where('area',  '<=',       $request->max_area);
+        if ($request->filled('bedrooms'))           $query->where('bedrooms', '>=',    $request->bedrooms);
+        if ($request->filled('furnishing_status'))  $query->where('furnishing_status', $request->furnishing_status);
+        if ($request->filled('pet_friendly'))       $query->where('pet_friendly',      true);
+        if ($request->filled('gated_society'))      $query->where('gated_society',     true);
+        if ($request->filled('vastu_compliant'))    $query->where('vastu_compliant',   true);
+
+        $sortBy = $request->get('sort_by', 'newest');
+        switch ($sortBy) {
+            case 'price_low':  $query->orderBy('price', 'asc');  break;
+            case 'price_high': $query->orderBy('price', 'desc'); break;
+            case 'area':       $query->orderBy('area',  'desc'); break;
+            default:
+                $query->orderByRaw('is_boosted DESC, boosted_until DESC, is_featured DESC, is_premium DESC, created_at DESC');
+        }
+
+        $properties    = $query->paginate(12)->withQueryString();
+        $cities        = Property::whereNotNull('city')->distinct()->pluck('city')->filter()->sort();
+        $propertyTypes = Property::whereNotNull('property_type')->distinct()->pluck('property_type')->filter()->sort();
+        $locationLabel  = $loc['label'];
+        $locationRadius = $radius;
+
+        // SEO enhancements for location pages
+        $seoTitle       = "Properties in {$locationLabel} | Buy & Rent Flats, Villas & Plots | IndianestHub";
+        $seoDescription = "Browse {$properties->total()} verified properties in {$locationLabel} and nearby areas within {$radius} km. Find flats, villas, plots for sale & rent. Connect with verified agents on IndianestHub.";
+        $seoH1          = "Properties in {$locationLabel}";
+        $seoIntro       = "Looking for property in {$locationLabel}? IndianestHub lists {$properties->total()} verified properties within {$radius} km of {$locationLabel} — including flats, villas, plots and commercial spaces. Browse by BHK type, budget and property status to find your perfect match.";
+
+        return view('frontend.properties',
+            compact('properties', 'cities', 'propertyTypes', 'locationLabel', 'locationRadius',
+                    'seoTitle', 'seoDescription', 'seoH1', 'seoIntro'));
+    }
+
+    public function index(Request $request)
+    {
+        $query = Property::with(['images', 'dealer', 'builder'])
+            ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
+            ->whereNotNull('price')
+            ->where('price', '>', 0);
+
+        // Keyword search
+        if ($request->filled('keyword')) {
+            $keyword = $request->keyword;
+            $query->where(function ($q) use ($keyword) {
+                $q->where('title', 'like', "%{$keyword}%")
+                  ->orWhere('description', 'like', "%{$keyword}%")
+                  ->orWhere('address', 'like', "%{$keyword}%")
+                  ->orWhere('locality', 'like', "%{$keyword}%")
+                  ->orWhere('city', 'like', "%{$keyword}%");
+            });
+        }
+
+        // Location filters
+        if ($request->filled('city')) $query->where('city', $request->city);
+        if ($request->filled('locality')) $query->where('locality', 'like', "%{$request->locality}%");
+
+        // Property type
+        if ($request->filled('property_type')) $query->where('property_type', $request->property_type);
+
+        // Looking for (Buy/Sale/Sell/Rent/PG)
+        if ($request->filled('looking_for')) {
+            $lf = $request->looking_for;
+            if (in_array($lf, ['Sale', 'Buy', 'buy', 'sale'])) {
+                $query->whereIn('looking_for', ['Sale', 'Sell', 'Buy', 'sell', 'buy', 'sale']);
+            } else {
+                $query->where('looking_for', $lf);
+            }
+        }
+
+        // BHK type
+        if ($request->filled('bhk_type')) $query->where('bhk_type', $request->bhk_type);
+
+        // Price range
+        if ($request->filled('min_price')) $query->where('price', '>=', $request->min_price);
+        if ($request->filled('max_price')) $query->where('price', '<=', $request->max_price);
+
+        // Area range
+        if ($request->filled('min_area')) $query->where('area', '>=', $request->min_area);
+        if ($request->filled('max_area')) $query->where('area', '<=', $request->max_area);
+
+        // Bedrooms
+        if ($request->filled('bedrooms')) $query->where('bedrooms', '>=', $request->bedrooms);
+
+        // Furnishing
+        if ($request->filled('furnishing_status')) $query->where('furnishing_status', $request->furnishing_status);
+
+        // Boolean filters
+        if ($request->filled('pet_friendly')) $query->where('pet_friendly', true);
+        if ($request->filled('gated_society')) $query->where('gated_society', true);
+        if ($request->filled('vastu_compliant')) $query->where('vastu_compliant', true);
+
+        // Sorting
+        $sortBy = $request->get('sort_by', 'newest');
+        switch ($sortBy) {
+            case 'price_low':
+                $query->orderBy('price', 'asc');
+                break;
+            case 'price_high':
+                $query->orderBy('price', 'desc');
+                break;
+            case 'area':
+                $query->orderBy('area', 'desc');
+                break;
+            default: // newest + placement priority
+                $query->orderByRaw('is_boosted DESC, boosted_until DESC, is_featured DESC, is_premium DESC, created_at DESC');
+                break;
+        }
+
+        $properties = $query->paginate(12)->withQueryString();
+
+        // Get filter data for dropdowns
+        $cities = Property::whereNotNull('city')->distinct()->pluck('city')->filter()->sort();
+        $propertyTypes = Property::whereNotNull('property_type')->distinct()->pluck('property_type')->filter()->sort();
+
+        return view('frontend.properties', compact('properties', 'cities', 'propertyTypes'));
+    }
+}

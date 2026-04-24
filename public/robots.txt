@@ -1,0 +1,48 @@
+# IndianestHub – robots.txt
+# https://indianesthub.com
+
+User-agent: *
+Allow: /
+
+# Disallow private/admin areas
+Disallow: /admin/
+Disallow: /dealer/
+Disallow: /builder/
+Disallow: /my/
+Disallow: /search/autocomplete
+Disallow: /compare/
+Disallow: /wallet
+Disallow: /chat
+Disallow: /analytics
+Disallow: /notifications
+Disallow: /two-factor
+Disallow: /verify-phone
+Disallow: /send-otp
+Disallow: /verify-otp
+Disallow: /send-2fa
+Disallow: /verify-2fa
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+
+# Allow important public pages
+Allow: /properties
+Allow: /properties/in/
+Allow: /blog
+Allow: /agents
+Allow: /builders
+Allow: /services
+Allow: /about
+Allow: /contact
+Allow: /flats-in-
+Allow: /plots-in-
+Allow: /villas-in-
+Allow: /rent-flats-in-
+Allow: /new-projects-in-
+
+# Crawl-delay for well-behaved bots
+Crawl-delay: 1
+
+# Sitemaps
+Sitemap: https://indianesthub.com/sitemap.xml
