@@ -239,19 +239,32 @@
       <div class="d-flex flex-wrap gap-2" style="font-size:.8rem;">
         {{-- Flats by city --}}
         <a href="{{ url('/flats-in-zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Flats in Zirakpur</a><span style="color:#334155;">·</span>
+        <a href="{{ url('/flats-in-zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Flats for sale in Zirakpur</a><span style="color:#334155;">·</span>
+        <a href="{{ url('/flats-in-zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">apartments for sale in Zirakpur</a><span style="color:#334155;">·</span>
+
         <a href="{{ url('/flats-in-mohali') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Flats in Mohali</a><span style="color:#334155;">·</span>
+        <a href="{{ url('/flats-in-mohali') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Flats for sale in Mohali</a><span style="color:#334155;">·</span>
+
         <a href="{{ url('/flats-in-chandigarh') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Flats in Chandigarh</a><span style="color:#334155;">·</span>
+        <a href="{{ url('/flats-in-chandigarh') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Flats for sale in Chandigarh</a><span style="color:#334155;">·</span>
+
         <a href="{{ url('/flats-in-panchkula') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Flats in Panchkula</a><span style="color:#334155;">·</span>
+        <a href="{{ url('/flats-in-panchkula') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Flats for sale in Panchkula</a><span style="color:#334155;">·</span>
+
         <a href="{{ url('/flats-in-kharar') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Flats in Kharar</a><span style="color:#334155;">·</span>
+        <a href="{{ url('/flats-in-kharar') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Flats for sale in Kharar</a><span style="color:#334155;">·</span>
+
         {{-- Rent --}}
         <a href="{{ url('/rent-flats-in-zirakpur') }}" style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Rent Flats Zirakpur</a><span style="color:#334155;">·</span>
         <a href="{{ url('/rent-flats-in-mohali') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Rent Flats Mohali</a><span style="color:#334155;">·</span>
         <a href="{{ url('/rent-flats-in-chandigarh') }}" style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Rent Flats Chandigarh</a><span style="color:#334155;">·</span>
         {{-- BHK --}}
-        <a href="{{ url('/2bhk-flats-in-zirakpur') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 BHK Flats Zirakpur</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/3bhk-flats-in-mohali') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 BHK Flats Mohali</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/3bhk-flats-in-chandigarh') }}" style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 BHK Flats Chandigarh</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/2bhk-flats-in-panchkula') }}" style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 BHK Flats Panchkula</a><span style="color:#334155;">·</span>
+        <a href="{{ url('/2bhk-flats-in-zirakpur') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 BHK Flats in Zirakpur</a><span style="color:#334155;">·</span>
+        <a href="{{ url('/3bhk-flats-in-zirakpur') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 BHK Flats in Zirakpur</a><span style="color:#334155;">·</span>
+
+        <a href="{{ url('/3bhk-flats-in-mohali') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 BHK Flats in Mohali</a><span style="color:#334155;">·</span>
+        <a href="{{ url('/3bhk-flats-in-chandigarh') }}" style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 BHK Flats in Chandigarh</a><span style="color:#334155;">·</span>
+        <a href="{{ url('/2bhk-flats-in-panchkula') }}" style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 BHK Flats in Panchkula</a><span style="color:#334155;">·</span>
         {{-- Plots & Villas --}}
         <a href="{{ url('/plots-in-zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Plots in Zirakpur</a><span style="color:#334155;">·</span>
         <a href="{{ url('/plots-in-mohali') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Plots in Mohali</a><span style="color:#334155;">·</span>
@@ -263,8 +276,8 @@
         <a href="{{ url('/new-projects-in-chandigarh') }}" style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">New Projects Chandigarh</a><span style="color:#334155;">·</span>
         <a href="{{ url('/new-projects-in-mullanpur') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">New Projects Mullanpur</a><span style="color:#334155;">·</span>
         {{-- Ready to Move --}}
-        <a href="{{ url('/ready-to-move-flats-zirakpur') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Ready to Move Zirakpur</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/ready-to-move-flats-mohali') }}"     style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Ready to Move Mohali</a>
+        <a href="{{ url('/ready-to-move-flats-zirakpur') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Ready to Move flats in Zirakpur</a><span style="color:#334155;">·</span>
+        <a href="{{ url('/ready-to-move-flats-mohali') }}"     style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">Ready to Move flats in Mohali</a>
       </div>
 
       {{-- Home Loan SEO Links --}}
