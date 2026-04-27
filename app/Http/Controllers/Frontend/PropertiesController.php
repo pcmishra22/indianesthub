@@ -165,6 +165,7 @@ class PropertiesController extends Controller
         $query = Property::with(['images', 'dealer', 'builder'])
             ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
             ->whereNotNull('price')
+            ->where('listing_status','active')
             ->where('price', '>', 0);
 
         // Keyword search
