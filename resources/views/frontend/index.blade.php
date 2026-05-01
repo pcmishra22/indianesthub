@@ -604,7 +604,7 @@
           $img = $cityImages[$cityName] ?? $fallbackImages[$i % count($fallbackImages)];
           $color = $cityColors[$i % count($cityColors)];
         @endphp
-        <div class="{{ $i < 2 ? 'col-lg-4 col-md-6' : 'col-lg-3 col-md-6' }}">
+        <div class="col-lg-3 col-md-6 mb-4"> {{-- Changed to consistently show 4 images per line --}}
           <a href="{{ route('properties', ['city' => $cityName]) }}" class="city-card">
             <img src="/assets/img/real-estate/{{ $img }}" alt="{{ $cityName }}" loading="lazy">
             <div class="city-card-overlay"></div>

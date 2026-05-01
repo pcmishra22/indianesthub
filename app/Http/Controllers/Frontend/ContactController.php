@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Frontend;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Contact;
+use App\Mail\ContactNotification;
+use Illuminate\Support\Facades\Mail;
 
 class ContactController extends Controller
 {
@@ -28,7 +30,14 @@ class ContactController extends Controller
             'message' => 'required|string',
         ]);
 
-        Contact::create($validated);
+        $contact = Contact::create($validated);
+
+        // Send email notifications to both admin email addresses
+        $emails = ['admin@indianesthub.com', 'pcmishra22@gmail.com'];
+        
+        foreach ($emails as $email) {
+            Mail::to($email)->send(new ContactNotification($contact));
+        }
 
         return redirect()->back()->with('success', 'Your message has been sent successfully!');
     }

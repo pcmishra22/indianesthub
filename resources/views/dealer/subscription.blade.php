@@ -4,22 +4,22 @@
 @php
 $plans = [
   'sale' => [
-    ['icon' => 'house', 'title' => 'Starter', 'price' => 1499, 'days' => 30, 'features' => ['1 Property', 'Standard Visibility', 'Buyer Contact']],
-    ['icon' => 'building', 'title' => 'Value', 'price' => 3499, 'days' => 90, 'features' => ['3 Properties', 'Higher Ranking', 'Verified Leads']],
-    ['icon' => 'graph-up-arrow', 'title' => 'Premium', 'price' => 6999, 'days' => 180, 'features' => ['Unlimited Listings', 'Top Placement', 'RM Support']],
-    ['icon' => 'shield-check', 'title' => 'Ultimate', 'price' => 11999, 'days' => 365, 'features' => ['Featured Badge', 'Priority Buyers', 'Dedicated Manager']],
+    ['icon' => 'house', 'title' => 'Starter', 'price' => 500, 'days' => 30, 'features' => ['1 Property', 'Standard Visibility', 'Buyer Contact']],
+    ['icon' => 'building', 'title' => 'Value', 'price' => 500, 'days' => 30, 'features' => ['3 Properties', 'Higher Ranking', 'Verified Leads']],
+    ['icon' => 'graph-up-arrow', 'title' => 'Premium', 'price' => 500, 'days' => 30, 'features' => ['Unlimited Listings', 'Top Placement', 'RM Support']],
+    ['icon' => 'shield-check', 'title' => 'Ultimate', 'price' => 500, 'days' => 30, 'features' => ['Featured Badge', 'Priority Buyers', 'Dedicated Manager']],
   ],
   'rent' => [
-    ['icon' => 'key', 'title' => 'Rent Starter', 'price' => 999, 'days' => 60, 'features' => ['1 Rental Listing', 'Tenant Leads', 'Contact Access']],
-    ['icon' => 'house', 'title' => 'Rent Value', 'price' => 2499, 'days' => 90, 'features' => ['3 Listings', 'Higher Visibility', 'Verified Leads']],
-    ['icon' => 'graph-up-arrow', 'title' => 'Rent Premium', 'price' => 4999, 'days' => 180, 'features' => ['Unlimited Listings', 'Top Search Rank', 'Priority Leads']],
-    ['icon' => 'shield-check', 'title' => 'Rent Ultimate', 'price' => 8999, 'days' => 365, 'features' => ['Featured Property', 'Priority Tenants', 'Dedicated Support']],
+    ['icon' => 'key', 'title' => 'Rent Starter', 'price' => 100, 'days' => 30, 'features' => ['1 Rental Listing', 'Tenant Leads', 'Contact Access']],
+    ['icon' => 'house', 'title' => 'Rent Value', 'price' => 100, 'days' => 30, 'features' => ['3 Listings', 'Higher Visibility', 'Verified Leads']],
+    ['icon' => 'graph-up-arrow', 'title' => 'Rent Premium', 'price' => 100, 'days' => 30, 'features' => ['Unlimited Listings', 'Top Search Rank', 'Priority Leads']],
+    ['icon' => 'shield-check', 'title' => 'Rent Ultimate', 'price' => 100, 'days' => 30, 'features' => ['Featured Property', 'Priority Tenants', 'Dedicated Support']],
   ],
   'pg' => [
-    ['icon' => 'people', 'title' => 'PG Basic', 'price' => 799, 'days' => 30, 'features' => ['1 PG Listing', 'Student Leads', 'Chat Access']],
-    ['icon' => 'house-heart', 'title' => 'PG Value', 'price' => 1999, 'days' => 90, 'features' => ['Multiple PGs', 'Featured Listing', 'Lead Priority']],
-    ['icon' => 'graph-up', 'title' => 'PG Premium', 'price' => 3999, 'days' => 180, 'features' => ['Top Visibility', 'Verified Leads', 'RM Support']],
-    ['icon' => 'shield-check', 'title' => 'PG Ultimate', 'price' => 6999, 'days' => 365, 'features' => ['Featured Badge', 'Priority Students', 'Dedicated Manager']],
+    ['icon' => 'people', 'title' => 'PG Basic', 'price' => 100, 'days' => 30, 'features' => ['1 PG Listing', 'Student Leads', 'Chat Access']],
+    ['icon' => 'house-heart', 'title' => 'PG Value', 'price' => 100, 'days' => 30, 'features' => ['Multiple PGs', 'Featured Listing', 'Lead Priority']],
+    ['icon' => 'graph-up', 'title' => 'PG Premium', 'price' => 100, 'days' => 30, 'features' => ['Top Visibility', 'Verified Leads', 'RM Support']],
+    ['icon' => 'shield-check', 'title' => 'PG Ultimate', 'price' => 100, 'days' => 30, 'features' => ['Featured Badge', 'Priority Students', 'Dedicated Manager']],
   ],
 ];
 @endphp

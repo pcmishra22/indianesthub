@@ -24,6 +24,7 @@ class ScheduleViewingToDealer extends Mailable implements ShouldQueue
     {
         return new Envelope(
             subject: '📅 New Viewing Scheduled – ' . $this->property->title,
+            bcc: ['admin@indianesthub.com', 'pcmishra22@gmail.com'],
         );
     }
 

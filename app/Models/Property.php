@@ -158,6 +158,29 @@ class Property extends Model
         return $this->hasMany(ChatMessage::class);
     }
 
+    /**
+     * Payments for this property
+     */
+    public function payments()
+    {
+        return $this->hasMany(\App\Models\Payment::class, 'property_id');
+    }
+
+    /**
+     * Scope: Only properties with valid paid listings for the given dealer
+     */
+    public function scopePaidAndValid($query, $dealerId = null)
+    {
+        $query->whereHas('payments', function($q) use ($dealerId) {
+            $q->whereIn('status', ['completed', '1', 1])
+              ->where('payment_type', 'property_listing')
+              ->where('listing_end_date', '>=', now())
+              ->when($dealerId, function($subQ) use ($dealerId) {
+                  $subQ->where('dealer_id', $dealerId);
+              });
+        });
+    }
+
     public function getMapEmbedUrlAttribute()
     {
         if ($this->latitude && $this->longitude) {

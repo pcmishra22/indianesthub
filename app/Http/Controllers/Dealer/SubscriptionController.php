@@ -50,25 +50,25 @@ class SubscriptionController extends Controller
 
     private function getPlanAmount($type, $plan)
     {
-        // You can move this to config or DB as needed
+        // Fixed pricing: ₹100/month for rental, ₹500/month for sale
         $plans = [
             'sale' => [
-                'Starter' => 1499,
-                'Value' => 3499,
-                'Premium' => 6999,
-                'Ultimate' => 11999,
+                'Starter' => 500,
+                'Value' => 500,
+                'Premium' => 500,
+                'Ultimate' => 500,
             ],
             'rent' => [
-                'Rent Starter' => 999,
-                'Rent Value' => 2499,
-                'Rent Premium' => 4999,
-                'Rent Ultimate' => 8999,
+                'Rent Starter' => 100,
+                'Rent Value' => 100,
+                'Rent Premium' => 100,
+                'Rent Ultimate' => 100,
             ],
             'pg' => [
-                'PG Basic' => 799,
-                'PG Value' => 1999,
-                'PG Premium' => 3999,
-                'PG Ultimate' => 6999,
+                'PG Basic' => 100,
+                'PG Value' => 100,
+                'PG Premium' => 100,
+                'PG Ultimate' => 100,
             ],
         ];
         return $plans[$type][$plan] ?? 0;

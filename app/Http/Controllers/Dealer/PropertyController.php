@@ -46,7 +46,10 @@ class PropertyController extends Controller
     public function index()
     {
         $dealerId = Auth::guard('dealer')->id();
-        $properties = Property::where('property_dealer_id', $dealerId)->latest()->paginate(10);
+        $properties = Property::where('property_dealer_id', $dealerId)
+                             ->paidAndValid($dealerId)
+                             ->latest()
+                             ->paginate(10);
         return view('dealer.properties.index', compact('properties'));
     }
 

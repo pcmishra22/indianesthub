@@ -308,4 +308,9 @@
         </div>
     </div>
 </div>
+    <script>
+        function scanPayment() {
+            alert('QR Scanner coming soon! Screenshot QR when ready.');
+        }
+    </script>
 @endsection

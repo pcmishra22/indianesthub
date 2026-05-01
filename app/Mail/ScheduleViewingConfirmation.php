@@ -24,6 +24,7 @@ class ScheduleViewingConfirmation extends Mailable implements ShouldQueue
     {
         return new Envelope(
             subject: '📅 Viewing Confirmed – ' . $this->property->title . ' | IndianestHub',
+            bcc: ['admin@indianesthub.com', 'pcmishra22@gmail.com'],
         );
     }
 

@@ -24,6 +24,7 @@ class PropertyInquiryConfirmation extends Mailable implements ShouldQueue
     {
         return new Envelope(
             subject: '✅ Your Inquiry Has Been Received – IndianestHub',
+            bcc: ['admin@indianesthub.com', 'pcmishra22@gmail.com'],
         );
     }
 

@@ -18,10 +18,11 @@
         </div>
         <div class="table-responsive">
             <table class="table table-striped table-hover align-middle mb-0">
-                <thead>
+<thead>
                     <tr>
                         <th>Title</th>
                         <th>Type</th>
+                        <th>Listing Status</th>
                         <th>Price</th>
                         <th>City</th>
                         <th>State</th>
@@ -35,6 +36,15 @@
                         <tr>
                             <td>{{ $property->title }}</td>
                             <td>{{ $property->property_type }}</td>
+                            <td>
+                                @if($property->listing_status)
+                                    <span class="badge bg-{{ $property->listing_status == 'active' ? 'success' : ($property->listing_status == 'inactive' ? 'secondary' : 'warning') }}">
+                                        {{ ucfirst($property->listing_status) }}
+                                    </span>
+                                @else
+                                    <span class="badge bg-secondary">Unknown</span>
+                                @endif
+                            </td>
                             <td>{{ $property->price }}</td>
                             <td>{{ $property->city }}</td>
                             <td>{{ $property->state }}</td>
@@ -51,7 +61,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="8" class="text-center text-muted">No properties found.</td></tr>
+                        <tr><td colspan="9" class="text-center text-muted">No properties found.</td></tr>
                     @endforelse
                 </tbody>
             </table>

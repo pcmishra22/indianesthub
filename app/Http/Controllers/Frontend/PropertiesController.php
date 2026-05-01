@@ -8,9 +8,6 @@ use Illuminate\Http\Request;
 
 class PropertiesController extends Controller
 {
-    /**
-     * Auto-complete suggestions for search fields.
-     */
     public function autocomplete(Request $request)
     {
         $term = $request->get('term', '');
@@ -37,10 +34,6 @@ class PropertiesController extends Controller
         return response()->json(array_values($suggestions));
     }
 
-    /**
-     * All known locations with their center coordinates (from Dhakoli reference point).
-     * Used by locationSearch() to build 10 km bounding box queries.
-     */
     public function getLocationMap(): array
     {
         return [
@@ -73,10 +66,6 @@ class PropertiesController extends Controller
         ];
     }
 
-    /**
-     * Properties in a specific location — shows that city + anything within 10 km.
-     * URL: /properties/in/{location}  e.g. /properties/in/dhakoli
-     */
     public function locationSearch(Request $request, string $location)
     {
         $locations = $this->getLocationMap();
@@ -87,7 +76,7 @@ class PropertiesController extends Controller
         }
 
         $loc      = $locations[$slug];
-        $radius   = 10; // km
+        $radius   = 10;
         $latDelta = $radius / 111.0;
         $lngDelta = $radius / 96.5;
 
@@ -97,23 +86,21 @@ class PropertiesController extends Controller
         $maxLng = $loc['lng'] + $lngDelta;
 
         $query = Property::with(['images', 'dealer', 'builder'])
+            ->paidAndValid()
             ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
             ->whereNotNull('price')
             ->where('price', '>', 0)
             ->where(function ($q) use ($loc, $minLat, $maxLat, $minLng, $maxLng) {
-                // Coordinate-based: bounding box ≈ 10 km radius
                 $q->where(function ($inner) use ($minLat, $maxLat, $minLng, $maxLng) {
                     $inner->whereNotNull('latitude')
                           ->whereNotNull('longitude')
-                          ->whereBetween('latitude',  [$minLat, $maxLat])
+                          ->whereBetween('latitude', [$minLat, $maxLat])
                           ->whereBetween('longitude', [$minLng, $maxLng]);
                 })
-                // Fallback: city/locality name match (catches older listings without coords)
-                ->orWhere('city',     'like', '%' . $loc['label'] . '%')
+                ->orWhere('city', 'like', '%' . $loc['label'] . '%')
                 ->orWhere('locality', 'like', '%' . $loc['label'] . '%');
             });
 
-        // Common filters (reused from index)
         if ($request->filled('property_type')) $query->where('property_type', $request->property_type);
         if ($request->filled('looking_for')) {
             $lf = $request->looking_for;
@@ -123,52 +110,48 @@ class PropertiesController extends Controller
                 $query->where('looking_for', $lf);
             }
         }
-        if ($request->filled('bhk_type'))          $query->where('bhk_type',          $request->bhk_type);
-        if ($request->filled('min_price'))          $query->where('price', '>=',       $request->min_price);
-        if ($request->filled('max_price'))          $query->where('price', '<=',       $request->max_price);
-        if ($request->filled('min_area'))           $query->where('area',  '>=',       $request->min_area);
-        if ($request->filled('max_area'))           $query->where('area',  '<=',       $request->max_area);
-        if ($request->filled('bedrooms'))           $query->where('bedrooms', '>=',    $request->bedrooms);
-        if ($request->filled('furnishing_status'))  $query->where('furnishing_status', $request->furnishing_status);
-        if ($request->filled('pet_friendly'))       $query->where('pet_friendly',      true);
-        if ($request->filled('gated_society'))      $query->where('gated_society',     true);
-        if ($request->filled('vastu_compliant'))    $query->where('vastu_compliant',   true);
+        if ($request->filled('bhk_type')) $query->where('bhk_type', $request->bhk_type);
+        if ($request->filled('min_price')) $query->where('price', '>=', $request->min_price);
+        if ($request->filled('max_price')) $query->where('price', '<=', $request->max_price);
+        if ($request->filled('min_area')) $query->where('area', '>=', $request->min_area);
+        if ($request->filled('max_area')) $query->where('area', '<=', $request->max_area);
+        if ($request->filled('bedrooms')) $query->where('bedrooms', '>=', $request->bedrooms);
+        if ($request->filled('furnishing_status')) $query->where('furnishing_status', $request->furnishing_status);
+        if ($request->filled('pet_friendly')) $query->where('pet_friendly', true);
+        if ($request->filled('gated_society')) $query->where('gated_society', true);
+        if ($request->filled('vastu_compliant')) $query->where('vastu_compliant', true);
 
         $sortBy = $request->get('sort_by', 'newest');
         switch ($sortBy) {
-            case 'price_low':  $query->orderBy('price', 'asc');  break;
+            case 'price_low':  $query->orderBy('price', 'asc'); break;
             case 'price_high': $query->orderBy('price', 'desc'); break;
-            case 'area':       $query->orderBy('area',  'desc'); break;
-            default:
-                $query->orderByRaw('is_boosted DESC, boosted_until DESC, is_featured DESC, is_premium DESC, created_at DESC');
+            case 'area': $query->orderBy('area', 'desc'); break;
+            default: $query->orderByRaw('is_boosted DESC, boosted_until DESC, is_featured DESC, is_premium DESC, created_at DESC');
         }
 
-        $properties    = $query->paginate(12)->withQueryString();
-        $cities        = Property::whereNotNull('city')->distinct()->pluck('city')->filter()->sort();
+        $properties = $query->paginate(24)->withQueryString();
+        $cities = Property::whereNotNull('city')->distinct()->pluck('city')->filter()->sort();
         $propertyTypes = Property::whereNotNull('property_type')->distinct()->pluck('property_type')->filter()->sort();
-        $locationLabel  = $loc['label'];
+        $locationLabel = $loc['label'];
         $locationRadius = $radius;
 
-        // SEO enhancements for location pages
-        $seoTitle       = "Properties in {$locationLabel} | Buy & Rent Flats, Villas & Plots | IndianestHub";
+        $seoTitle = "Properties in {$locationLabel} | Buy & Rent Flats, Villas & Plots | IndianestHub";
         $seoDescription = "Browse {$properties->total()} verified properties in {$locationLabel} and nearby areas within {$radius} km. Find flats, villas, plots for sale & rent. Connect with verified agents on IndianestHub.";
-        $seoH1          = "Properties in {$locationLabel}";
-        $seoIntro       = "Looking for property in {$locationLabel}? IndianestHub lists {$properties->total()} verified properties within {$radius} km of {$locationLabel} — including flats, villas, plots and commercial spaces. Browse by BHK type, budget and property status to find your perfect match.";
+        $seoH1 = "Properties in {$locationLabel}";
+        $seoIntro = "Looking for property in {$locationLabel}? IndianestHub lists {$properties->total()} verified properties within {$radius} km of {$locationLabel} — including flats, villas, plots and commercial spaces. Browse by BHK type, budget and property status to find your perfect match.";
 
-        return view('frontend.properties',
-            compact('properties', 'cities', 'propertyTypes', 'locationLabel', 'locationRadius',
-                    'seoTitle', 'seoDescription', 'seoH1', 'seoIntro'));
+        return view('frontend.properties', compact('properties', 'cities', 'propertyTypes', 'locationLabel', 'locationRadius', 'seoTitle', 'seoDescription', 'seoH1', 'seoIntro'));
     }
 
     public function index(Request $request)
     {
         $query = Property::with(['images', 'dealer', 'builder'])
+            ->paidAndValid()
             ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
             ->whereNotNull('price')
-            ->where('listing_status','active')
+            ->where('listing_status', 'active')
             ->where('price', '>', 0);
 
-        // Keyword search
         if ($request->filled('keyword')) {
             $keyword = $request->keyword;
             $query->where(function ($q) use ($keyword) {
@@ -180,14 +163,9 @@ class PropertiesController extends Controller
             });
         }
 
-        // Location filters
         if ($request->filled('city')) $query->where('city', $request->city);
         if ($request->filled('locality')) $query->where('locality', 'like', "%{$request->locality}%");
-
-        // Property type
         if ($request->filled('property_type')) $query->where('property_type', $request->property_type);
-
-        // Looking for (Buy/Sale/Sell/Rent/PG)
         if ($request->filled('looking_for')) {
             $lf = $request->looking_for;
             if (in_array($lf, ['Sale', 'Buy', 'buy', 'sale'])) {
@@ -196,52 +174,30 @@ class PropertiesController extends Controller
                 $query->where('looking_for', $lf);
             }
         }
-
-        // BHK type
         if ($request->filled('bhk_type')) $query->where('bhk_type', $request->bhk_type);
-
-        // Price range
         if ($request->filled('min_price')) $query->where('price', '>=', $request->min_price);
         if ($request->filled('max_price')) $query->where('price', '<=', $request->max_price);
-
-        // Area range
         if ($request->filled('min_area')) $query->where('area', '>=', $request->min_area);
         if ($request->filled('max_area')) $query->where('area', '<=', $request->max_area);
-
-        // Bedrooms
         if ($request->filled('bedrooms')) $query->where('bedrooms', '>=', $request->bedrooms);
-
-        // Furnishing
         if ($request->filled('furnishing_status')) $query->where('furnishing_status', $request->furnishing_status);
-
-        // Boolean filters
         if ($request->filled('pet_friendly')) $query->where('pet_friendly', true);
         if ($request->filled('gated_society')) $query->where('gated_society', true);
         if ($request->filled('vastu_compliant')) $query->where('vastu_compliant', true);
 
-        // Sorting
         $sortBy = $request->get('sort_by', 'newest');
         switch ($sortBy) {
-            case 'price_low':
-                $query->orderBy('price', 'asc');
-                break;
-            case 'price_high':
-                $query->orderBy('price', 'desc');
-                break;
-            case 'area':
-                $query->orderBy('area', 'desc');
-                break;
-            default: // newest + placement priority
-                $query->orderByRaw('is_boosted DESC, boosted_until DESC, is_featured DESC, is_premium DESC, created_at DESC');
-                break;
+            case 'price_low': $query->orderBy('price', 'asc'); break;
+            case 'price_high': $query->orderBy('price', 'desc'); break;
+            case 'area': $query->orderBy('area', 'desc'); break;
+            default: $query->orderByRaw('is_boosted DESC, boosted_until DESC, is_featured DESC, is_premium DESC, created_at DESC'); break;
         }
 
-        $properties = $query->paginate(12)->withQueryString();
-
-        // Get filter data for dropdowns
+        $properties = $query->paginate(24)->withQueryString();
         $cities = Property::whereNotNull('city')->distinct()->pluck('city')->filter()->sort();
         $propertyTypes = Property::whereNotNull('property_type')->distinct()->pluck('property_type')->filter()->sort();
 
         return view('frontend.properties', compact('properties', 'cities', 'propertyTypes'));
-    }
 }
+}
+

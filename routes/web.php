@@ -245,13 +245,33 @@ Route::get('/resale-flats-in-{city}',
     [\App\Http\Controllers\Frontend\SeoLandingController::class, 'resaleFlatsInCity'])
     ->name('seo.resale.city');
 
+Route::get('/furnished-flats-in-{city}',
+    [\App\Http\Controllers\Frontend\SeoLandingController::class, 'furnishedFlatsInCity'])
+    ->name('seo.furnished.city');
+
+Route::get('/apartments-in-{city}',
+    [\App\Http\Controllers\Frontend\SeoLandingController::class, 'apartmentsInCity'])
+    ->name('seo.apartments.city');
+
+Route::get('/property-listings-in-{city}',
+    [\App\Http\Controllers\Frontend\SeoLandingController::class, 'propertyListingsInCity'])
+    ->name('seo.listings.city');
+
+Route::get('/{city}-real-estate',
+    [\App\Http\Controllers\Frontend\SeoLandingController::class, 'realEstateInCity'])
+    ->name('seo.realestate.city');
+
+Route::get('/flats-in-{city}-with-loan-facility',
+    [\App\Http\Controllers\Frontend\SeoLandingController::class, 'loanFacilityFlatsInCity'])
+    ->name('seo.loan.facility.city');
+
 // ── Generic city-level pages (catch-all — must be last in this group) ──
 Route::get('/flats-in-{city}',          [\App\Http\Controllers\Frontend\SeoLandingController::class, 'flatsInCity'])->name('seo.flats.city');
 Route::get('/rent-flats-in-{city}',     [\App\Http\Controllers\Frontend\SeoLandingController::class, 'rentFlatsInCity'])->name('seo.rent.city');
 Route::get('/plots-in-{city}',          [\App\Http\Controllers\Frontend\SeoLandingController::class, 'plotsInCity'])->name('seo.plots.city');
 Route::get('/villas-in-{city}',         [\App\Http\Controllers\Frontend\SeoLandingController::class, 'villasInCity'])->name('seo.villas.city');
 Route::get('/new-projects-in-{city}',   [\App\Http\Controllers\Frontend\SeoLandingController::class, 'newProjectsInCity'])->name('seo.projects.city');
-Route::get('/ready-to-move-flats-{city}', [\App\Http\Controllers\Frontend\SeoLandingController::class, 'readyToMoveIn'])->name('seo.rtm.city');
+Route::get('/ready-to-move-flats-in-{city}', [\App\Http\Controllers\Frontend\SeoLandingController::class, 'readyToMoveIn'])->name('seo.rtm.city');
 Route::get('/{bhk}bhk-flats-in-{city}', [\App\Http\Controllers\Frontend\SeoLandingController::class, 'bhkFlatsInCity'])
      ->name('seo.bhk.city')
      ->where('bhk', '[1-5]');
@@ -405,6 +425,7 @@ Route::prefix('dealer')->middleware('auth:dealer')->name('dealer.')->group(funct
 
     // Properties CRUD
     Route::resource('properties', DealerPropertyController::class);
+    Route::post('/properties/{property}/pay', [DealerPropertyController::class, 'payProperty'])->name('properties.pay');
     // Bulk CSV upload
     Route::get('/properties/upload-csv', [DealerPropertyController::class, 'showCsvUploadForm'])->name('properties.uploadCsvForm');
         Route::post('/properties/upload-csv', [DealerPropertyController::class, 'uploadCsv'])->name('properties.uploadCsv');
