@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Builder;
 use App\Models\BuilderProject;
 use App\Models\BuilderLead;
+use App\Services\WhatsAppNotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 
 class BuilderController extends Controller
 {
@@ -119,7 +122,7 @@ class BuilderController extends Controller
             'lead_type' => ['required', 'in:general,visit,callback,brochure,whatsapp'],
         ]);
 
-        BuilderLead::create([
+        $lead = BuilderLead::create([
             'builder_id'         => $project->builder_id,
             'builder_project_id' => $project->id,
             'name'               => $validated['name'],
@@ -134,10 +137,70 @@ class BuilderController extends Controller
         // Update leads count on project
         $project->increment('leads_count');
 
+        // Handle Notifications
+        try {
+            $this->sendLeadNotifications($lead, $project);
+        } catch (\Exception $e) {
+            Log::error("Builder lead notification failed: " . $e->getMessage());
+        }
+
         if ($request->expectsJson()) {
             return response()->json(['success' => true, 'message' => 'Your enquiry has been submitted. We will contact you shortly!']);
         }
 
         return back()->with('success', 'Your enquiry has been submitted. We will contact you shortly!');
+    }
+
+    /**
+     * Send email and WhatsApp notifications for new builder leads.
+     */
+    private function sendLeadNotifications(BuilderLead $lead, BuilderProject $project): void
+    {
+        $builder = $project->builder;
+        $messageText = "New Lead for Project: {$project->name}\n" .
+                       "Name: {$lead->name}\n" .
+                       "Email: {$lead->email}\n" .
+                       "Phone: {$lead->phone}\n" .
+                       "Type: {$lead->lead_type}\n" .
+                       "Message: {$lead->message}";
+
+        Log::info("Processing lead notifications for Lead ID: {$lead->id}");
+
+        $fromAddress = config('mail.from.address', 'support@indianesthub.com');
+        $fromName = config('mail.from.name', 'India Nest Hub');
+
+        // 1. Notify Builder
+        if ($builder && $builder->email) {
+            Log::info("Attempting to email builder: {$builder->email}");
+            Mail::raw($messageText, function ($message) use ($builder, $fromAddress, $fromName) {
+                $message->from($fromAddress, $fromName)
+                        ->to($builder->email)
+                        ->subject('New Project Lead Received');
+            });
+            
+            if ($builder->phone) {
+                $this->sendWhatsAppNotification($builder->phone, "New lead for your project {$project->name}: {$lead->name}, {$lead->phone}");
+            }
+        }
+
+        // 2. Notify Admin
+        $adminEmail = config('app.contact_email', 'admin@indianesthub.com');
+        Log::info("Attempting to email admin: {$adminEmail}");
+        Mail::raw("Admin Alert - New Builder Lead:\n" . $messageText, function ($message) use ($adminEmail, $fromAddress, $fromName) {
+            $message->from($fromAddress, $fromName)
+                    ->to($adminEmail)->subject('New Builder Lead Notification');
+        });
+
+        $adminWhatsApp = config('app.whatsapp_number', '9876543210');
+        $this->sendWhatsAppNotification($adminWhatsApp, "New lead for project {$project->name}: {$lead->name}");
+    }
+
+/**
+     * Send WhatsApp notification using the WhatsAppNotificationService.
+     */
+    private function sendWhatsAppNotification(string $recipientNumber, string $message): void
+    {
+        $whatsappService = new WhatsAppNotificationService();
+        $whatsappService->send($recipientNumber, $message);
     }
 }

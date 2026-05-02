@@ -38,6 +38,6 @@
 <div class="bw">
   <a href="https://wa.me/91{{ $inquiry->phone }}?text=Hi {{ urlencode($inquiry->name) }}, I'm calling from {{ config('app.name') }} regarding your inquiry for {{ urlencode($property->title) }}." class="btn btn-wa">💬 WhatsApp Buyer Now</a>
   &nbsp;
-  <a href="{{ route('dealer.inquiries') }}" class="btn-o">View All Inquiries</a>
+  <a href="{{ url('/dealer/inquiries') }}" class="btn-o">View All Inquiries</a>
 </div>
 @endsection

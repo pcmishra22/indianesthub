@@ -20,11 +20,10 @@ class PropertyInquiryToDealer extends Mailable implements ShouldQueue
         public Property $property
     ) {}
 
-    public function envelope(): Envelope
+public function envelope(): Envelope
     {
         return new Envelope(
             subject: '🔔 New Inquiry Received – ' . $this->property->title,
-            bcc: ['admin@indianesthub.com', 'pcmishra22@gmail.com'],
         );
     }
 

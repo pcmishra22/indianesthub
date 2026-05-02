@@ -11,8 +11,10 @@ use App\Models\LoanLead;
 use App\Models\Property;
 use App\Models\PropertyView;
 use App\Models\RecentlyViewed;
+use App\Services\WhatsAppNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class PropertyDetailsController extends Controller
@@ -106,17 +108,67 @@ class PropertyDetailsController extends Controller
         $inquiry->save();
 
         // ── Fire queued emails ────────────────────────────────────────────────
-        // 1) Notify the dealer about the new inquiry
+        $fromAddress = config('mail.from.address', 'support@indianesthub.com');
+        $fromName = config('mail.from.name', 'India Nest Hub');
+
+// 1) Notify the dealer about the new inquiry
+        $dealer = null;
         if ($property && $property->property_dealer_id) {
             $dealer = Dealer::find($property->property_dealer_id);
-            if ($dealer && $dealer->email) {
-                Mail::to($dealer->email)->queue(new PropertyInquiryToDealer($inquiry, $property));
+            Log::info("Property Dealer ID: " . $property->property_dealer_id . " - Dealer found: " . ($dealer ? $dealer->email : 'null'));
+if ($dealer && $dealer->email) {
+                Log::info("Sending dealer email to: " . $dealer->email);
+                Mail::to($dealer->email)->send(new PropertyInquiryToDealer($inquiry, $property));
+                
+                // WhatsApp notification to dealer
+                if ($dealer->phone) {
+                    Log::info("Sending WhatsApp to dealer: " . $dealer->phone);
+                    $this->sendWhatsAppNotification(
+                        $dealer->phone,
+                        "New inquiry for your property '{$property->title}'. From: {$validated['name']}, Phone: {$validated['phone']}."
+                    );
+                }
             }
+        } else {
+            Log::warning("Property has no property_dealer_id set. Property ID: " . ($property ? $property->id : 'null'));
         }
 
-        // 2) Send confirmation to the buyer
-        Mail::to($inquiry->email)->queue(new PropertyInquiryConfirmation($inquiry, $property));
-        // ─────────────────────────────────────────────────────────────────────
+// 2) Send confirmation to the buyer
+        Mail::to($inquiry->email)->send(new PropertyInquiryConfirmation($inquiry, $property));
+
+        // 3) Send notification to admins (admin@indianesthub.com and pcmishra22@gmail.com)
+        $adminRecipients = array_unique(array_filter([
+            config('app.contact_email'),
+            'admin@indianesthub.com',
+            'pcmishra22@gmail.com'
+        ]));
+
+        if (!empty($adminRecipients)) {
+            $adminMessage = "Site Admin: New property inquiry received.\n\n" .
+                "Property: {$property->title} (ID: {$property->id})\n" .
+                "Name: {$validated['name']}\n" .
+                "Email: {$validated['email']}\n" .
+                "Phone: {$validated['phone']}\n" .
+                "Message: {$validated['message']}\n" .
+                "Property Link: " . url('/properties/' . $property->id);
+
+            Mail::raw($adminMessage, function ($message) use ($adminRecipients, $fromAddress, $fromName) {
+                $message->from($fromAddress, $fromName)
+                    ->to($adminRecipients)
+                    ->subject('New Property Inquiry - Admin Notification');
+            });
+
+// WhatsApp notification to admin
+            $adminWhatsAppNumber = config('app.whatsapp_number', '7340753780');
+            Log::info("Admin WhatsApp number: " . $adminWhatsAppNumber);
+            if ($adminWhatsAppNumber) {
+                $this->sendWhatsAppNotification(
+                    $adminWhatsAppNumber,
+                    "New property inquiry for '{$property->title}'. Contact: {$validated['name']}, {$validated['phone']}."
+                );
+            }
+        }
+        // ──────────────────────────────────────────────────────────────────────
 
         // Auto-create a LoanLead if user checked "needs loan assistance"
         if ($request->boolean('needs_loan')) {
@@ -168,5 +220,14 @@ class PropertyDetailsController extends Controller
         if (str_contains($ua, 'safari'))   return 'Safari';
         if (str_contains($ua, 'msie') || str_contains($ua, 'trident')) return 'IE';
         return 'Other';
+    }
+
+/**
+     * Send WhatsApp notification using the WhatsAppNotificationService.
+     */
+    private function sendWhatsAppNotification(string $recipientNumber, string $message): void
+    {
+        $whatsappService = new WhatsAppNotificationService();
+        $whatsappService->send($recipientNumber, $message);
     }
 }

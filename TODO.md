@@ -1,22 +1,37 @@
-# Public Properties Payment Filter - Complete ✅
+# WhatsApp Notification Fix Plan
 
-## Final Implementation
-**Both** dealer dashboard AND public `/properties` now filter to **only paid listings** (`payment_type='property_listing'`, `status='completed'`, `listing_end_date >= today`).
+## Task: Fix WhatsApp Notification - All enquiries should notify to admin AND dealer WhatsApp numbers
 
-**Updated**:
-- Frontend\\PropertiesController::index() + locationSearch(): Added `->paidAndValid()` early.
+### Information Gathered:
+- Both `InquiryController` and `PropertyDetailsController` have placeholder `sendWhatsAppNotification()` methods that only log messages (not real)
+- Admin WhatsApp number is configured via `config('app.whatsapp_number')` 
+- Dealer WhatsApp comes from dealer's phone number in property
+- The code already tries to send to both, but they are just simulated (logged)
 
-**Current State** (per Tinker):
-- 3155 total properties
-- 0 filtered (no payments data yet - expected)
+### Current Code Flow:
+1. Dealer gets email + WhatsApp notification (simulated)
+2. Admin gets email + WhatsApp notification (simulated)
+3. Buyer gets confirmation email
 
-**Usage**:
-1. In Tinker terminal: 
-```
-$p = App\\Models\\Property::inRandomOrder()->first(); echo $p->property_dealer_id, ' ', $p->id;
-$pay = new App\\Models\\Payment; $pay->dealer_id = $p->property_dealer_id; $pay->property_id = $p->id; $pay->status = 'completed'; $pay->payment_type = 'property_listing'; $pay->plan_name = 'Monthly'; $pay->amount = 999; $pay->listing_start_date = '2024-10-01'; $pay->listing_end_date = now()->addMonth(); $pay->save();
-```
-2. Repeat 5x.
-3. Visit http://127.0.0.1:8000/properties - only those show!
+### Plan:
+1. Create a WhatsAppNotificationService that can send real WhatsApp messages via WhatsApp Business API
+2. Update InquiryController to use the real service
+3. Update PropertyDetailsController to use the real service
+4. Add required WhatsApp Business API configuration to config/app.php
 
-Feature **fully implemented**. Dealer pays → property lists publicly.
+### Dependent Files to be edited:
+- app/Http/Controllers/Dealer/InquiryController.php
+- app/Http/Controllers/Frontend/PropertyDetailsController.php
+- config/app.php (optional - add WhatsApp config)
+
+### Followup Steps:
+- Test by submitting an inquiry
+- Verify WhatsApp messages are received on both admin and dealer numbers
+
+---
+
+### TODO List:
+- [ ] 1. Create WhatsAppNotificationService with real API integration
+- [ ] 2. Update InquiryController to use the service
+- [ ] 3. Update PropertyDetailsController to use the service  
+- [ ] 4. Test the WhatsApp notifications

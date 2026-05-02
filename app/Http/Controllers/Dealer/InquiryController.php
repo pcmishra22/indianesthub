@@ -5,10 +5,11 @@ namespace App\Http\Controllers\Dealer;
 use App\Http\Controllers\Controller;
 use App\Models\Inquiry;
 use App\Models\Property;
+use App\Services\WhatsAppNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Log; // Added for simulated WhatsApp notification
+use Illuminate\Support\Facades\Log;
 
 class InquiryController extends Controller
 {
@@ -21,9 +22,11 @@ class InquiryController extends Controller
             'phone' => 'nullable|string|max:20',
             'message' => 'nullable|string',
         ]);
-        $property = Property::find($data['property_id']);
+        $property = Property::findOrFail($data['property_id']);
         $data['broker_id'] = $property ? $property->property_dealer_id : null;
         $inquiry = Inquiry::create($data);
+        
+        Log::info("Inquiry created for property ID: {$property->id}");
 
         $inquiryMessage = "New inquiry for property '{$property->title}' (ID: {$property->id}):\n" .
                           "Name: {$data['name']}\n" .
@@ -31,39 +34,64 @@ class InquiryController extends Controller
                           "Phone: {$data['phone']}\n" .
                           "Message: {$data['message']}";
 
-        // Email notification to owner/agent
+        // 1. Notification to Dealer/Owner
         $owner = $property ? $property->dealer : null;
-        if ($owner && $owner->email) {
-            Mail::raw(
-                $inquiryMessage,
-                function ($message) use ($owner, $property) {
-                    $message->to($owner->email)
-                            ->subject('New Property Inquiry');
-                }
-            );
+        $fromAddress = config('mail.from.address', 'support@indianesthub.com');
+        $fromName = config('mail.from.name', 'India Nest Hub');
 
-            // WhatsApp notification to dealer
-            if ($owner->phone) { // Assuming 'phone' field stores a WhatsApp-capable number
-                $this->sendWhatsAppNotification($owner->phone, "New inquiry for your property '{$property->title}'. From: {$data['name']}, Phone: {$data['phone']}.");
+        Log::info("Starting notification process for Inquiry ID: {$inquiry->id}");
+        Log::debug("Mailer Driver: " . config('mail.default'));
+
+        try {
+            if ($owner && $owner->email) {
+                Log::info("Attempting to send email to dealer: {$owner->email}");
+                Mail::raw(
+                    $inquiryMessage,
+                    function ($message) use ($owner, $fromAddress, $fromName) {
+                        $message->from($fromAddress, $fromName)
+                                ->to($owner->email)
+                                ->subject('New Property Inquiry');
+                    }
+                );
+                
+                if ($owner->phone) { // Assuming 'phone' field stores a WhatsApp-capable number
+                    $this->sendWhatsAppNotification($owner->phone, "New inquiry for your property '{$property->title}'. From: {$data['name']}, Phone: {$data['phone']}.");
+                }
+            } else {
+                Log::warning("No owner or email found for property ID: {$property->id}");
             }
+        } catch (\Exception $e) {
+            Log::error("Error sending dealer inquiry notification: " . $e->getMessage());
         }
 
-        // Email notification to site admin
-        $adminEmail = config('app.contact_email');
-        if ($adminEmail) {
-            Mail::raw(
-                "Site Admin: New inquiry received.\n" . $inquiryMessage . "\nProperty Link: " . url('/properties/' . $property->id), // Adjust route as necessary for public property view
-                function ($message) use ($adminEmail) {
-                    $message->to($adminEmail)
-                            ->subject('New Property Inquiry - Admin Notification');
-                }
-            );
-        }
+        // 2. Notification to Site Admins (Urgent Fix)
+        // We include both the configured admin email and the specific ones you provided
+        $adminRecipients = array_unique(array_filter([
+            config('app.contact_email'),
+            'admin@indianesthub.com',
+            'pcmishra22@gmail.com'
+        ]));
 
-        // WhatsApp notification to site admin
-        $adminWhatsAppNumber = config('app.whatsapp_number');
-        if ($adminWhatsAppNumber) {
-            $this->sendWhatsAppNotification($adminWhatsAppNumber, "New property inquiry for '{$property->title}'. Contact: {$data['name']}, {$data['phone']}.");
+        try {
+            if (!empty($adminRecipients)) {
+                Log::info("Attempting to send email to admins: " . implode(', ', $adminRecipients));
+                Mail::raw(
+                    "Site Admin: New inquiry received.\n" . $inquiryMessage . "\nProperty Link: " . url('/properties/' . $property->id), // Adjust route as necessary for public property view
+                    function ($message) use ($adminRecipients, $fromAddress, $fromName) {
+                        $message->from($fromAddress, $fromName)
+                                ->to($adminRecipients)
+                                ->subject('New Property Inquiry - Admin Notification');
+                    }
+                );
+            }
+
+            // 3. WhatsApp Notification to Admin
+            $adminWhatsAppNumber = config('app.whatsapp_number') ?: '7340753780';
+            if ($adminWhatsAppNumber) {
+                $this->sendWhatsAppNotification($adminWhatsAppNumber, "New property inquiry for '{$property->title}'. Contact: {$data['name']}, {$data['phone']}.");
+            }
+        } catch (\Exception $e) {
+            Log::error("Error sending admin inquiry notification: " . $e->getMessage());
         }
 
         return redirect()->back()->with('success', 'Inquiry submitted successfully!');
@@ -78,14 +106,12 @@ class InquiryController extends Controller
         return view('dealer.inquiries.index', compact('inquiries'));
     }
 
-    /**
-     * Placeholder for sending WhatsApp notifications.
-     * In a real application, this would integrate with a third-party WhatsApp API (e.g., Twilio, MessageBird).
-     * This method would handle the API calls, error handling, and message formatting.
-     * For this example, it only logs the message.
+/**
+     * Send WhatsApp notification using the WhatsAppNotificationService.
      */
     private function sendWhatsAppNotification(string $recipientNumber, string $message): void
     {
-        Log::info("WhatsApp Notification (simulated): To {$recipientNumber} - {$message}");
+        $whatsappService = new WhatsAppNotificationService();
+        $whatsappService->send($recipientNumber, $message);
     }
 }

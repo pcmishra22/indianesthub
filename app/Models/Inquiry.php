@@ -15,8 +15,13 @@ class Inquiry extends Model
         'ip_address', 'user_agent', 'source',
     ];
 
-    public function property()
+public function property()
     {
         return $this->belongsTo(\App\Models\Property::class);
+    }
+
+    public function broker()
+    {
+        return $this->belongsTo(\App\Models\Dealer::class, 'broker_id');
     }
 }
