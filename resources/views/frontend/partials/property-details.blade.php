@@ -1203,6 +1203,7 @@
             </div>
 
             <div class="pc-cta-row">
+              @auth
               @if($property->dealer && $property->dealer->phone)
               <a href="tel:{{ $property->dealer->phone }}" class="btn btn-light text-primary">
                 <i class="bi bi-telephone-fill me-1"></i>Call
@@ -1217,6 +1218,11 @@
                 <i class="bi bi-chat-dots-fill me-1"></i>Enquire
               </button>
               @endif
+              @else
+              <a href="{{ route('login') }}" class="btn btn-light text-primary w-100">
+                <i class="bi bi-lock-fill me-1"></i> Login to Contact
+              </a>
+              @endauth
             </div>
           </div>
 
@@ -1236,6 +1242,7 @@
               </div>
             </div>
 
+            @auth
             <div class="pd-contact-row">
               @if($property->dealer->phone)
               <div class="pd-contact-detail">
@@ -1264,6 +1271,11 @@
                 <i class="bi bi-chat-text"></i> Send Message
               </button>
             </div>
+            @else
+            <div class="alert alert-info py-2 mb-0" style="font-size: .85rem;">
+              <i class="bi bi-info-circle me-1"></i> Please <a href="{{ route('login') }}" class="fw-bold">Login</a> to view contact details.
+            </div>
+            @endauth
 
             <div class="pd-trust-row mt-3">
               <span class="pd-trust-badge"><i class="bi bi-shield-check-fill"></i> Safe & Verified</span>
@@ -1273,6 +1285,7 @@
           @endif
 
           {{-- Inquiry Form --}}
+          @auth
           <div class="pd-inquiry-card" id="inquiry-form-sidebar">
             <h5><i class="bi bi-envelope-fill me-2 text-primary"></i>Send Your Inquiry</h5>
             <form action="{{ route('property.inquiry.submit') }}" method="POST" id="property-inquiry-form">
@@ -1301,11 +1314,13 @@
               </button>
             </form>
           </div>
+          @endauth
 
           {{-- Schedule a Site Visit --}}
           @if($property->property_dealer_id)
           <div class="pd-inquiry-card" id="schedule-visit-card" style="background:linear-gradient(135deg,#f0f9ff 0%,#e0f2fe 100%);border:1.5px solid #bae6fd;">
             <h5><i class="bi bi-calendar2-check-fill me-2" style="color:#0284c7;"></i>Schedule a Site Visit</h5>
+            @auth
             <form id="schedule-viewing-form">
               @csrf
               <input type="hidden" name="property_id" value="{{ $property->id }}">
@@ -1384,6 +1399,12 @@
                 </div>
               </div>
             </form>
+            @else
+            <div class="text-center py-2">
+              <p class="small text-muted mb-2">Login to schedule a visit with the dealer.</p>
+              <a href="{{ route('login') }}" class="btn btn-sm btn-primary">Login Now</a>
+            </div>
+            @endauth
           </div>
           @endif
 

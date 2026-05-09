@@ -8,6 +8,7 @@ use App\Models\BuilderProject;
 use App\Models\BuilderLead;
 use App\Services\WhatsAppNotificationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 
@@ -56,6 +57,12 @@ class BuilderController extends Controller
     {
         abort_if($builder->status !== 'active', 404);
 
+        // Mask builder contact details if the user is not logged in
+        if (!Auth::check()) {
+            $builder->phone = 'Login to view';
+            $builder->email = 'Login to view';
+        }
+
         $builder->loadCount('projects');
 
         $projects = $builder->projects()
@@ -86,6 +93,12 @@ class BuilderController extends Controller
               ->orderBy('price');
         }]);
 
+        // Mask builder contact details if the user is not logged in
+        if (!Auth::check() && $project->builder) {
+            $project->builder->phone = 'Login to view';
+            $project->builder->email = 'Login to view';
+        }
+
         // Increment views
         $project->increment('views_count');
 
@@ -114,6 +127,14 @@ class BuilderController extends Controller
      */
     public function submitLead(Request $request, BuilderProject $project)
     {
+        // Restrict enquiry submission to logged-in users
+        if (!Auth::check()) {
+            if ($request->expectsJson()) {
+                return response()->json(['success' => false, 'message' => 'Please login to send an enquiry.'], 401);
+            }
+            return redirect()->route('login')->with('error', 'Please login to send an enquiry.');
+        }
+
         $validated = $request->validate([
             'name'      => ['required', 'string', 'max:100'],
             'email'     => ['nullable', 'email', 'max:150'],

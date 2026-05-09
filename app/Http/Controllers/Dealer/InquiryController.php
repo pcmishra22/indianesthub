@@ -15,6 +15,11 @@ class InquiryController extends Controller
 {
     public function store(Request $request)
     {
+        // Restrict inquiry submission to logged-in users
+        if (!Auth::check()) {
+            return redirect()->route('login')->with('error', 'Please login to send an inquiry.');
+        }
+
         $data = $request->validate([
             'property_id' => 'required|integer|exists:properties,id',
             'name' => 'required|string|max:255',

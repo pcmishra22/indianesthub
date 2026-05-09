@@ -9,12 +9,18 @@ use App\Models\LoanLead;
 use App\Models\ScheduleViewing;
 use App\Models\Property;
 use App\Models\Dealer;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 
 class ScheduleViewingController extends Controller
 {
     public function submit(Request $request)
     {
+        // Restrict scheduling viewings to logged-in users
+        if (!Auth::check()) {
+            return response()->json(['success' => false, 'message' => 'Please login to schedule a viewing.'], 401);
+        }
+
         $data = $request->validate([
             'property_id' => 'required|exists:properties,id',
             'dealer_id' => 'required|exists:property_dealers,id',
