@@ -3,12 +3,11 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Mail\SignupEmail;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
+use Illuminate\Auth\Events\Registered;
 use Illuminate\Validation\Rules\Password;
 
 class UserRegisterController extends Controller
@@ -34,10 +33,9 @@ class UserRegisterController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
-        Auth::guard('web')->login($user);
+        event(new Registered($user));
 
-        // Send welcome email via queue
-        Mail::to($user->email)->queue(new SignupEmail($user));
+        Auth::guard('web')->login($user);
 
         return redirect()->intended('/')->with('success', 'Registration successful! Welcome to IndianestHub.');
     }
