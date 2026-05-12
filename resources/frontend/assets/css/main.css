@@ -9798,3 +9798,18 @@ section,
 .starter-section {
   /* Add your styles here */
 }
+
+/*--------------------------------------------------------------
+# Banner Section
+--------------------------------------------------------------*/
+.banner-section {
+  padding: 40px 0; /* Add some padding around the banner */
+  text-align: center; /* Center the image */
+}
+
+.banner-section img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px; /* Optional: add some rounded corners */
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); /* Optional: add a subtle shadow */
+}

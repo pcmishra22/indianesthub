@@ -336,6 +336,15 @@
 ════════════════════════════════════════════════════════ --}}
 <section class="hs-section white">
   <div class="container">
+    <div class="col-12 mb-4">
+      <img
+        src="{{ asset('assets/img/loan_and_properties_banner.png') }}"
+        alt="Loans & Properties"
+        class="img-fluid rounded"
+        loading="lazy"
+      >
+    </div>
+
     <div class="hs-section-title">
       <span class="hs-badge">Browse by Category</span>
       <h2>What Are You Looking For?</h2>
@@ -410,6 +419,9 @@
       <p>Handpicked premium listings across India's top cities</p>
     </div>
     <div class="row g-4">
+
+
+
       @forelse($featuredProperties->take(6) as $property)
         @php
           $imgUrl = homeImg($property, $fallbackImages);

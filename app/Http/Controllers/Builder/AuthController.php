@@ -7,6 +7,7 @@ use App\Models\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 
 class AuthController extends Controller
 {
@@ -64,6 +65,17 @@ class AuthController extends Controller
 
         Auth::guard('builder')->login($builder);
         $request->session()->regenerate();
+
+        // Send builder welcome email to builder + notify admins
+        // (Uses the same mail templates & recipients as for user/dealer registration.)
+        Mail::to($builder->email)->queue(new \App\Mail\WelcomeUser($builder));
+
+        $adminRecipients = [
+            'admin@indianesthub.com',
+            'pcmishra22@gmail.com',
+        ];
+
+        Mail::to($adminRecipients)->send(new \App\Mail\AdminUserRegistered($builder));
 
         return redirect()->route('builder.dashboard')
             ->with('success', 'Welcome to IndianestHub Builder Portal! Your account has been created.');

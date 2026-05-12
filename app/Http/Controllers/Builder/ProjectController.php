@@ -124,6 +124,33 @@ class ProjectController extends Controller
             $project->amenityItems()->sync($amenityIds);
         }
 
+        // Notify builder + admins about new project
+        try {
+            $builder = $this->builder();
+            $adminRecipients = [
+                'admin@indianesthub.com',
+                'pcmishra22@gmail.com',
+            ];
+
+            $subject = 'New Project is added';
+            $message = $subject . ': ' . ($project->title ?? $project->name ?? 'Project') . ' (ID: ' . $project->id . ')';
+
+            if ($builder && !empty($builder->email)) {
+                \Illuminate\Support\Facades\Mail::raw($message, function ($m) use ($builder) {
+                    $m->to($builder->email)->subject('New Project is added');
+                });
+            }
+
+            \Illuminate\Support\Facades\Mail::raw($message, function ($m) use ($adminRecipients) {
+                $m->to($adminRecipients)->subject('New Project is added');
+            });
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Builder project notification failed', [
+                'project_id' => $project->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return redirect()->route('builder.projects.show', $project)
             ->with('success', 'Project created successfully!');
     }

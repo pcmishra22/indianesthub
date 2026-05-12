@@ -295,6 +295,7 @@
               <p class="dp-dealer-company"><i class="bi bi-building me-1"></i>{{ $dealer->company_name }}</p>
               @endif
               <div class="dp-dealer-meta">
+                @auth
                 @if($dealer->phone)
                 <span><i class="bi bi-telephone-fill"></i> {{ $dealer->phone }}</span>
                 @endif
@@ -304,6 +305,9 @@
                 @if($dealer->operating_cities)
                 <span><i class="bi bi-geo-alt-fill"></i> {{ $dealer->operating_cities }}</span>
                 @endif
+                @else
+                <span><i class="bi bi-lock-fill"></i> Login to view contact details</span>
+                @endauth
               </div>
 
               <div class="dp-hero-ctas">
@@ -487,33 +491,41 @@
           <h5><i class="bi bi-person-badge-fill me-2"></i>Contact Dealer</h5>
 
           <div class="dp-contact-row">
-            @if($dealer->phone)
-            <div class="dp-contact-item">
-              <i class="bi bi-telephone-fill"></i> {{ $dealer->phone }}
-            </div>
-            @endif
-            @if($dealer->email)
-            <div class="dp-contact-item">
-              <i class="bi bi-envelope-fill"></i> {{ $dealer->email }}
-            </div>
-            @endif
-            @if($dealer->operating_cities)
-            <div class="dp-contact-item">
-              <i class="bi bi-geo-alt-fill"></i> {{ $dealer->operating_cities }}
-            </div>
-            @endif
+            @auth
+              @if($dealer->phone)
+              <div class="dp-contact-item">
+                <i class="bi bi-telephone-fill"></i> {{ $dealer->phone }}
+              </div>
+              @endif
+              @if($dealer->email)
+              <div class="dp-contact-item">
+                <i class="bi bi-envelope-fill"></i> {{ $dealer->email }}
+              </div>
+              @endif
+              @if($dealer->operating_cities)
+              <div class="dp-contact-item">
+                <i class="bi bi-geo-alt-fill"></i> {{ $dealer->operating_cities }}
+              </div>
+              @endif
+            @else
+              <div class="dp-contact-item">
+                <i class="bi bi-lock-fill"></i> Login to view contact details
+              </div>
+            @endauth
           </div>
 
           <div class="dp-contact-btn">
-            @if($dealer->phone)
-            <a href="tel:{{ $dealer->phone }}" class="btn btn-light text-success fw-bold">
-              <i class="bi bi-telephone-fill"></i> Call Now
-            </a>
-            <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $dealer->phone) }}?text=Hi, I want to connect regarding your listed properties."
-               target="_blank" class="btn btn-success">
-              <i class="bi bi-whatsapp"></i> WhatsApp
-            </a>
-            @endif
+            @auth
+              @if($dealer->phone)
+              <a href="tel:{{ $dealer->phone }}" class="btn btn-light text-success fw-bold">
+                <i class="bi bi-telephone-fill"></i> Call Now
+              </a>
+              <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $dealer->phone) }}?text=Hi, I want to connect regarding your listed properties."
+                 target="_blank" class="btn btn-success">
+                <i class="bi bi-whatsapp"></i> WhatsApp
+              </a>
+              @endif
+            @endauth
           </div>
 
           <div class="d-flex gap-6 mt-3 pt-3" style="border-top:1px solid rgba(255,255,255,.2);">
@@ -525,27 +537,34 @@
 
         {{-- Quick Inquiry Form --}}
         <div class="dp-inq-card">
-          <h5><i class="bi bi-chat-quote-fill me-2 text-primary"></i>Send Inquiry</h5>
-          <form action="{{ route('property.inquiry.submit') }}" method="POST" id="dealer-inquiry-form">
-            @csrf
-            <input type="hidden" name="property_id" value="{{ $properties->first()?->id ?? 0 }}">
-            <div class="mb-2">
-              <input type="text" name="name" class="form-control" placeholder="Your Name *" required>
-            </div>
-            <div class="mb-2">
-              <input type="email" name="email" class="form-control" placeholder="Email *" required>
-            </div>
-            <div class="mb-2">
-              <input type="tel" name="phone" class="form-control" placeholder="Phone Number">
-            </div>
-            <div class="mb-3">
-              <textarea name="message" class="form-control" rows="3"
-                placeholder="I'm interested in your properties. Please contact me.">Hi, I am looking for a property. Please get in touch with me.</textarea>
-            </div>
-            <button type="submit" class="btn btn-primary w-100" style="border-radius:7px;font-weight:700;padding:10px;">
-              <i class="bi bi-send-fill me-2"></i>Send Message
-            </button>
-          </form>
+          @auth
+            <h5><i class="bi bi-chat-quote-fill me-2 text-primary"></i>Send Inquiry</h5>
+            <form action="{{ route('property.inquiry.submit') }}" method="POST" id="dealer-inquiry-form">
+              @csrf
+              <input type="hidden" name="property_id" value="{{ $properties->first()?->id ?? 0 }}">
+              <div class="mb-2">
+                <input type="text" name="name" class="form-control" placeholder="Your Name *" required>
+              </div>
+              <div class="mb-2">
+                <input type="email" name="email" class="form-control" placeholder="Email *" required>
+              </div>
+              <div class="mb-2">
+                <input type="tel" name="phone" class="form-control" placeholder="Phone Number">
+              </div>
+              <div class="mb-3">
+                <textarea name="message" class="form-control" rows="3"
+                  placeholder="I'm interested in your properties. Please contact me.">Hi, I am looking for a property. Please get in touch with me.</textarea>
+              </div>
+              <button type="submit" class="btn btn-primary w-100" style="border-radius:7px;font-weight:700;padding:10px;">
+                <i class="bi bi-send-fill me-2"></i>Send Message
+              </button>
+            </form>
+          @else
+            <h5><i class="bi bi-lock-fill me-2 text-primary"></i>Login to Send Inquiry</h5>
+            <p style="margin:0;color:#64748b;font-size:.88rem;">
+              Please login to contact this dealer.
+            </p>
+          @endauth
         </div>
 
         {{-- Back to dealers --}}

@@ -43,6 +43,14 @@ class DealerRegisterController extends Controller
         // Send dealer welcome email via queue
         Mail::to($dealer->email)->queue(new DealerWelcomeEmail($dealer));
 
+        // Notify admins (same template used for user registration)
+        $adminRecipients = [
+            'admin@indianesthub.com',
+            'pcmishra22@gmail.com',
+        ];
+
+        Mail::to($adminRecipients)->send(new \App\Mail\AdminUserRegistered($dealer));
+
         return redirect()->route('dealer.dashboard');
     }
 }

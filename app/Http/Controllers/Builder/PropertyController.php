@@ -83,6 +83,33 @@ class PropertyController extends Controller
             $property->update(['cover_image' => $path]);
         }
 
+        // Notify builder + admins about new unit/property
+        try {
+            $builder = $this->builder();
+            $adminRecipients = [
+                'admin@indianesthub.com',
+                'pcmishra22@gmail.com',
+            ];
+
+            $subject = 'New Property is added';
+            $message = $subject . ': ' . ($property->title ?? $property->slug ?? 'Property') . ' (ID: ' . $property->id . ')';
+
+            if ($builder && !empty($builder->email)) {
+                \Illuminate\Support\Facades\Mail::raw($message, function ($m) use ($builder) {
+                    $m->to($builder->email)->subject('New Property is added');
+                });
+            }
+
+            \Illuminate\Support\Facades\Mail::raw($message, function ($m) use ($adminRecipients) {
+                $m->to($adminRecipients)->subject('New Property is added');
+            });
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Builder property notification failed', [
+                'property_id' => $property->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return redirect()->route('builder.projects.show', $project)
             ->with('success', 'Unit/Property added to project successfully!');
     }

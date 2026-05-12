@@ -223,6 +223,38 @@ class PropertyController extends Controller
             $property->save();
         }
 
+        // Notify dealer + admins about new property
+        try {
+            $dealer = Auth::guard('dealer')->user();
+            $adminRecipients = [
+                'admin@indianesthub.com',
+                'pcmishra22@gmail.com',
+            ];
+
+            if ($dealer && !empty($dealer->email)) {
+                \Illuminate\Support\Facades\Mail::raw(
+                    "New Property is added: {$property->title} (ID: {$property->id})",
+                    function ($message) use ($dealer) {
+                        $message->to($dealer->email)
+                            ->subject('New Property is added');
+                    }
+                );
+            }
+
+            \Illuminate\Support\Facades\Mail::raw(
+                "New Property is added: {$property->title} (ID: {$property->id})",
+                function ($message) use ($adminRecipients) {
+                    $message->to($adminRecipients)
+                        ->subject('New Property is added');
+                }
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Dealer property notification failed', [
+                'property_id' => $property->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return redirect()->route('dealer.properties.index')->with('success', 'Property created successfully.');
     }
 
