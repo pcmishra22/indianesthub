@@ -329,7 +329,18 @@ class SeoLandingController extends Controller
         }
 
         if ($propertyType) {
-            $query->where('property_type', 'like', "%{$propertyType}%");
+            // SEO-critical: allow common DB variants for flats.
+            // In your DB, property_type can be values like Flat/Flats/Apartment/Apartments.
+            if (in_array(strtolower(trim($propertyType)), ['flat', 'flats', 'apartment', 'apartments'])) {
+                $query->where(function ($q) {
+                    $q->where('property_type', 'like', '%Flat%')
+                      ->orWhere('property_type', 'like', '%Flats%')
+                      ->orWhere('property_type', 'like', '%Apartment%')
+                      ->orWhere('property_type', 'like', '%Apartments%');
+                });
+            } else {
+                $query->where('property_type', 'like', "%{$propertyType}%");
+            }
         }
 
         if ($lookingFor) {

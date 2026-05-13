@@ -308,6 +308,34 @@
         </div>
     </div>
 </div>
+    {{-- QR Payment section (always visible) --}}
+    <div class="mt-4 p-3 border rounded bg-white">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div>
+                <h5 class="mb-1">Pay for this Property</h5>
+                @if(isset($hasValidPayment) && $hasValidPayment)
+                    <div class="text-success fw-semibold">Payment received — this property is currently active/visible.</div>
+                @else
+                    <div class="text-muted">Scan the QR code below to pay. After successful payment, the property visibility will be updated automatically.</div>
+                @endif
+            </div>
+            <div class="text-end">
+                <div class="small text-muted">Property: <strong>{{ $property->title }}</strong></div>
+            </div>
+        </div>
+
+        <div class="row mt-3 justify-content-center">
+            <div class="col-12 col-md-5 text-center">
+                <img
+                    src="{{ asset('assets/img/qr-payment..jpeg') }}"
+                    alt="QR Payment"
+                    style="width: 220px; max-width: 100%; height: auto; border-radius: 8px; border: 1px solid #eee;"
+                >
+                <div class="small text-muted mt-2">Use this QR to complete payment for the listing.</div>
+            </div>
+        </div>
+    </div>
+
     <script>
         function scanPayment() {
             alert('QR Scanner coming soon! Screenshot QR when ready.');

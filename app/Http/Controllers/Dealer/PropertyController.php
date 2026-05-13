@@ -447,9 +447,18 @@ class PropertyController extends Controller
             abort(403);
         }
     }
-     public function show(Property $property)
+public function show(Property $property)
     {
         $this->authorizeDealer($property);
-        return view('dealer.properties.show', compact('property'));
+
+        $dealerId = $property->property_dealer_id;
+        $hasValidPayment = $property->payments()
+            ->whereIn('status', ['completed', '1', 1])
+            ->where('payment_type', 'property_listing')
+            ->where('listing_end_date', '>=', now())
+            ->where('dealer_id', $dealerId)
+            ->exists();
+
+        return view('dealer.properties.show', compact('property', 'hasValidPayment'));
     }
 }

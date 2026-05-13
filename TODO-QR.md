@@ -1,17 +1,6 @@
-# QR Scanner Complete ✅
+- [x] Add QR code image section at bottom of dealer property show page
+- [x] Ensure QR section works with “paid/active” state display (uses payments validity)
+- [x] Pass payment validity flag from Dealer\PropertyController@show to Blade
+- [ ] Verify manually: /dealer/login -> property show -> QR appears at bottom; paid properties show paid/active badge
 
-**Added**:
-1. **QR Image**: `images/qr-payment.jpeg`
-2. **Full JS Scanner**: Camera scans UPI confirmation QR → verifies backend.
-3. **jsQR CDN** included.
 
-**Backend Needed**:
-- Route `dealer.properties.pay`
-- Controller method
-
-**Test**:
-1. Visit dealer property details.
-2. Click "Scan Payment Confirmation" → camera opens.
-3. Scan UPI confirmation after payment → auto-activates.
-
-Await backend!
