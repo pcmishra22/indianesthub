@@ -84,9 +84,15 @@ class SeoController extends Controller
         $locations    = self::getSeoLocations();
         $landingCities = self::getSeoLandingCities();
 
+        // Essential static pages for SEO discovery
+        $staticPages = [
+            'home', 'about', 'properties', 'agents', 'builders.index', 'blog', 'services', 
+            'contact', 'pricing', 'subscription', 'privacy', 'terms'
+        ];
+
         $content = view('frontend.seo.sitemap', compact(
             'properties', 'dealers', 'builders', 'projects',
-            'blogs', 'locations', 'landingCities'
+            'blogs', 'locations', 'landingCities', 'staticPages'
         ))->render();
 
         return response($content, 200)->header('Content-Type', 'application/xml; charset=UTF-8');

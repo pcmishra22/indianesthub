@@ -15,6 +15,7 @@ use App\Services\WhatsAppNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Mail;
 
 class PropertyDetailsController extends Controller
@@ -47,16 +48,24 @@ class PropertyDetailsController extends Controller
         $browser   = $this->detectBrowser($userAgent);
 
         // Log detailed visit in property_views
+// Stable visitor token (guest fingerprint)
+        $visitorToken = request()->cookie('visitor_token');
+        if (empty($visitorToken)) {
+            $visitorToken = (string) \Illuminate\Support\Str::uuid();
+            Cookie::queue('visitor_token', $visitorToken, 60 * 24 * 30); // ~180 days
+        }
+
         PropertyView::create([
-            'property_id' => $property->id,
-            'user_id'     => Auth::id(),
-            'session_id'  => request()->session()->getId(),
-            'ip_address'  => request()->ip(),
-            'device'      => $device,
-            'browser'     => $browser,
-            'referrer'    => request()->headers->get('referer'),
-            'page_url'    => request()->fullUrl(),
-            'viewed_at'   => now(),
+            'property_id'     => $property->id,
+            'user_id'         => Auth::id(),
+            'session_id'      => request()->session()->getId(),
+            'visitor_token'   => $visitorToken,
+            'ip_address'      => request()->ip(),
+            'device'          => $device,
+            'browser'         => $browser,
+            'referrer'        => request()->headers->get('referer'),
+            'page_url'        => request()->fullUrl(),
+            'viewed_at'       => now(),
         ]);
 
         // Track in recently_viewed table
@@ -122,9 +131,10 @@ class PropertyDetailsController extends Controller
         $inquiry->message     = $validated['message'];
         $inquiry->property_id = $validated['property_id'];
         $inquiry->broker_id   = $brokerId;
-        $inquiry->ip_address  = $request->ip();
-        $inquiry->user_agent  = $request->userAgent();
-        $inquiry->source      = 'website';
+$inquiry->ip_address     = $request->ip();
+        $inquiry->user_agent     = $request->userAgent();
+        $inquiry->visitor_token  = $request->cookie('visitor_token');
+        $inquiry->source         = 'website';
         $inquiry->save();
 
         // ── Fire queued emails ────────────────────────────────────────────────

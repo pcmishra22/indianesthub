@@ -183,7 +183,7 @@ class PropertyController extends Controller
         // Cover image
         if ($request->hasFile('cover_image')) {
             $file = $request->file('cover_image');
-            $property->cover_image = $file->storeAs("{$basePath}/cover", uniqid().'.'.$file->getClientOriginalExtension(), 'public');
+            $property->cover_image = $file->storeAs("{$basePath}/images", uniqid().'.'.$file->getClientOriginalExtension(), 'public');
             $needsSave = true;
         }
 
@@ -366,6 +366,12 @@ class PropertyController extends Controller
             'search_tags' => 'nullable|string|max:255',
             'featured' => 'nullable|boolean',
             'priority_score' => 'nullable|integer',
+            // File fields validation to prevent silent failures
+            'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'images.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'floor_plan_images.*' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
+            'video' => 'nullable|file|mimes:mp4,mov,avi,wmv|max:30720',
+            'brochure_pdf' => 'nullable|file|mimes:pdf|max:10240',
         ]);
 
         $data['share_with_agents'] = $request->has('share_with_agents');
@@ -397,7 +403,7 @@ class PropertyController extends Controller
         // Cover image
         if ($request->hasFile('cover_image')) {
             $file = $request->file('cover_image');
-            $data['cover_image'] = $file->storeAs("{$basePath}/cover", uniqid().'.'.$file->getClientOriginalExtension(), 'public');
+            $data['cover_image'] = $file->storeAs("{$basePath}/images", uniqid().'.'.$file->getClientOriginalExtension(), 'public');
         }
 
         // Floor plan images (JSON array)

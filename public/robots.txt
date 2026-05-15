@@ -9,8 +9,9 @@ Disallow: /admin/
 Disallow: /dealer/
 Disallow: /builder/
 Disallow: /my/
+Disallow: /email/track/
 Disallow: /search/autocomplete
-Disallow: /compare/
+Disallow: /compare
 Disallow: /wallet
 Disallow: /chat
 Disallow: /analytics
@@ -26,20 +27,11 @@ Disallow: /register
 Disallow: /forgot-password
 Disallow: /reset-password
 
-# Allow important public pages
-Allow: /properties
-Allow: /properties/in/
-Allow: /blog
-Allow: /agents
-Allow: /builders
-Allow: /services
-Allow: /about
-Allow: /contact
-Allow: /flats-in-
-Allow: /plots-in-
-Allow: /villas-in-
-Allow: /rent-flats-in-
-Allow: /new-projects-in-
+# Block crawling of search result pages with parameters to avoid index bloat/duplicate content
+# This ensures Google prioritizes the clean hyperlocal URLs defined in your sitemap.
+Disallow: /*?*property_type=
+Disallow: /*?*looking_for=
+Disallow: /*?*city=
 
 # Crawl-delay for well-behaved bots
 Crawl-delay: 1

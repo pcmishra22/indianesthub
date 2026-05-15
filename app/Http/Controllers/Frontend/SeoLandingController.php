@@ -1,5 +1,6 @@
 <?php
 
+
 namespace App\Http\Controllers\Frontend;
 
 use App\Http\Controllers\Controller;
@@ -479,10 +480,253 @@ class SeoLandingController extends Controller
             : null;
 
         $appName  = config('app.name');
-        $seoTitle = "{$h1} | Verified Listings | {$appName}";
-        $seoDesc  = "Find {$totalCount}+ verified {$h1} on {$appName}. Browse with photos, floor plans & agent contact. Best deals in {$locationLabel}, {$city['state']}.";
+
+        // SEO tuning for high-intent Zirakpur pages in the footer.
+        // Targets:
+        // - /flats-in-zirakpur ("flats for sale in zirakpur", "apartments for sale in zirakpur", "buy flat in zirakpur")
+        // - /2bhk-flats-in-zirakpur, /3bhk-flats-in-zirakpur, /4bhk-flats-in-zirakpur
+        // - /ready-to-move-flats-zirakpur
+        $citySlugLower = strtolower($citySlug);
+
+        if ($citySlugLower === 'zirakpur' && $pageType === 'flats' && !$bhkType) {
+            $seoTitle = "Flats for Sale in Zirakpur | Verified Listings | {$appName}";
+            $seoDesc  = "Find flats for sale in Zirakpur, Punjab. Browse verified listings with photos, floor plans & direct agent contact on {$appName}. Best deals in Zirakpur.";
+        }
+        // Zirakpur property listings + real estate (footer anchors)
+        else if ($citySlugLower === 'zirakpur' && $pageType === 'flats' && $propertyType === '' && !$lookingFor && !$bhkType) {
+            $seoTitle = "Zirakpur Property Listings | Verified Listings | {$appName}";
+            $seoDesc  = "Browse verified property listings in Zirakpur on {$appName}. Find flats for sale, apartments, 2/3/4 BHK options and connect with trusted agents.";
+        }
+        // Mohali / Chandigarh listing pages for footer SEO
+        else if ($citySlugLower === 'mohali' && $pageType === 'flats' && $propertyType === '' && !$lookingFor && !$bhkType) {
+            $seoTitle = "Flats for Sale in Mohali | Verified Listings | {$appName}";
+            $seoDesc  = "Find flats for sale in Mohali, Punjab. Browse verified listings with photos, floor plans & direct agent contact on {$appName}. Best deals in Mohali.";
+        }
+        else if ($citySlugLower === 'chandigarh' && $pageType === 'flats' && $propertyType === '' && !$lookingFor && !$bhkType) {
+            $seoTitle = "Flats for Sale in Chandigarh | Verified Listings | {$appName}";
+            $seoDesc  = "Find flats for sale in Chandigarh, UT Chandigarh. Browse verified listings with photos, floor plans & direct agent contact on {$appName}. Best deals in Chandigarh.";
+        }
+        // Panchkula listing pages for footer SEO
+        else if ($citySlugLower === 'panchkula' && $pageType === 'flats' && $propertyType === '' && !$lookingFor && !$bhkType) {
+            $seoTitle = "Property for Sale in Panchkula | Verified Listings | {$appName}";
+            $seoDesc  = "Find verified property listings for sale in Panchkula on {$appName}. Browse flats in Panchkula and connect with trusted agents.";
+        }
+
+        // Panchkula (new projects) — footer: /new-projects-in-panchkula
+        else if ($citySlugLower === 'panchkula' && $pageType === 'new-projects' && $propertyType === '' && !$lookingFor && !$bhkType) {
+            $seoTitle = "New Projects in Panchkula | Verified Listings | {$appName}";
+            $seoDesc  = "Browse verified new projects in Panchkula on {$appName}. Find RERA projects, launch updates, and connect with top builders.";
+        }
+
+        // Panchkula (affordable) — /affordable-flats-in-panchkula
+        else if ($citySlugLower === 'panchkula' && $pageType === 'flats' && $propertyType === 'Flat' && $maxPrice) {
+            $seoTitle = "Affordable Flats in Panchkula | Verified Listings | {$appName}";
+            $seoDesc  = "Find affordable flats in Panchkula within your budget on {$appName}. Browse verified 2/3/4 BHK listings with photos and contact agents directly.";
+        }
+
+        // Panchkula (resale) — /resale-flats-in-panchkula
+        else if ($citySlugLower === 'panchkula' && $pageType === 'flats' && $propertyType === 'Flat' && isset($extraFilters['listing_type']) && $extraFilters['listing_type'] === 'Resale') {
+            $seoTitle = "Resale Flats in Panchkula | Verified Listings | {$appName}";
+            $seoDesc  = "Find resale flats in Panchkula with verified listings on {$appName}. Compare 2/3/4 BHK options and contact trusted owners/agents.";
+        }
+
+        // Panchkula (RTM) — /ready-to-move-flats-panchkula
+        else if ($citySlugLower === 'panchkula' && $pageType === 'ready-to-move') {
+            $seoTitle = "Ready to Move Flats in Panchkula | Verified Listings | {$appName}";
+            $seoDesc  = "Browse verified ready to move flats in Panchkula on {$appName}. Immediate possession options with photos and direct agent contact.";
+        }
+
+        // Panchkula BHK pages — /2bhk-flats-in-panchkula and /3bhk-flats-in-panchkula
+        else if ($pageType === 'bhk-flats' && $citySlugLower === 'panchkula' && $bhkType) {
+            $bhkNum = trim(str_replace('BHK', '', $bhkType));
+            $bhkNum = preg_replace('/[^0-9]/', '', $bhkNum);
+            $bhkNum = $bhkNum ?: $bhkType;
+            $seoTitle = "{$bhkType} Flats for Sale in Panchkula | Verified Listings | {$appName}";
+            $seoDesc  = "Find verified {$bhkNum} BHK flats for sale in Panchkula. Browse 2/3/4 BHK listings with photos, floor plans and direct agent contact on {$appName}. Best deals in Panchkula.";
+        }
+
+        // Mullanpur listing pages for footer SEO
+        else if ($citySlugLower === 'mullanpur' && $pageType === 'flats' && $propertyType === '' && !$lookingFor && !$bhkType) {
+            $seoTitle = "Property for Sale in Mullanpur | New Chandigarh | {$appName}";
+            $seoDesc  = "Browse verified property listings in Mullanpur, New Chandigarh. Find flats for sale, plots, villas and connect with trusted agents on {$appName}.";
+        }
+
+        // Mullanpur (flats specifically)
+        else if ($citySlugLower === 'mullanpur' && $pageType === 'flats' && $propertyType === 'Flat' && !$lookingFor && !$bhkType && !$maxPrice) {
+             $seoTitle = "Flats for Sale in Mullanpur | New Chandigarh | {$appName}";
+             $seoDesc  = "Find verified flats for sale in Mullanpur, New Chandigarh. Browse 2/3/4 BHK apartments with photos, floor plans & direct agent contact on {$appName}.";
+        }
+
+        // Mullanpur (resale)
+        else if ($citySlugLower === 'mullanpur' && $pageType === 'flats' && $propertyType === 'Flat' && isset($extraFilters['listing_type']) && $extraFilters['listing_type'] === 'Resale') {
+            $seoTitle = "Resale Flats in Mullanpur | Verified Listings | {$appName}";
+            $seoDesc  = "Find verified resale flats in Mullanpur, New Chandigarh. Compare 2/3/4 BHK options from owners and trusted agents on {$appName}.";
+        }
+
+        // Mullanpur (RTM)
+        else if ($citySlugLower === 'mullanpur' && $pageType === 'ready-to-move') {
+            $seoTitle = "Ready to Move Flats in Mullanpur | New Chandigarh | {$appName}";
+            $seoDesc  = "Find verified ready to move flats in Mullanpur, New Chandigarh. Browse immediate possession apartments with photos and direct agent contact on {$appName}.";
+        }
+
+        // Mullanpur BHK pages — /2bhk-flats-in-mullanpur and /3bhk-flats-in-mullanpur
+        else if ($pageType === 'bhk-flats' && $citySlugLower === 'mullanpur' && $bhkType) {
+            $bhkNum = trim(str_replace('BHK', '', $bhkType));
+            $bhkNum = preg_replace('/[^0-9]/', '', $bhkNum);
+            $bhkNum = $bhkNum ?: $bhkType;
+            $seoTitle = "{$bhkType} Flats in Mullanpur | New Chandigarh | {$appName}";
+            $seoDesc  = "Find verified {$bhkNum} BHK flats in Mullanpur, New Chandigarh. Browse 2/3/4 BHK listings with photos, floor plans and direct agent contact on {$appName}.";
+        }
+
+        // Chandigarh - property for sale landing (footer: properties/in/chandigarh)
+        else if ($citySlugLower === 'chandigarh' && $pageType === 'flats' && $propertyType === '' && !$lookingFor && !$bhkType) {
+            $seoTitle = "Property for Sale in Chandigarh | Verified Listings | {$appName}";
+            $seoDesc  = "Find verified property listings for sale in Chandigarh on {$appName}. Browse flats in Chandigarh and connect with trusted agents.";
+        }
+
+        // Mullanpur (new projects)
+        else if ($citySlugLower === 'mullanpur' && $pageType === 'new-projects') {
+            $seoTitle = "New Projects & New Flats in Mullanpur | Latest Launches | {$appName}";
+            $seoDesc  = "Browse verified new projects and new flats in Mullanpur, New Chandigarh. Find RERA projects, latest launch updates, and connect with trusted builders.";
+        }
+
+        // Mullanpur (affordable)
+        else if ($citySlugLower === 'mullanpur' && $pageType === 'flats' && $propertyType === 'Flat' && $maxPrice) {
+            $seoTitle = "Affordable Flats in Mullanpur | Budget Apartments | {$appName}";
+            $seoDesc  = "Find affordable flats in Mullanpur, New Chandigarh within your budget. Browse verified budget-friendly 2/3 BHK listings with photos on {$appName}.";
+        }
+
+
+        // Kharar BHK pages
+        else if ($pageType === 'bhk-flats' && $citySlugLower === 'kharar' && $bhkType) {
+            $bhkNum = trim(str_replace('BHK', '', $bhkType));
+            $bhkNum = preg_replace('/[^0-9]/', '', $bhkNum);
+            $bhkNum = $bhkNum ?: $bhkType;
+            $seoTitle = "{$bhkType} Flats for Sale in Kharar | Verified Listings | {$appName}";
+            $seoDesc  = "Find verified {$bhkNum} BHK flats for sale in Kharar. Browse 2/3/4 BHK listings with photos, floor plans and direct agent contact on {$appName}. Best deals in Kharar.";
+        }
+
+        // Kharar listing pages (flats)
+        else if ($citySlugLower === 'kharar' && $pageType === 'flats' && $propertyType === '' && !$lookingFor && !$bhkType) {
+            $seoTitle = "Property for Sale in Kharar | Verified Listings | {$appName}";
+            $seoDesc  = "Find verified property listings for sale in Kharar on {$appName}. Browse flats in Kharar and connect with trusted agents.";
+        }
+
+        // Kharar (new projects)
+        else if ($citySlugLower === 'kharar' && $pageType === 'new-projects') {
+            $seoTitle = "New Projects & New Flats in Kharar | Latest Launches | {$appName}";
+            $seoDesc  = "Browse verified new projects and new flats in Kharar. Find latest launch updates, RERA projects, and connect with top builders in Kharar.";
+        }
+
+        // Kharar (affordable)
+        else if ($citySlugLower === 'kharar' && $pageType === 'flats' && $propertyType === 'Flat' && $maxPrice) {
+            $seoTitle = "Affordable Flats in Kharar | Budget Apartments | {$appName}";
+            $seoDesc  = "Find affordable flats in Kharar within your budget. Browse verified budget-friendly 2/3/4 BHK listings with photos and contact agents directly on {$appName}.";
+        }
+
+        // Kharar (resale)
+        else if ($citySlugLower === 'kharar' && $pageType === 'flats' && $propertyType === 'Flat' && isset($extraFilters['listing_type']) && $extraFilters['listing_type'] === 'Resale') {
+            $seoTitle = "Resale Flats in Kharar | Verified Listings | {$appName}";
+            $seoDesc  = "Find verified resale flats in Kharar. Compare 2/3/4 BHK options from owners and trusted agents on {$appName} for the best resale deals in Kharar.";
+        }
+
+        // Kharar (RTM)
+        else if ($citySlugLower === 'kharar' && $pageType === 'ready-to-move') {
+            $seoTitle = "Ready to Move Flats in Kharar | Verified Listings | {$appName}";
+            $seoDesc  = "Browse verified ready to move flats in Kharar on {$appName}. Immediate possession options with photos and direct agent contact.";
+        }
+
+        // BHK landing pages (SEO-critical): tune meta description to match the exact search intent.
+
+
+        // Targets: /2bhk-flats-in-zirakpur, /3bhk-flats-in-zirakpur, /4bhk-flats-in-zirakpur
+        else if ($pageType === 'bhk-flats' && $citySlugLower === 'zirakpur' && $bhkType) {
+
+
+            // $bhkType is like "2 BHK".
+            $bhkNum = trim(str_replace('BHK', '', $bhkType));
+            $bhkNum = preg_replace('/[^0-9]/', '', $bhkNum);
+            $bhkNum = $bhkNum ?: $bhkType;
+
+            $seoTitle = "{$bhkType} Flats for Sale in Zirakpur | Verified Listings | {$appName}";
+            $seoDesc  = "Find verified {$bhkNum} BHK flats for sale in Zirakpur. Browse 2/3/4 BHK listings with photos, floor plans and direct agent contact on {$appName}. Best deals in Zirakpur, Punjab.";
+        } else {
+            $seoTitle = "{$h1} | Verified Listings | {$appName}";
+            $seoDesc  = "Find {$totalCount}+ verified {$h1} on {$appName}. Browse with photos, floor plans & agent contact. Best deals in {$locationLabel}, {$city['state']}.";
+        }
+
+        // Zirakpur ready-to-move handled by readyToMoveIn() in this controller.
+
+        // DERABASSI (footer links + common city pages)
+        if ($citySlugLower === 'derabassi') {
+            // ready to move
+            if ($pageType === 'ready-to-move') {
+                $seoTitle = "Ready to Move Flats in Derabassi | Immediate Possession | {$appName}";
+                $seoDesc  = "Find verified ready to move flats in Derabassi. Browse immediate possession apartments with photos, floor plans and direct agent contact on {$appName}.";
+            }
+            // new projects
+            else if ($pageType === 'new-projects') {
+                $seoTitle = "New Projects & New Flats in Derabassi | Latest Launches | {$appName}";
+                $seoDesc  = "Browse verified new projects and new flats in Derabassi. Find RERA projects, latest launch updates, and connect with top builders in Derabassi.";
+            }
+            // property for sale (properties/in/derabassi style)
+            else if ($pageType === 'flats' && $propertyType === '' && !$lookingFor && !$bhkType) {
+                $seoTitle = "Property for Sale in Derabassi | Verified Listings | {$appName}";
+                $seoDesc  = "Find property for sale in Derabassi on {$appName}. Browse verified listings of flats, plots, and villas with direct agent contact in Derabassi.";
+            }
+            // affordable
+            else if ($pageType === 'flats' && $propertyType === 'Flat' && $maxPrice) {
+                $seoTitle = "Affordable Flats in Derabassi | Budget Apartments | {$appName}";
+                $seoDesc  = "Find affordable flats in Derabassi within your budget. Browse verified budget-friendly 2/3 BHK listings with photos and contact agents directly on {$appName}.";
+            }
+            // resale
+            else if ($pageType === 'flats' && $propertyType === 'Flat' && isset($extraFilters['listing_type']) && $extraFilters['listing_type'] === 'Resale') {
+                $seoTitle = "Resale Flats in Derabassi | Verified Listings | {$appName}";
+                $seoDesc  = "Find verified resale flats in Derabassi. Compare 2/3/4 BHK options from owners and trusted agents on {$appName} for the best resale deals in Derabassi.";
+            }
+            // BHK
+            else if ($pageType === 'bhk-flats' && $bhkType) {
+                $bhkNum = trim(str_replace('BHK', '', $bhkType));
+                $bhkNum = preg_replace('/[^0-9]/', '', $bhkNum);
+                $bhkNum = $bhkNum ?: $bhkType;
+                $seoTitle = "{$bhkType} Flats in Derabassi | Verified Listings | {$appName}";
+                $seoDesc  = "Find verified {$bhkNum} BHK flats for sale in Derabassi. Browse listings with photos, floor plans and direct agent contact on {$appName}.";
+            }
+        }
+
+        // Budget/Filter pages are already handled by renderLanding(), but add explicit Zirakpur long-tail intent.
+        if ($citySlugLower === 'zirakpur' && $pageType === 'bhk-flats' && $bhkType) {
+            // /2bhk-flats-in-zirakpur-under-50-lakh
+            if (!empty($maxPrice) && $maxPrice <= 5000000 && str_starts_with($bhkType, '2')) {
+                $bhkNum = trim(str_replace('BHK', '', $bhkType));
+                $bhkNum = preg_replace('/[^0-9]/', '', $bhkNum);
+                $bhkNum = $bhkNum ?: $bhkType;
+                $seoTitle = "2 BHK Flats in Zirakpur Under 50 Lakh | Verified Listings | {$appName}";
+                $seoDesc  = "Find verified 2 BHK flats in Zirakpur under 50 Lakh. Browse budget apartments with photos, floor plans and direct agent contact on {$appName}.";
+            }
+            // /3bhk-flats-in-zirakpur-under-80-lakh
+            if (!empty($maxPrice) && $maxPrice <= 8000000 && str_starts_with($bhkType, '3')) {
+                $bhkNum = trim(str_replace('BHK', '', $bhkType));
+                $bhkNum = preg_replace('/[^0-9]/', '', $bhkNum);
+                $bhkNum = $bhkNum ?: $bhkType;
+                $seoTitle = "3 BHK Flats in Zirakpur Under 80 Lakh | Verified Listings | {$appName}";
+                $seoDesc  = "Find verified 3 BHK flats in Zirakpur under 80 Lakh. Browse premium budget apartments with photos, floor plans and direct agent contact on {$appName}.";
+            }
+        }
+
+        // Zirakpur (resale)
+        else if ($citySlugLower === 'zirakpur' && $pageType === 'flats' && $propertyType === 'Flat' && isset($extraFilters['listing_type']) && $extraFilters['listing_type'] === 'Resale') {
+            $seoTitle = "Resale Flats in Zirakpur | Verified Listings | {$appName}";
+            $seoDesc  = "Find verified resale flats in Zirakpur. Compare 2/3/4 BHK options from owners and trusted agents on {$appName} for the best resale deals in Zirakpur.";
+        }
+        // Zirakpur (affordable)
+        else if ($citySlugLower === 'zirakpur' && $pageType === 'flats' && $propertyType === 'Flat' && $maxPrice) {
+            $seoTitle = "Affordable Flats in Zirakpur | Budget Apartments | {$appName}";
+            $seoDesc  = "Find affordable flats in Zirakpur within your budget. Browse verified budget-friendly 2/3 BHK listings with photos and contact agents directly on {$appName}.";
+        }
 
         return view('frontend.seo-landing', compact(
+
             'properties', 'newProjects', 'pageDealers',
             'cityLabel', 'citySlug', 'h1',
             'seoTitle', 'seoDesc', 'subLocalities', 'faqs', 'allCities',
@@ -572,6 +816,7 @@ class SeoLandingController extends Controller
         $loc = $this->resolveCity($city);
         if (!$loc) abort(404);
 
+        $initialH1 = "Ready to Move Flats in {$loc['cityLabel']}"; // Store the initial H1 for SEO
         $cityLabel = $loc['cityLabel'];
         $citySlug  = $loc['citySlug'];
         $cityData  = $loc['cityData'];
@@ -592,8 +837,8 @@ class SeoLandingController extends Controller
             ->orderByRaw('is_boosted DESC, is_featured DESC, created_at DESC');
 
         $properties    = $query->paginate(12)->withQueryString();
-        $totalCount    = $properties->total();
-        $h1            = "Ready to Move Flats in {$cityLabel}";
+        $totalCount    = $properties->total(); // This is the count for the specific query
+        $h1            = $initialH1; // The H1 for the view, initially the specific one
         $isFallback    = false;
 
         // ── Multi-stage Fallback for Ready to Move ────────────────────────
@@ -612,7 +857,7 @@ class SeoLandingController extends Controller
             $properties = $query->paginate(12)->withQueryString();
             $totalCount = $properties->total();
 
-            if ($totalCount > 0) {
+            if ($totalCount > 0) { // If fallback 1 yields results
                 $h1 = "Flats for Sale in {$cityLabel}";
                 $isFallback = true;
             } else {
@@ -627,20 +872,20 @@ class SeoLandingController extends Controller
                     ->orderByRaw('is_boosted DESC, is_featured DESC, created_at DESC');
 
                 $properties = $query->paginate(12)->withQueryString();
-                $totalCount = $properties->total();
+                $totalCount = $properties->total(); // Total count for fallback 2
                 $h1         = "Available Properties in {$cityLabel}";
                 $isFallback = true;
             }
         }
 
         $subLocalities = $this->getSubLocalities()[$citySlug] ?? [];
-        $faqs          = $this->getFaqs($isFallback ? 'property' : 'ready-to-move flat', $cityLabel);
+        $faqs          = $this->getFaqs($isFallback ? 'property' : 'ready-to-move flat', $cityLabel); // This logic for FAQs seems fine
         $allCities     = $cities;
         $appName       = config('app.name');
-        $seoTitle      = $isFallback ? "{$h1} | Verified Listings | {$appName}" : "{$h1} | Immediate Possession | {$appName}";
-        $seoDesc       = $isFallback 
-            ? "Find verified properties in {$cityLabel} on {$appName}. Browse photos and contact agents directly."
-            : "Browse {$totalCount} ready-to-move flats in {$cityLabel}. Immediate possession, no wait time. Verified listings with photos and owner contact on {$appName}.";
+        $seoTitle      = $isFallback ? "{$initialH1} | Verified Listings | {$appName}" : "{$initialH1} | Immediate Possession | {$appName}"; // Use initialH1 for SEO title
+        $seoDesc       = $isFallback
+            ? "Find verified properties in {$cityLabel} on {$appName}. Browse photos and contact agents directly." // This description is generic, consider using initialH1 here too for stronger SEO
+            : "Browse {$initialPropertiesCount} ready-to-move flats in {$cityLabel}. Immediate possession, no wait time. Verified listings with photos and owner contact on {$appName}."; // Use initialPropertiesCount for specific count
         $pageType      = 'ready-to-move';
         $newProjects   = null;
         $pageDealers   = null;
@@ -648,9 +893,9 @@ class SeoLandingController extends Controller
         $budgetLabel   = null;
 
         return view('frontend.seo-landing', compact(
-            'properties', 'newProjects', 'pageDealers', 'cityLabel', 'citySlug', 'h1',
+            'properties', 'newProjects', 'pageDealers', 'cityLabel', 'citySlug', 'h1', // Pass the potentially modified H1 to the view
             'seoTitle', 'seoDesc', 'subLocalities', 'faqs', 'allCities',
-            'totalCount', 'pageType', 'areaLabel', 'budgetLabel'
+            'totalCount', 'pageType', 'areaLabel', 'budgetLabel', 'initialPropertiesCount' // Pass initial count for potential display in view
         ) + ['city' => $cityData]);
     }
 

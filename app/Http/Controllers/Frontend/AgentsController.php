@@ -42,9 +42,13 @@ class AgentsController extends Controller
 
         $properties = $dealer->properties()
             ->with('images')
+            // Show any property that is not explicitly removed.
+            // (Dealer list pages should not hide the dealer's own properties.)
             ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired'])
+            ->orWhereNull('status')
             ->orderByDesc('created_at')
             ->paginate(9);
+
 
         $totalViews = $dealer->properties()->sum('views_count');
 

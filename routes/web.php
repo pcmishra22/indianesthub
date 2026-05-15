@@ -80,6 +80,7 @@ use App\Http\Controllers\Admin\LeadReportController as AdminLeadReportController
 use App\Http\Controllers\Admin\BuilderController as AdminBuilderController;
 use App\Http\Controllers\Admin\BuilderProjectController as AdminBuilderProjectController;
 use App\Http\Controllers\Admin\BuilderLeadController as AdminBuilderLeadController;
+use App\Http\Controllers\Admin\PropertyViewersController;
 
 /*
 |--------------------------------------------------------------------------
@@ -474,6 +475,10 @@ Route::prefix('admin')->middleware('auth:admin')->name('admin.')->group(function
     // Manage Properties
     Route::resource('properties', AdminPropertyController::class)->only(['index', 'show', 'destroy']);
     Route::post('/properties/{property}/toggle-featured', [AdminPropertyController::class, 'toggleFeatured'])->name('properties.toggle-featured');
+
+    // Property viewers (guest token based tracking)
+        Route::get('/properties/{property}/viewers', [\App\Http\Controllers\Admin\PropertyViewersController::class, 'index'])
+        ->name('properties.viewers.index');
 
     // Manage Payments
     Route::get('/payments', [AdminPaymentController::class, 'index'])->name('payments.index');

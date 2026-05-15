@@ -499,6 +499,7 @@
           <li><i class="bi bi-chevron-right"></i><a href="{{ url('/blog') }}">Blog</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ url('/pricing') }}" style="color:#fbbf24!important;">Pricing &amp; Plans</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ url('/contact') }}">Contact</a></li>
+          <li><i class="bi bi-chevron-right"></i><a href="{{ route('seo.sitemap') }}" target="_blank">XML Sitemap</a></li>
         </ul>
       </div>
 

@@ -12,7 +12,7 @@ class Inquiry extends Model
     protected $fillable = [
         'property_id', 'broker_id', 'name', 'email', 'phone', 'message',
         'status', 'notes', 'tags', 'assigned_agent_id',
-        'ip_address', 'user_agent', 'source',
+        'ip_address', 'visitor_token', 'user_agent', 'source',
     ];
 
 public function property()

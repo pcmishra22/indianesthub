@@ -1,0 +1,1 @@
+{"version":2,"defects":{"Tests\\Feature\\AdminPanelTest::test_admin_can_login":7},"times":{"Tests\\Unit\\ExampleTest::test_that_true_is_true":0.003,"Tests\\Feature\\AdminPanelTest::test_admin_login_page_loads":0.059,"Tests\\Feature\\AdminPanelTest::test_admin_can_login":0.023}}
