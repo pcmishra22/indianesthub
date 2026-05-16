@@ -14,11 +14,29 @@ return new class extends Migration
         Schema::table('properties', function (Blueprint $table) {
             // Make property_dealer_id nullable so builder properties don't need a dealer
             $table->unsignedBigInteger('property_dealer_id')->nullable()->change();
-            // Add builder foreign keys
-            $table->foreignId('builder_id')->nullable()->after('property_dealer_id')
-                  ->constrained('builders')->nullOnDelete();
-            $table->foreignId('builder_project_id')->nullable()->after('builder_id')
-                  ->constrained('builder_projects')->nullOnDelete();
+
+            // Avoid duplicate column errors if this migration (partially) ran before
+            $hasBuildersTable = Schema::hasTable('builders');
+            $hasBuilderProjectsTable = Schema::hasTable('builder_projects');
+
+            if (!Schema::hasColumn('properties', 'builder_id')) {
+                // Add builder foreign keys
+                if ($hasBuildersTable) {
+                    $table->foreignId('builder_id')->nullable()->after('property_dealer_id')
+                        ->constrained('builders')->nullOnDelete();
+                } else {
+                    $table->unsignedBigInteger('builder_id')->nullable()->after('property_dealer_id');
+                }
+            }
+
+            if (!Schema::hasColumn('properties', 'builder_project_id')) {
+                if ($hasBuilderProjectsTable) {
+                    $table->foreignId('builder_project_id')->nullable()->after('builder_id')
+                        ->constrained('builder_projects')->nullOnDelete();
+                } else {
+                    $table->unsignedBigInteger('builder_project_id')->nullable()->after('builder_id');
+                }
+            }
         });
     }
 

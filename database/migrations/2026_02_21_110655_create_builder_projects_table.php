@@ -13,7 +13,15 @@ return new class extends Migration
     {
         Schema::create('builder_projects', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('builder_id')->constrained('builders')->cascadeOnDelete();
+
+            // Avoid hard dependency on builders table existence (migration ordering)
+            // If builders table isn't present, create the column without FK.
+            if (Schema::hasTable('builders')) {
+                $table->foreignId('builder_id')->constrained('builders')->cascadeOnDelete();
+            } else {
+                $table->unsignedBigInteger('builder_id')->nullable();
+            }
+
             $table->string('title');
             $table->text('description')->nullable();
             $table->string('project_type')->default('Residential'); // Residential/Commercial/Plotted/Township/Mixed Use

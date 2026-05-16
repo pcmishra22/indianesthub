@@ -45,11 +45,15 @@ class HomeController extends Controller
             ->limit(8)
             ->get();
 
-        // Top dealers
-        $topDealers = Dealer::whereNotNull('name')
-            ->where('name', '!=', '')
+        // Top dealers (property_dealers table has no `name` column; use company/first/last)
+        $topDealers = Dealer::where(function ($q) {
+            $q->whereNotNull('company_name')->where('company_name', '!=', '')
+              ->orWhereNotNull('first_name')->where('first_name', '!=', '')
+              ->orWhereNotNull('last_name')->where('last_name', '!=', '');
+        })
             ->limit(6)
             ->get();
+
 
         // Top builders
         $topBuilders = Builder::where('status', 'active')
