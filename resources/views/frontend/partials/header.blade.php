@@ -17,8 +17,7 @@
 }
 </style>
 
-  <header id="header" class="header d-flex align-items-center sticky-top">
-    <div class="container-fluid container-xl position-relative d-flex align-items-center justify-content-between">
+  <header id="header" class="header d-flex align-items-center sticky-top" style="overflow: hidden;">
 
       <a href="{{ url('/') }}" class="logo d-flex align-items-center">
         <!-- Uncomment the line below if you also wish to use an image logo -->
@@ -165,6 +164,4 @@
           </div>
         @endauth
       </div>
-
-    </div>
   </header>
