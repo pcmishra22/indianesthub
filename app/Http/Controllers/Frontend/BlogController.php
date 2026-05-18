@@ -40,7 +40,7 @@ class BlogController extends Controller
      */
     public function show(BlogPost $blog)
     {
-        abort_if($blog->status !== 'published', 404);
+        abort_if(!($blog->is_published && !empty($blog->published_at) && $blog->published_at <= now()), 404);
 
         // Increment views
         $blog->increment('views_count');

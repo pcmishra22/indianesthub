@@ -1,6 +1,5 @@
-## TODO
-- [x] Implement guard logic in `database/migrations/2026_02_21_110655_add_builder_fields_to_properties_table.php` to skip adding foreign keys if `builders` or `builder_projects` tables don’t exist.
-- [x] Re-run migrations (`php artisan migrate`) to confirm the foreign key error is resolved.
-
-
+- [ ] Identify mismatch between BlogPost model queries and blog_posts migration columns
+- [ ] Update BlogPost model scopePublished (and any other references) to use existing columns (is_published) instead of missing status
+- [ ] Update BlogController show() visibility check to align with published rules
+- [ ] Run Laravel tests or a quick artisan migrate check / minimal query to confirm fix
 
