@@ -47,7 +47,12 @@ class PropertyController extends Controller
     {
         $dealerId = Auth::guard('dealer')->id();
         $properties = Property::where('property_dealer_id', $dealerId)
-                             ->paidAndValid($dealerId)
+                             ->withExists(['payments as is_paid' => function($query) use ($dealerId) {
+                                 $query->whereIn('status', ['completed', '1', 1])
+                                       ->where('payment_type', 'property_listing')
+                                       ->where('listing_end_date', '>=', now())
+                                       ->where('dealer_id', $dealerId);
+                             }])
                              ->latest()
                              ->paginate(10);
         return view('dealer.properties.index', compact('properties'));

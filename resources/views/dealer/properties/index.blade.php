@@ -23,6 +23,7 @@
                         <th>Title</th>
                         <th>Type</th>
                         <th>Listing Status</th>
+                        <th>Payment</th>
                         <th>Price</th>
                         <th>City</th>
                         <th>State</th>
@@ -45,6 +46,17 @@
                                     <span class="badge bg-secondary">Unknown</span>
                                 @endif
                             </td>
+                            <td>
+                                @if($property->is_paid)
+                                    <span class="badge bg-success">Paid</span>
+                                @else
+                                    <span class="badge bg-danger">Unpaid</span>
+                                    <form action="{{ route('dealer.properties.pay', $property->slug) }}" method="POST" class="d-inline">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-link p-0 text-primary" title="Pay Now"><i class="align-middle" data-feather="credit-card"></i></button>
+                                    </form>
+                                @endif
+                            </td>
                             <td>{{ $property->price }}</td>
                             <td>{{ $property->city }}</td>
                             <td>{{ $property->state }}</td>
@@ -61,7 +73,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="9" class="text-center text-muted">No properties found.</td></tr>
+                        <tr><td colspan="10" class="text-center text-muted">No properties found.</td></tr>
                     @endforelse
                 </tbody>
             </table>
