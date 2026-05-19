@@ -367,6 +367,7 @@ class SeoLandingController extends Controller
         $query->orderByRaw('is_boosted DESC, is_featured DESC, is_premium DESC, created_at DESC');
         $properties = $query->paginate(12)->withQueryString();
 
+        $isFallback = false;
         // ── Multi-stage Fallback ──────────────────────────────────────────
         // If 0 properties found for exact criteria, broaden search step-by-step:
         // 1. BHK -> Property Type -> City
@@ -407,6 +408,7 @@ class SeoLandingController extends Controller
 
                 if ($properties->total() > 0) {
                     $h1 = ($propertyType ? "{$propertyType}s" : "Properties") . " for " . ($lookingFor ?: 'Sale') . " in " . ($areaLabel ? "{$areaLabel}, {$cityLabel}" : $cityLabel);
+                    $isFallback = true;
                 }
             }
 
@@ -434,8 +436,12 @@ class SeoLandingController extends Controller
 
                 // Update H1 to reflect general results for the city
                 $h1 = "Available Properties in " . ($areaLabel ? "{$areaLabel}, {$cityLabel}" : $cityLabel);
+                $isFallback = true;
             }
         }
+
+        // Soft 404 Mitigation: If we had to fallback or have 0 results, tell Google not to index this specific URL
+        $noindex = $isFallback || $properties->total() === 0;
 
         // ── Builder projects (new-projects / upcoming / best-projects) ────
         $newProjects = null;
@@ -647,9 +653,8 @@ class SeoLandingController extends Controller
             $bhkNum = trim(str_replace('BHK', '', $bhkType));
             $bhkNum = preg_replace('/[^0-9]/', '', $bhkNum);
             $bhkNum = $bhkNum ?: $bhkType;
-
             $seoTitle = "{$bhkType} Flats for Sale in Zirakpur | Verified Listings | {$appName}";
-            $seoDesc  = "Find verified {$bhkNum} BHK flats for sale in Zirakpur. Browse 2/3/4 BHK listings with photos, floor plans and direct agent contact on {$appName}. Best deals in Zirakpur, Punjab.";
+            $seoDesc  = "Find verified {$bhkNum} BHK flats for sale in Zirakpur. Browse {$bhkNum} BHK listings with photos, floor plans and direct agent contact on {$appName}. Best deals in Zirakpur, Punjab.";
         } else {
             $seoTitle = "{$h1} | Verified Listings | {$appName}";
             $seoDesc  = "Find {$totalCount}+ verified {$h1} on {$appName}. Browse with photos, floor plans & agent contact. Best deals in {$locationLabel}, {$city['state']}.";
@@ -839,6 +844,7 @@ class SeoLandingController extends Controller
         $properties    = $query->paginate(12)->withQueryString();
         $totalCount    = $properties->total(); // This is the count for the specific query
         $h1            = $initialH1; // The H1 for the view, initially the specific one
+        $initialPropertiesCount = $totalCount;
         $isFallback    = false;
 
         // ── Multi-stage Fallback for Ready to Move ────────────────────────
@@ -883,6 +889,8 @@ class SeoLandingController extends Controller
         $allCities     = $cities;
         $appName       = config('app.name');
         $seoTitle      = $isFallback ? "{$initialH1} | Verified Listings | {$appName}" : "{$initialH1} | Immediate Possession | {$appName}"; // Use initialH1 for SEO title
+        $noindex       = $isFallback || $totalCount === 0;
+        $canonicalUrl  = url()->current();
         $seoDesc       = $isFallback
             ? "Find verified properties in {$cityLabel} on {$appName}. Browse photos and contact agents directly." // This description is generic, consider using initialH1 here too for stronger SEO
             : "Browse {$initialPropertiesCount} ready-to-move flats in {$cityLabel}. Immediate possession, no wait time. Verified listings with photos and owner contact on {$appName}."; // Use initialPropertiesCount for specific count
@@ -893,9 +901,9 @@ class SeoLandingController extends Controller
         $budgetLabel   = null;
 
         return view('frontend.seo-landing', compact(
-            'properties', 'newProjects', 'pageDealers', 'cityLabel', 'citySlug', 'h1', // Pass the potentially modified H1 to the view
+            'properties', 'newProjects', 'pageDealers', 'cityLabel', 'citySlug', 'h1',
             'seoTitle', 'seoDesc', 'subLocalities', 'faqs', 'allCities',
-            'totalCount', 'pageType', 'areaLabel', 'budgetLabel', 'initialPropertiesCount' // Pass initial count for potential display in view
+            'totalCount', 'pageType', 'areaLabel', 'budgetLabel', 'initialPropertiesCount', 'noindex', 'canonicalUrl'
         ) + ['city' => $cityData]);
     }
 
