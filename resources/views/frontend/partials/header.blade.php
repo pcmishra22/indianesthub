@@ -17,7 +17,7 @@
 }
 </style>
 
-  <header id="header" class="header d-flex align-items-center sticky-top" style="overflow: hidden;">
+  <header id="header" class="header d-flex align-items-center sticky-top" style="overflow: visible;">
 
       <a href="{{ url('/') }}" class="logo d-flex align-items-center">
         <!-- Uncomment the line below if you also wish to use an image logo -->
