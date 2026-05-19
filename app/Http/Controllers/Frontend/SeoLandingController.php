@@ -35,7 +35,7 @@ class SeoLandingController extends Controller
     private function getSubLocalities(): array
     {
         return [
-            'zirakpur'   => ['VIP Road', 'Patiala Road', 'Airport Road', 'Dhakoli', 'Baltana', 'Lohgarh'],
+            'zirakpur'   => ['VIP Road', 'Patiala Road', 'Airport Road', 'Dhakoli', 'Baltana', 'Lohgarh', 'Peer Muchalla'],
             'mohali'     => ['Phase 5', 'Phase 7', 'Phase 10', 'Phase 11', 'Sector 70', 'Sector 82', 'Aerocity'],
             'chandigarh' => ['Sector 9', 'Sector 20', 'Sector 35', 'Sector 44', 'Manimajra', 'Panchkula Road'],
             'panchkula'  => ['Sector 20', 'Sector 25', 'MDC', 'Sector 9', 'Sector 12A'],
@@ -642,19 +642,38 @@ class SeoLandingController extends Controller
             $seoDesc  = "Browse verified ready to move flats in Kharar on {$appName}. Immediate possession options with photos and direct agent contact.";
         }
 
-        // BHK landing pages (SEO-critical): tune meta description to match the exact search intent.
-
-
-        // Targets: /2bhk-flats-in-zirakpur, /3bhk-flats-in-zirakpur, /4bhk-flats-in-zirakpur
+        // Targets: /1bhk-flats-in-zirakpur to /5bhk-flats-in-zirakpur
         else if ($pageType === 'bhk-flats' && $citySlugLower === 'zirakpur' && $bhkType) {
-
-
-            // $bhkType is like "2 BHK".
             $bhkNum = trim(str_replace('BHK', '', $bhkType));
             $bhkNum = preg_replace('/[^0-9]/', '', $bhkNum);
             $bhkNum = $bhkNum ?: $bhkType;
-            $seoTitle = "{$bhkType} Flats for Sale in Zirakpur | Verified Listings | {$appName}";
-            $seoDesc  = "Find verified {$bhkNum} BHK flats for sale in Zirakpur. Browse {$bhkNum} BHK listings with photos, floor plans and direct agent contact on {$appName}. Best deals in Zirakpur, Punjab.";
+
+            // Specific Metadata for Zirakpur BHK pages to help rank on 1st page
+            switch ($bhkNum) {
+                case '1':
+                    $seoTitle = "1 BHK Flats for Sale in Zirakpur | Affordable Apartments | {$appName}";
+                    $seoDesc  = "Looking for affordable 1 BHK flats in Zirakpur? Browse verified listings with photos, floor plans and direct agent contact. Perfect for small families and investors in Zirakpur, Punjab.";
+                    break;
+                case '2':
+                    $seoTitle = "2 BHK Flats for Sale in Zirakpur | Best Gated Societies | {$appName}";
+                    $seoDesc  = "Find the best 2 BHK flats for sale in Zirakpur's top gated societies. Browse verified listings with real photos, amenities, and floor plans. Your dream 2 BHK in Zirakpur starts here.";
+                    break;
+                case '3':
+                    $seoTitle = "3 BHK Flats for Sale in Zirakpur | Luxury & Spacious | {$appName}";
+                    $seoDesc  = "Explore premium 3 BHK flats for sale in Zirakpur. Spacious layouts, world-class amenities, and verified listings with direct agent contact on {$appName}. Best 3 BHK deals in Zirakpur.";
+                    break;
+                case '4':
+                    $seoTitle = "4 BHK Flats for Sale in Zirakpur | Luxury Penthouses & Units | {$appName}";
+                    $seoDesc  = "Discover luxury 4 BHK flats and penthouses for sale in Zirakpur. Browse premium verified listings with high-end amenities and great connectivity on {$appName}. Elite living in Zirakpur.";
+                    break;
+                case '5':
+                    $seoTitle = "5 BHK Flats for Sale in Zirakpur | Ultra Luxury Living | {$appName}";
+                    $seoDesc  = "Ultra-luxury 5 BHK flats for sale in Zirakpur. Find expansive homes with premium features in Zirakpur's most prestigious projects. Verified listings with photos and direct agent contact.";
+                    break;
+                default:
+                    $seoTitle = "{$bhkType} Flats for Sale in Zirakpur | Verified Listings | {$appName}";
+                    $seoDesc  = "Find verified {$bhkNum} BHK flats for sale in Zirakpur. Browse {$bhkNum} BHK listings with photos, floor plans and direct agent contact on {$appName}. Best deals in Zirakpur, Punjab.";
+            }
         } else {
             $seoTitle = "{$h1} | Verified Listings | {$appName}";
             $seoDesc  = "Find {$totalCount}+ verified {$h1} on {$appName}. Browse with photos, floor plans & agent contact. Best deals in {$locationLabel}, {$city['state']}.";

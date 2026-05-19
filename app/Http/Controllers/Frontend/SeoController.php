@@ -19,7 +19,7 @@ class SeoController extends Controller
     public static function getSeoLocations(): array
     {
         return [
-            'dhakoli', 'zirakpur', 'derabassi', 'panchkula',
+            'dhakoli', 'zirakpur', 'peer-muchalla', 'derabassi', 'panchkula',
             'chandigarh', 'mohali', 'manimajra', 'banur',
             'landran', 'mullanpur', 'kharar', 'gharuan',
             'kurali', 'morinda', 'fatehgarh-sahib', 'pinjore',

@@ -39,6 +39,7 @@ class PropertiesController extends Controller
         return [
             'dhakoli'          => ['label' => 'Dhakoli',           'lat' => 30.6400, 'lng' => 76.8190],
             'zirakpur'         => ['label' => 'Zirakpur',          'lat' => 30.6525, 'lng' => 76.8371],
+            'peer-muchalla'    => ['label' => 'Peer Muchalla',     'lat' => 30.6530, 'lng' => 76.8290],
             'derabassi'        => ['label' => 'Derabassi',         'lat' => 30.5952, 'lng' => 76.8378],
             'panchkula'        => ['label' => 'Panchkula',         'lat' => 30.6942, 'lng' => 76.8606],
             'chandigarh'       => ['label' => 'Chandigarh',        'lat' => 30.7333, 'lng' => 76.7794],
@@ -200,4 +201,3 @@ class PropertiesController extends Controller
         return view('frontend.properties', compact('properties', 'cities', 'propertyTypes'));
 }
 }
-
