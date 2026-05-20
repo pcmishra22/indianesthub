@@ -728,7 +728,12 @@ class SeoLandingController extends Controller
             $seoDesc  = "Find {$totalCount}+ verified {$h1} on {$appName}. Browse with photos, floor plans & agent contact. Best deals in {$locationLabel}, {$city['state']}.";
         }
 
+        // Safety net: avoid compact() on an undefined SEO title/desc.
+        $seoTitle = $seoTitle ?? ($h1 . " | Verified Listings | " . $appName);
+        $seoDesc  = $seoDesc  ?? ("Find {$totalCount}+ verified {$h1} on {$appName}.");
+
         return view('frontend.seo-landing', compact(
+
 
             'properties', 'newProjects', 'pageDealers',
             'cityLabel', 'citySlug', 'h1',
