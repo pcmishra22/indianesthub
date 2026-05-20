@@ -45,14 +45,32 @@ class LeadReportController extends Controller
             ->paginate(15, ['*'], 'bl_page');
 
         // ── Most Viewed Properties ────────────────────────────────────────────
-        $topProperties = Property::select('properties.*',
-                DB::raw('COUNT(property_views.id) as view_count'))
+        // IMPORTANT: MySQL ONLY_FULL_GROUP_BY requires that every selected non-aggregated
+        // column is present in GROUP BY. Selecting properties.* with groupBy(properties.id)
+        // breaks under ONLY_FULL_GROUP_BY.
+        $topProperties = Property::select([
+                'properties.id',
+                'properties.slug',
+                'properties.title',
+                'properties.city',
+                'properties.property_type',
+                'properties.price',
+                DB::raw('COUNT(property_views.id) as view_count'),
+            ])
             ->join('property_views', 'properties.id', '=', 'property_views.property_id')
             ->whereBetween('property_views.viewed_at', [$from, $to])
-            ->groupBy('properties.id')
+            ->groupBy([
+                'properties.id',
+                'properties.slug',
+                'properties.title',
+                'properties.city',
+                'properties.property_type',
+                'properties.price',
+            ])
             ->orderByDesc('view_count')
             ->limit(10)
             ->get();
+
 
         // ── Recent Visitor Log ────────────────────────────────────────────────
         $recentVisits = PropertyView::with('property')
