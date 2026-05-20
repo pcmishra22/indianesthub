@@ -146,12 +146,42 @@ class PropertiesController extends Controller
 
     public function index(Request $request)
     {
-        $lookingFor = $request->get('looking_for');
-        $city     = $request->get('city');
-        $locality = $request->get('locality');
-        $sector = $request->get('sector');
+        // Normalize common query params (some upstream URLs may append extra data like dates)
+        $normalizeParam = function ($value): ?string {
+            if ($value === null) {
+                return null;
+            }
+            $value = trim((string) $value);
+            // Strip wrapping quotes
+            $value = trim($value, "\"' ");
+            return $value === '' ? null : $value;
+        };
+
+        $normalizeLookingFor = function ($value): ?string {
+            $value = $value === null ? null : (string) $value;
+            $value = $value === null ? null : trim($value);
+            $value = $value === null ? null : trim($value, "\"' ");
+
+            if (!$value) {
+                return null;
+            }
+
+            // Handle cases like "PG,2026-04-01" => "PG"
+            $parts = explode(',', $value, 2);
+            $first = $parts[0] ?? null;
+            $first = $first === null ? null : trim($first);
+            $first = $first === null ? null : trim($first, "\"' ");
+
+            return $first === '' ? null : $first;
+        };
+
+        $lookingFor = $normalizeLookingFor($request->get('looking_for'));
+        $city     = $normalizeParam($request->get('city'));
+        $locality = $normalizeParam($request->get('locality'));
+        $sector   = $normalizeParam($request->get('sector'));
 
         $buildBaseQuery = function($lFor = null) use ($request) {
+
             $q = Property::with(['images', 'dealer', 'builder'])
                 ->paidAndValid()
                 ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
