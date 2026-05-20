@@ -3,7 +3,7 @@
     {{-- 1. Static Pages --}}
     @foreach($staticPages as $page)
     <url>
-        <loc>{{ route($page) }}</loc>
+        <loc>{{ rtrim($baseUrl, '/') . '/' . ltrim(route($page), '/') }}</loc>
         <changefreq>monthly</changefreq>
         <priority>{{ $page === 'home' ? '1.0' : '0.8' }}</priority>
     </url>

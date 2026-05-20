@@ -74,12 +74,15 @@ class SeoController extends Controller
             ->get();
 
         // Published blog posts
-        $blogs = BlogPost::where('status', 'published')
+        // NOTE: blog_posts table uses `is_published` + `published_at` (not `status`).
+        $blogs = BlogPost::published()
             ->whereNotNull('slug')
             ->where('slug', '!=', '')
             ->select('slug', 'updated_at')
             ->orderBy('updated_at', 'desc')
             ->get();
+
+
 
         $locations    = self::getSeoLocations();
         $landingCities = self::getSeoLandingCities();
@@ -90,10 +93,11 @@ class SeoController extends Controller
             'contact', 'pricing', 'subscription', 'privacy', 'terms'
         ];
 
-        $content = view('frontend.seo.sitemap', compact(
+$content = view('frontend.seo.sitemap', compact(
             'properties', 'dealers', 'builders', 'projects',
             'blogs', 'locations', 'landingCities', 'staticPages'
-        ))->render();
+        ))->with('baseUrl', rtrim(config('app.url', url('/')), '/'))
+          ->render();
 
         return response($content, 200)->header('Content-Type', 'application/xml; charset=UTF-8');
     }
