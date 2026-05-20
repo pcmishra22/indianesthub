@@ -146,48 +146,66 @@ class PropertiesController extends Controller
 
     public function index(Request $request)
     {
-        // Base query (always applies paid/valid + listing status + price basics)
-        $baseQuery = Property::with(['images', 'dealer', 'builder'])
-            ->paidAndValid()
-            ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
-            ->whereNotNull('price')
-            ->where('listing_status', 'active')
-            ->where('price', '>', 0);
+        $lookingFor = $request->get('looking_for');
+        $city     = $request->get('city');
+        $locality = $request->get('locality');
+        $sector = $request->get('sector');
 
-        if ($request->filled('keyword')) {
-            $keyword = $request->keyword;
-            $baseQuery->where(function ($q) use ($keyword) {
-                $q->where('title', 'like', "%{$keyword}%")
-                  ->orWhere('description', 'like', "%{$keyword}%")
-                  ->orWhere('address', 'like', "%{$keyword}%")
-                  ->orWhere('locality', 'like', "%{$keyword}%")
-                  ->orWhere('city', 'like', "%{$keyword}%");
-            });
-        }
+        $buildBaseQuery = function($lFor = null) use ($request) {
+            $q = Property::with(['images', 'dealer', 'builder'])
+                ->paidAndValid()
+                ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
+                ->whereNotNull('price')
+                ->where('listing_status', 'active')
+                ->where('price', '>', 0);
 
-        if ($request->filled('property_type')) {
-            $baseQuery->where('property_type', $request->property_type);
-        }
-
-        if ($request->filled('looking_for')) {
-            $lf = $request->looking_for;
-            if (in_array($lf, ['Sale', 'Buy', 'buy', 'sale'])) {
-                $baseQuery->whereIn('looking_for', ['Sale', 'Sell', 'Buy', 'sell', 'buy', 'sale']);
-            } else {
-                $baseQuery->where('looking_for', $lf);
+            if ($request->filled('keyword')) {
+                $keyword = $request->keyword;
+                $q->where(function ($inner) use ($keyword) {
+                    $inner->where('title', 'like', "%{$keyword}%")
+                      ->orWhere('description', 'like', "%{$keyword}%")
+                      ->orWhere('address', 'like', "%{$keyword}%")
+                      ->orWhere('locality', 'like', "%{$keyword}%")
+                      ->orWhere('city', 'like', "%{$keyword}%");
+                });
             }
-        }
 
-        if ($request->filled('bhk_type')) $baseQuery->where('bhk_type', $request->bhk_type);
-        if ($request->filled('min_price')) $baseQuery->where('price', '>=', $request->min_price);
-        if ($request->filled('max_price')) $baseQuery->where('price', '<=', $request->max_price);
-        if ($request->filled('min_area')) $baseQuery->where('area', '>=', $request->min_area);
-        if ($request->filled('max_area')) $baseQuery->where('area', '<=', $request->max_area);
-        if ($request->filled('bedrooms')) $baseQuery->where('bedrooms', '>=', $request->bedrooms);
-        if ($request->filled('furnishing_status')) $baseQuery->where('furnishing_status', $request->furnishing_status);
-        if ($request->filled('pet_friendly')) $baseQuery->where('pet_friendly', true);
-        if ($request->filled('gated_society')) $baseQuery->where('gated_society', true);
-        if ($request->filled('vastu_compliant')) $baseQuery->where('vastu_compliant', true);
+            if ($request->filled('property_type')) {
+                $pType = $request->property_type;
+                if (in_array(strtolower(trim($pType)), ['flat', 'flats', 'apartment', 'apartments'])) {
+                    $q->where(function ($inner) {
+                        $inner->where('property_type', 'like', '%Flat%')
+                          ->orWhere('property_type', 'like', '%Flats%')
+                          ->orWhere('property_type', 'like', '%Apartment%')
+                          ->orWhere('property_type', 'like', '%Apartments%');
+                    });
+                } else {
+                    $q->where('property_type', 'like', "%{$pType}%");
+                }
+            }
+
+            $useLF = $lFor ?? $request->get('looking_for');
+            if ($useLF) {
+                if (in_array($useLF, ['Sale', 'Buy', 'buy', 'sale'])) {
+                    $q->whereIn('looking_for', ['Sale', 'Sell', 'Buy', 'sell', 'buy', 'sale']);
+                } else {
+                    $q->where('looking_for', $useLF);
+                }
+            }
+
+            if ($request->filled('bhk_type')) $q->where('bhk_type', $request->bhk_type);
+            if ($request->filled('min_price')) $q->where('price', '>=', $request->min_price);
+            if ($request->filled('max_price')) $q->where('price', '<=', $request->max_price);
+            if ($request->filled('min_area')) $q->where('area', '>=', $request->min_area);
+            if ($request->filled('max_area')) $q->where('area', '<=', $request->max_area);
+            if ($request->filled('bedrooms')) $q->where('bedrooms', '>=', $request->bedrooms);
+            if ($request->filled('furnishing_status')) $q->where('furnishing_status', $request->furnishing_status);
+            if ($request->filled('pet_friendly')) $q->where('pet_friendly', true);
+            if ($request->filled('gated_society')) $q->where('gated_society', true);
+            if ($request->filled('vastu_compliant')) $q->where('vastu_compliant', true);
+
+            return $q;
+        };
 
         // Sorting
         $sortBy = $request->get('sort_by', 'newest');
@@ -208,15 +226,7 @@ class PropertiesController extends Controller
             }
         };
 
-        $city     = $request->get('city');
-        $locality = $request->get('locality');
-
-        // Progressive fallback:
-        // 1) city + locality
-        // 2) city only
-        // 3) sector only (if requested + if schema supports it)
-        $sector = $request->get('sector');
-
+        $baseQuery = $buildBaseQuery();
         $attempt = function (callable $applyLocationFilters) use ($baseQuery, $applySorting) {
             $q = clone $baseQuery;
             $applyLocationFilters($q);
@@ -227,14 +237,12 @@ class PropertiesController extends Controller
         $attemptCount = 0;
         $properties = null;
 
-        // Attempt 1: city + locality
+        // Attempt 1: exact city + locality
         if (!empty($city) && !empty($locality)) {
             $q1 = clone $baseQuery;
-            $q1->where('city', $city);
-            $q1->where('locality', 'like', "%{$locality}%");
+            $q1->where('city', 'like', "%{$city}%")
+               ->where('locality', 'like', "%{$locality}%");
             $applySorting($q1);
-
-            $attemptCount++;
             if ($q1->count() > 0) {
                 $properties = $q1->paginate(24)->withQueryString();
             }
@@ -243,10 +251,9 @@ class PropertiesController extends Controller
         // Attempt 2: city only
         if ($properties === null && !empty($city)) {
             $q2 = clone $baseQuery;
-            $q2->where('city', $city);
+            $q2->where('city', 'like', "%{$city}%")
+               ->orWhere('locality', 'like', "%{$city}%");
             $applySorting($q2);
-
-            $attemptCount++;
             if ($q2->count() > 0) {
                 $properties = $q2->paginate(24)->withQueryString();
             }
@@ -259,8 +266,6 @@ class PropertiesController extends Controller
                 $q3 = clone $baseQuery;
                 $q3->where('sector', 'like', "%{$sector}%");
                 $applySorting($q3);
-
-                $attemptCount++;
                 if ($q3->count() > 0) {
                     $properties = $q3->paginate(24)->withQueryString();
                 }
@@ -270,10 +275,34 @@ class PropertiesController extends Controller
         }
 
         // Final fallback: whatever filters remain (no city/locality/sector gating)
-        if ($properties === null) {
+        if ($properties === null || $properties->total() === 0) {
             $q0 = clone $baseQuery;
             $applySorting($q0);
             $properties = $q0->paginate(24)->withQueryString();
+        }
+
+        // Fallback: If still no results and looking for PG, try Rent
+        if ($properties->total() === 0 && strtolower($lookingFor) === 'pg') {
+            $baseQuery = $buildBaseQuery('Rent');
+            $qFallback = clone $baseQuery;
+            if (!empty($city)) {
+                $qFallback->where('city', 'like', "%{$city}%");
+            }
+            $applySorting($qFallback);
+            $properties = $qFallback->paginate(24)->withQueryString();
+        }
+
+        // Ultimate Fallback: Just show latest properties in the city if any, or any properties
+        if ($properties->total() === 0) {
+            $properties = Property::with(['images', 'dealer', 'builder'])
+                ->paidAndValid()
+                ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
+                ->where('listing_status', 'active')
+                ->when($city, function($q) use ($city) {
+                    $q->where('city', 'like', "%{$city}%");
+                })
+                ->orderByRaw('is_boosted DESC, created_at DESC')
+                ->paginate(24);
         }
 
         $cities = Property::whereNotNull('city')->distinct()->pluck('city')->filter()->sort();
@@ -282,5 +311,3 @@ class PropertiesController extends Controller
         return view('frontend.properties', compact('properties', 'cities', 'propertyTypes'));
     }
 }
-
-

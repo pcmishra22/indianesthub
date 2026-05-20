@@ -205,6 +205,73 @@ class SeoLandingController extends Controller
     }
 
     /**
+     * Builds the base property query with common filters.
+     *
+     * @param string      $cityLabel
+     * @param string|null $propertyType
+     * @param string|null $lookingFor
+     * @param string|null $bhkType
+     * @param int|null    $maxPrice
+     * @param string|null $areaLabel
+     * @param array       $extraFilters
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    private function buildPropertyQuery(
+        string $cityLabel,
+        ?string $propertyType,
+        ?string $lookingFor,
+        ?string $bhkType,
+        ?int $maxPrice,
+        ?string $areaLabel,
+        array $extraFilters
+    ): \Illuminate\Database\Eloquent\Builder {
+        $query = Property::with(['images', 'dealer', 'builder'])
+            ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
+            ->whereNotNull('price')
+            ->where('price', '>', 0)
+            ->where(function ($q) use ($cityLabel, $areaLabel) {
+                $q->where('city', 'like', "%{$cityLabel}%")
+                  ->orWhere('locality', 'like', "%{$cityLabel}%")
+                  ->orWhere('address', 'like', "%{$cityLabel}%");
+
+                if ($areaLabel) {
+                    $q->where(function ($subQ) use ($areaLabel) {
+                        $subQ->where('locality', 'like', "%{$areaLabel}%")
+                             ->orWhere('sub_locality', 'like', "%{$areaLabel}%")
+                             ->orWhere('address', 'like', "%{$areaLabel}%");
+                    });
+                }
+            });
+
+        if ($propertyType) {
+            if (in_array(strtolower(trim($propertyType)), ['flat', 'flats', 'apartment', 'apartments'])) {
+                $query->where(function ($q) {
+                    $q->where('property_type', 'like', '%Flat%')
+                      ->orWhere('property_type', 'like', '%Flats%')
+                      ->orWhere('property_type', 'like', '%Apartment%')
+                      ->orWhere('property_type', 'like', '%Apartments%');
+                });
+            } else {
+                $query->where('property_type', 'like', "%{$propertyType}%");
+            }
+        }
+
+        if ($lookingFor) {
+            if (in_array($lookingFor, ['Sale', 'Buy', 'buy', 'sale'])) {
+                $query->whereIn('looking_for', ['Sale', 'Sell', 'Buy', 'sell', 'buy', 'sale']);
+            } else {
+                $query->where('looking_for', $lookingFor);
+            }
+        }
+
+        if ($bhkType) $query->where('bhk_type', $bhkType);
+        if ($maxPrice) $query->where('price', '<=', $maxPrice);
+        foreach ($extraFilters as $col => $val) $query->where($col, $val);
+
+        return $query;
+    }
+
+    /**
      * Generic BHK × property-type handler (sale or rent).
      * Shared by house, villa, duplex, flat variants to avoid duplication.
      */
@@ -284,7 +351,7 @@ class SeoLandingController extends Controller
         string  $propertyType,
         string  $lookingFor,
         string  $bhkType,
-        string  $h1,
+        string  $h1_param, // Renamed to avoid conflict with local $h1
         string  $pageType,
         Request $request,
         ?int    $maxPrice     = null,
@@ -306,138 +373,74 @@ class SeoLandingController extends Controller
                 'desc'  => 'a growing real estate destination',
             ];
         }
-
         $cityLabel = $city['label'];
+        $originalMaxPrice = $maxPrice;
 
-        // ── Build property query ──────────────────────────────────────────
-        $query = Property::with(['images', 'dealer', 'builder'])
-            ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
-            ->whereNotNull('price')
-            ->where('price', '>', 0)
-            ->where(function ($q) use ($cityLabel) {
-                $q->where('city', 'like', "%{$cityLabel}%")
-                  ->orWhere('locality', 'like', "%{$cityLabel}%")
-                  ->orWhere('address', 'like', "%{$cityLabel}%");
-            });
-
-        // Sub-locality filter for area+city pages
-        if ($areaLabel) {
-            $query->where(function ($q) use ($areaLabel) {
-                $q->where('locality', 'like', "%{$areaLabel}%")
-                  ->orWhere('sub_locality', 'like', "%{$areaLabel}%")
-                  ->orWhere('address', 'like', "%{$areaLabel}%");
-            });
-        }
-
-        if ($propertyType) {
-            // SEO-critical: allow common DB variants for flats.
-            // In your DB, property_type can be values like Flat/Flats/Apartment/Apartments.
-            if (in_array(strtolower(trim($propertyType)), ['flat', 'flats', 'apartment', 'apartments'])) {
-                $query->where(function ($q) {
-                    $q->where('property_type', 'like', '%Flat%')
-                      ->orWhere('property_type', 'like', '%Flats%')
-                      ->orWhere('property_type', 'like', '%Apartment%')
-                      ->orWhere('property_type', 'like', '%Apartments%');
-                });
-            } else {
-                $query->where('property_type', 'like', "%{$propertyType}%");
-            }
-        }
-
-        if ($lookingFor) {
-            if (in_array($lookingFor, ['Sale', 'Buy', 'buy', 'sale'])) {
-                $query->whereIn('looking_for', ['Sale', 'Sell', 'Buy', 'sell', 'buy', 'sale']);
-            } else {
-                $query->where('looking_for', $lookingFor);
-            }
-        }
-
-        if ($bhkType) {
-            $query->where('bhk_type', $bhkType);
-        }
-
-        if ($maxPrice) {
-            $query->where('price', '<=', $maxPrice);
-        }
-
-        foreach ($extraFilters as $col => $val) {
-            $query->where($col, $val);
-        }
-
-        $query->orderByRaw('is_boosted DESC, is_featured DESC, is_premium DESC, created_at DESC');
-        $properties = $query->paginate(12)->withQueryString();
+        // Local variables for current query state, allowing fallbacks to modify them
+        $_propertyType = $propertyType;
+        $_lookingFor = $lookingFor;
+        $_bhkType = $bhkType;
+        $_maxPrice = $maxPrice;
+        $_areaLabel = $areaLabel;
+        $_extraFilters = $extraFilters;
+        $h1 = $h1_param; // Initialize local H1 with the passed parameter
 
         $isFallback = false;
+
+        // Initial query attempt
+        $properties = $this->buildPropertyQuery(
+            $cityLabel, $_propertyType, $_lookingFor, $_bhkType, $_maxPrice, $_areaLabel, $_extraFilters
+        )->orderByRaw('is_boosted DESC, is_featured DESC, is_premium DESC, created_at DESC')
+         ->paginate(12)->withQueryString();
+
+        // Fallback 0: PG to Rent
+        if ($properties->total() === 0 && strtolower($_lookingFor) === 'pg') {
+            $_lookingFor = 'Rent'; // Change lookingFor to Rent
+            $h1 = str_ireplace('PG', 'Rent', $h1); // Update H1 to reflect the change
+            $isFallback = true;
+
+            // Re-run the query with the updated lookingFor
+            $properties = $this->buildPropertyQuery(
+                $cityLabel, $_propertyType, $_lookingFor, $_bhkType, $_maxPrice, $_areaLabel, $_extraFilters
+            )->orderByRaw('is_boosted DESC, is_featured DESC, is_premium DESC, created_at DESC')
+             ->paginate(12)->withQueryString();
+        }
         // ── Multi-stage Fallback ──────────────────────────────────────────
         // If 0 properties found for exact criteria, broaden search step-by-step:
         // 1. BHK -> Property Type -> City
-        if ($properties->total() === 0) {
+        if ($properties->total() === 0 && ($_bhkType || $_maxPrice || !empty($_extraFilters))) {
             // FALLBACK 1: Broaden from specific BHK/Budget/Extras to just Property Type (e.g. "Flats in Zirakpur")
-            if ($bhkType || $maxPrice || !empty($extraFilters)) {
-                $query = Property::with(['images', 'dealer', 'builder'])
-                    ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
-                    ->whereNotNull('price')->where('price', '>', 0)
-                    ->where(function ($q) use ($cityLabel) {
-                        $q->where('city', 'like', "%{$cityLabel}%")
-                          ->orWhere('locality', 'like', "%{$cityLabel}%")
-                          ->orWhere('address', 'like', "%{$cityLabel}%");
-                    });
+            $_bhkType = null;
+            $_maxPrice = null;
+            $_extraFilters = [];
+            $isFallback = true;
 
-                if ($areaLabel) {
-                    $query->where(function ($q) use ($areaLabel) {
-                        $q->where('locality', 'like', "%{$areaLabel}%")
-                          ->orWhere('sub_locality', 'like', "%{$areaLabel}%")
-                          ->orWhere('address', 'like', "%{$areaLabel}%");
-                    });
-                }
+            $properties = $this->buildPropertyQuery(
+                $cityLabel, $_propertyType, $_lookingFor, $_bhkType, $_maxPrice, $_areaLabel, $_extraFilters
+            )->orderByRaw('is_boosted DESC, is_featured DESC, is_premium DESC, created_at DESC')
+             ->paginate(12)->withQueryString();
 
-                if ($propertyType) {
-                    $query->where('property_type', 'like', "%{$propertyType}%");
-                }
-
-                if ($lookingFor) {
-                    if (in_array($lookingFor, ['Sale', 'Buy', 'buy', 'sale'])) {
-                        $query->whereIn('looking_for', ['Sale', 'Sell', 'Buy', 'sell', 'buy', 'sale']);
-                    } else {
-                        $query->where('looking_for', $lookingFor);
-                    }
-                }
-
-                $query->orderByRaw('is_boosted DESC, is_featured DESC, is_premium DESC, created_at DESC');
-                $properties = $query->paginate(12)->withQueryString();
-
-                if ($properties->total() > 0) {
-                    $h1 = ($propertyType ? "{$propertyType}s" : "Properties") . " for " . ($lookingFor ?: 'Sale') . " in " . ($areaLabel ? "{$areaLabel}, {$cityLabel}" : $cityLabel);
-                    $isFallback = true;
-                }
+            if ($properties->total() > 0) {
+                $h1 = ($_propertyType ? "{$_propertyType}s" : "Properties") . " for " . ($_lookingFor ?: 'Sale') . " in " . ($_areaLabel ? "{$_areaLabel}, {$cityLabel}" : $cityLabel);
             }
+        }
 
-            // FALLBACK 2: Broaden to any property in the city/area (e.g. "Properties in Zirakpur")
-            if ($properties->total() === 0) {
-                $query = Property::with(['images', 'dealer', 'builder'])
-                    ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
-                    ->whereNotNull('price')->where('price', '>', 0)
-                    ->where(function ($q) use ($cityLabel) {
-                        $q->where('city', 'like', "%{$cityLabel}%")
-                          ->orWhere('locality', 'like', "%{$cityLabel}%")
-                          ->orWhere('address', 'like', "%{$cityLabel}%");
-                    });
+        // FALLBACK 2: Broaden to any property in the city/area (e.g. "Properties in Zirakpur")
+        if ($properties->total() === 0) {
+            $_propertyType = null;
+            $_bhkType = null;
+            $_maxPrice = null;
+            $_extraFilters = [];
+            $_areaLabel = null; // Also broaden area label
+            $isFallback = true;
 
-                if ($lookingFor) {
-                    if (in_array($lookingFor, ['Sale', 'Buy', 'buy', 'sale'])) {
-                        $query->whereIn('looking_for', ['Sale', 'Sell', 'Buy', 'sell', 'buy', 'sale']);
-                    } else {
-                        $query->where('looking_for', $lookingFor);
-                    }
-                }
+            $properties = $this->buildPropertyQuery(
+                $cityLabel, $_propertyType, $_lookingFor, $_bhkType, $_maxPrice, $_areaLabel, $_extraFilters
+            )->orderByRaw('is_boosted DESC, is_featured DESC, is_premium DESC, created_at DESC')
+             ->paginate(12)->withQueryString();
 
-                $query->orderByRaw('is_boosted DESC, is_featured DESC, is_premium DESC, created_at DESC');
-                $properties = $query->paginate(12)->withQueryString();
-
-                // Update H1 to reflect general results for the city
-                $h1 = "Available Properties in " . ($areaLabel ? "{$areaLabel}, {$cityLabel}" : $cityLabel);
-                $isFallback = true;
-            }
+            // Update H1 to reflect general results for the city
+            $h1 = "Available Properties in " . ($_areaLabel ? "{$_areaLabel}, {$cityLabel}" : $cityLabel);
         }
 
         // Soft 404 Mitigation: If we had to fallback or have 0 results, tell Google not to index this specific URL
@@ -480,8 +483,8 @@ class SeoLandingController extends Controller
         $totalCount    = $properties->total();
 
         $budgetLabel = $maxPrice
-            ? ($maxPrice >= 10000000
-                ? '₹' . number_format($maxPrice / 10000000, 1) . ' Crore'
+            ? ($originalMaxPrice >= 10000000
+                ? '₹' . number_format($originalMaxPrice / 10000000, 1) . ' Crore'
                 : '₹' . number_format($maxPrice / 100000) . ' Lakh')
             : null;
 
@@ -748,7 +751,7 @@ class SeoLandingController extends Controller
         $h1 = $loc['areaLabel']
             ? "Flats for Sale in {$loc['areaLabel']}, {$loc['cityLabel']}"
             : "Flats for Sale in {$loc['cityLabel']}";
-
+        
         return $this->renderLanding(
             $loc['citySlug'], 'Flat', 'Sale', '', $h1, 'flats', $request, null, $loc['areaLabel']
         );
@@ -763,7 +766,7 @@ class SeoLandingController extends Controller
         $h1 = $loc['areaLabel']
             ? "Flats for Rent in {$loc['areaLabel']}, {$loc['cityLabel']}"
             : "Flats for Rent in {$loc['cityLabel']}";
-
+        
         return $this->renderLanding(
             $loc['citySlug'], 'Flat', 'Rent', '', $h1, 'rent-flats', $request, null, $loc['areaLabel']
         );
@@ -778,7 +781,7 @@ class SeoLandingController extends Controller
         $h1 = $loc['areaLabel']
             ? "Plots for Sale in {$loc['areaLabel']}, {$loc['cityLabel']}"
             : "Plots for Sale in {$loc['cityLabel']}";
-
+        
         return $this->renderLanding(
             $loc['citySlug'], 'Plot', 'Sale', '', $h1, 'plots', $request, null, $loc['areaLabel']
         );
@@ -793,7 +796,7 @@ class SeoLandingController extends Controller
         $h1 = $loc['areaLabel']
             ? "Villas for Sale in {$loc['areaLabel']}, {$loc['cityLabel']}"
             : "Villas for Sale in {$loc['cityLabel']}";
-
+        
         return $this->renderLanding(
             $loc['citySlug'], 'Villa', 'Sale', '', $h1, 'villas', $request, null, $loc['areaLabel']
         );
@@ -915,7 +918,7 @@ class SeoLandingController extends Controller
         $h1 = $loc['areaLabel']
             ? "{$bhkLabel} Flats for Sale in {$loc['areaLabel']}, {$loc['cityLabel']}"
             : "{$bhkLabel} Flats for Sale in {$loc['cityLabel']}";
-
+        
         return $this->renderLanding(
             $loc['citySlug'], 'Flat', 'Sale', $bhkLabel, $h1, 'bhk-flats', $request, null, $loc['areaLabel']
         );
