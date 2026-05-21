@@ -25,6 +25,7 @@ class SeoLandingController extends Controller
             'derabassi'  => ['label' => 'Derabassi',  'state' => 'Punjab',        'desc' => 'a growing township between Chandigarh and Ambala'],
             'mullanpur'  => ['label' => 'Mullanpur',  'state' => 'Punjab',        'desc' => 'Chandigarh\'s New City — the biggest township project in North India'],
             'patiala'    => ['label' => 'Patiala',    'state' => 'Punjab',        'desc' => 'Punjab\'s second largest city with rich heritage and growing real estate'],
+            'pinjore'    => ['label' => 'Pinjore',    'state' => 'Haryana',       'desc' => 'a historic town in Haryana known for its gardens and growing real estate'],
             'ambala'     => ['label' => 'Ambala',     'state' => 'Haryana',       'desc' => 'a strategic city on NH44 with growing residential development'],
         ];
     }
