@@ -880,12 +880,13 @@ document.getElementById('propSearchForm').addEventListener('submit', function(e)
   let baseUrl = '{{ url("/properties") }}';
   
   // Redirect to path-based routes if searching by City or City + Property Type
+  // IMPORTANT: path-based routes are defined like /{type}-in-{city}, not /{type}-in/{city}.
   if (city && !hasOtherFilters && !params.get('keyword')) {
     const citySlug = encodeURIComponent(city.toLowerCase().replace(/\s+/g, '-'));
     const pType = propertyType.toLowerCase();
     
     if (pType.includes('flat') || pType.includes('apartment')) {
-      baseUrl = (lookingFor === 'Rent') ? '{{ url("/rent-flats-in") }}/' + citySlug : '{{ url("/flats-in") }}/' + citySlug;
+      baseUrl = (lookingFor === 'Rent') ? '{{ url("/rent-flats-in") }}-' + citySlug : '{{ url("/flats-in") }}-' + citySlug;
       params.delete('city');
       params.delete('property_type');
       params.delete('looking_for');
@@ -894,7 +895,7 @@ document.getElementById('propSearchForm').addEventListener('submit', function(e)
       params.delete('city');
       params.delete('property_type');
     } else if (pType.includes('villa') || pType.includes('house')) {
-      baseUrl = '{{ url("/villas-in") }}/' + citySlug;
+      baseUrl = '{{ url("/villas-in") }}-' + citySlug;
       params.delete('city');
       params.delete('property_type');
     } else {
