@@ -176,7 +176,10 @@ class PropertiesController extends Controller
         };
 
         $lookingFor = $normalizeLookingFor($request->get('looking_for'));
-        $city     = $normalizeParam($request->get('city'));
+
+        // SEO-friendly route: /properties-in/{city}
+        $routeCity = $request->route('city');
+        $city     = $normalizeParam($request->get('city') ?? $routeCity);
         $locality = $normalizeParam($request->get('locality'));
         $sector   = $normalizeParam($request->get('sector'));
 

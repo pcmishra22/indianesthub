@@ -558,7 +558,12 @@
           @foreach($activeFilters as $f)
             <span class="filter-tag">
               {{ $f['label'] }}
-              <a href="{{ url('/properties').'?'.http_build_query(request()->except([$f['key'],'page'])) }}">&times;</a>
+              @php
+                $nextQuery = request()->except([$f['key'], 'page']);
+                $nextCity   = $nextQuery['city'] ?? null;
+                $baseUrl    = $nextCity ? route('properties.city', ['city' => $nextCity]) : url('/properties');
+              @endphp
+              <a href="{{ $baseUrl . (count($nextQuery) ? ('?'.http_build_query($nextQuery)) : '') }}">&times;</a>
             </span>
           @endforeach
         </div>
@@ -569,9 +574,11 @@
     {{-- RESULTS BAR                                       --}}
     {{-- ══════════════════════════════════════════════════ --}}
     <div class="results-bar d-flex align-items-center justify-content-between mt-4">
-      <div class="results-count">
+            <div class="results-count">
         <span>{{ $properties->total() }}</span> Properties
-        @if(request('city')) in {{ request('city') }} @endif
+        @php $displayCity = request('city'); @endphp
+        @if(!$displayCity && request()->route('city')) $displayCity = request()->route('city'); @endif
+        @if($displayCity) in {{ $displayCity }} @endif
         @if(request('looking_for') == 'Sale') &nbsp;· For Sale @elseif(request('looking_for') == 'Rent') &nbsp;· For Rent @elseif(request('looking_for') == 'PG') &nbsp;· PG @endif
         @if($properties->total() > 0)
           <small class="text-muted ms-2">({{ $properties->firstItem() }}–{{ $properties->lastItem() }} shown)</small>
@@ -836,6 +843,45 @@ function toggleAdv(btn) {
     btn.style.color = '';
   }
 }
+
+// Improved form submission to create clean, SEO-friendly URLs and remove empty parameters
+document.getElementById('propSearchForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  
+  const form = this;
+  const formData = new FormData(form);
+  const params = new URLSearchParams();
+  
+  let city = '';
+  let hasComplexFilters = false;
+  // Define parameters that can be part of the clean SEO path
+  const seoFriendlyParams = ['city', 'looking_for'];
+
+  for (const [key, value] of formData.entries()) {
+    if (value !== null && value.toString().trim() !== '') {
+      // Omit the default sort value to keep the URL shorter
+      if (key === 'sort_by' && value === 'newest') continue;
+      
+      if (key === 'city') {
+        city = value;
+      } else if (!seoFriendlyParams.includes(key)) {
+        hasComplexFilters = true;
+      }
+      params.append(key, value);
+    }
+  }
+
+  let baseUrl = '{{ url("/properties") }}';
+  
+  // If only city (and/or looking_for) is selected, redirect to the SEO-friendly route path
+  if (city && !hasComplexFilters) {
+    baseUrl = '{{ url("/properties-in") }}/' + encodeURIComponent(city);
+    params.delete('city');
+  }
+
+  const queryString = params.toString();
+  window.location.href = baseUrl + (queryString ? '?' + queryString : '');
+});
 
 // Restore view preference
 (function() {

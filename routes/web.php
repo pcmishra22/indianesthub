@@ -105,6 +105,8 @@ Route::middleware('auth')->group(function () {
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/about', [AboutController::class, 'about'])->name('about');
 Route::get('/properties', [PropertiesController::class, 'index'])->name('properties');
+// SEO-friendly city search (maps to same filter logic as /properties)
+Route::get('/properties-in/{city}', [PropertiesController::class, 'index'])->name('properties.city');
 Route::get('/properties/in/{location}', [PropertiesController::class, 'locationSearch'])->name('properties.location');
 Route::get('/properties/{property:slug}', [PropertyDetailsController::class, 'show'])->name('property-details');
 
