@@ -844,74 +844,19 @@ function toggleAdv(btn) {
   }
 }
 
-// Improved form submission to create clean, SEO-friendly URLs, remove empty parameters,
-// and map to hyperlocal landing pages defined in web.php
+// Improved form submission (SEO mapping disabled for this page)
+//
+// To restore earlier working behavior for /properties search,
+// we keep results on the same page using query-string parameters.
+//
+// If you later want dedicated SEO landing pages, we can re-enable
+// path-based redirects behind a flag.
 document.getElementById('propSearchForm').addEventListener('submit', function(e) {
-  e.preventDefault();
-  
-  const form = this;
-  const formData = new FormData(form);
-  const params = new URLSearchParams();
-  
-  let city = '';
-  let propertyType = '';
-  let lookingFor = '';
-  let hasOtherFilters = false;
-
-  for (const [key, value] of formData.entries()) {
-    const val = value.toString().trim();
-    if (val !== '') {
-      // Omit the default sort value to keep the URL shorter
-      if (key === 'sort_by' && val === 'newest') continue;
-      
-      if (key === 'city') {
-        city = val;
-      } else if (key === 'property_type') {
-        propertyType = val;
-      } else if (key === 'looking_for') {
-        lookingFor = val;
-      } else if (key !== 'keyword') {
-        hasOtherFilters = true;
-      }
-      params.append(key, val);
-    }
-  }
-
-  let baseUrl = '{{ url("/properties") }}';
-  
-  // Redirect to path-based routes if searching by City or City + Property Type
-  // IMPORTANT: path-based routes are defined like /{type}-in-{city}, not /{type}-in/{city}.
-  if (city && !hasOtherFilters && !params.get('keyword')) {
-    const citySlug = encodeURIComponent(city.toLowerCase().replace(/\s+/g, '-'));
-    const pType = propertyType.toLowerCase();
-    
-    if (pType.includes('flat') || pType.includes('apartment')) {
-      baseUrl = (lookingFor === 'Rent') ? '{{ url("/rent-flats-in") }}-' + citySlug : '{{ url("/flats-in") }}-' + citySlug;
-      params.delete('city');
-      params.delete('property_type');
-      params.delete('looking_for');
-    } else if (pType.includes('plot')) {
-      baseUrl = '{{ url("/plots-in") }}-' + citySlug;
-      params.delete('city');
-      params.delete('property_type');
-    } else if (pType.includes('villa') || pType.includes('house')) {
-      baseUrl = '{{ url("/villas-in") }}-' + citySlug;
-      params.delete('city');
-      params.delete('property_type');
-    } else {
-      baseUrl = '{{ url("/properties-in") }}/' + citySlug;
-      params.delete('city');
-    }
-  } else if (city) {
-    // Still use the city path even if other query filters are present
-    const citySlug = encodeURIComponent(city.toLowerCase().replace(/\s+/g, '-'));
-    baseUrl = '{{ url("/properties-in") }}/' + citySlug;
-    params.delete('city');
-  }
-
-  const queryString = params.toString();
-  window.location.href = baseUrl + (queryString ? '?' + queryString : '');
+  // Allow normal form GET submission so results render on /properties
+  // and match the expected earlier behavior.
+  // (No preventDefault here.)
 });
+
 
 // Restore view preference
 (function() {

@@ -157,6 +157,11 @@ class PropertiesController extends Controller
             return $value === '' ? null : $value;
         };
 
+        // If we're on the base listing page (/properties) we should not apply
+        // any SEO landing fallback that can override query-string searches.
+        $isBasePropertiesPage = $request->path() === 'properties';
+
+
         $normalizeLookingFor = function ($value): ?string {
             $value = $value === null ? null : (string) $value;
             $value = $value === null ? null : trim($value);
@@ -314,29 +319,35 @@ class PropertiesController extends Controller
             $properties = $q0->paginate(24)->withQueryString();
         }
 
-        // Fallback: If still no results and looking for PG, try Rent
-        if ($properties->total() === 0 && strtolower($lookingFor) === 'pg') {
-            $baseQuery = $buildBaseQuery('Rent');
-            $qFallback = clone $baseQuery;
-            if (!empty($city)) {
-                $qFallback->where('city', 'like', "%{$city}%");
+        // Important: on /properties we must keep results strictly matching
+        // the query-string filters. Do NOT widen search via PG->Rent or
+        // “ultimate fallback” (it changes behavior vs earlier working version).
+        if (!$isBasePropertiesPage) {
+            // Fallback: If still no results and looking for PG, try Rent
+            if ($properties->total() === 0 && strtolower($lookingFor) === 'pg') {
+                $baseQuery = $buildBaseQuery('Rent');
+                $qFallback = clone $baseQuery;
+                if (!empty($city)) {
+                    $qFallback->where('city', 'like', "%{$city}%");
+                }
+                $applySorting($qFallback);
+                $properties = $qFallback->paginate(24)->withQueryString();
             }
-            $applySorting($qFallback);
-            $properties = $qFallback->paginate(24)->withQueryString();
+
+            // Ultimate Fallback: Just show latest properties in the city if any, or any properties
+            if ($properties->total() === 0) {
+                $properties = Property::with(['images', 'dealer', 'builder'])
+                    ->paidAndValid()
+                    ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
+                    ->where('listing_status', 'active')
+                    ->when($city, function($q) use ($city) {
+                        $q->where('city', 'like', "%{$city}%");
+                    })
+                    ->orderByRaw('is_boosted DESC, created_at DESC')
+                    ->paginate(24);
+            }
         }
 
-        // Ultimate Fallback: Just show latest properties in the city if any, or any properties
-        if ($properties->total() === 0) {
-            $properties = Property::with(['images', 'dealer', 'builder'])
-                ->paidAndValid()
-                ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
-                ->where('listing_status', 'active')
-                ->when($city, function($q) use ($city) {
-                    $q->where('city', 'like', "%{$city}%");
-                })
-                ->orderByRaw('is_boosted DESC, created_at DESC')
-                ->paginate(24);
-        }
 
         $cities = Property::whereNotNull('city')->distinct()->pluck('city')->filter()->sort();
         $propertyTypes = Property::whereNotNull('property_type')->distinct()->pluck('property_type')->filter()->sort();
