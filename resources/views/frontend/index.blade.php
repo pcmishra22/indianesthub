@@ -336,14 +336,14 @@
 ════════════════════════════════════════════════════════ --}}
 <section class="hs-section white">
   <div class="container">
-    <div class="col-12 mb-4">
+    <!--<div class="col-12 mb-4">
       <img
         src="{{ asset('assets/img/loan_and_properties_banner.png') }}"
         alt="Loans & Properties"
         class="img-fluid rounded"
         loading="lazy"
       >
-    </div>
+    </div>-->
 
     <div class="hs-section-title">
       <span class="hs-badge">Browse by Category</span>
