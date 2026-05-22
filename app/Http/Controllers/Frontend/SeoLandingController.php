@@ -192,6 +192,19 @@ class SeoLandingController extends Controller
             }
         }
 
+        // ── 5. Known City (Guess State) Fallback ─────────────────────────
+        // Allow known cities (from guessState map) even if no properties exist.
+        $cityLabel = collect(explode('-', $slug))->map(fn($w) => ucfirst($w))->implode(' ');
+        $state = $this->guessState($cityLabel);
+        if ($state !== 'India') {
+            return [
+                'citySlug'  => $slug,
+                'cityData'  => ['label' => $cityLabel, 'state' => $state, 'desc' => 'a growing real estate destination'],
+                'cityLabel' => $cityLabel,
+                'areaLabel' => null,
+            ];
+        }
+
         return null; // No properties found anywhere → 404
     }
 

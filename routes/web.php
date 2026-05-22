@@ -106,7 +106,13 @@ Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/about', [AboutController::class, 'about'])->name('about');
 Route::get('/properties', [PropertiesController::class, 'index'])->name('properties');
 // SEO-friendly city search (maps to same filter logic as /properties)
-Route::get('/properties-in/{city}', [PropertiesController::class, 'index'])->name('properties.city');
+Route::get('/properties-in-{city}', [\App\Http\Controllers\Frontend\SeoLandingController::class, 'propertyListingsInCity'])->name('properties.city');
+
+// Redirect slashed version to hyphenated version for SEO and search box compatibility
+Route::get('/properties-in/{city}', function ($city) {
+    return redirect()->route('properties.city', ['city' => $city], 301);
+});
+
 Route::get('/properties/in/{location}', [PropertiesController::class, 'locationSearch'])->name('properties.location');
 Route::get('/properties/{property:slug}', [PropertyDetailsController::class, 'show'])->name('property-details');
 
