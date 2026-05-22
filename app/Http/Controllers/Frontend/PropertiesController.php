@@ -312,6 +312,45 @@ class PropertiesController extends Controller
             }
         }
 
+        // IMPORTANT CONSISTENCY NOTE:
+        // /properties/in/{location} uses locationSearch(): 10km geo-bounding-box OR label match.
+        // To ensure counts match, when ?city={slug} is a known location slug we must
+        // use the same geo+label filter BEFORE the result is finalized.
+        //
+        // This runs regardless of whether attempt1/attempt2 already found results.
+        if (!empty($city) && $request->filled('city')) {
+            $locations = $this->getLocationMap();
+            $slug = strtolower(trim((string) $city));
+
+            if (isset($locations[$slug])) {
+                $loc = $locations[$slug];
+                $radius = 10;
+                $latDelta = $radius / 111.0;
+                $lngDelta = $radius / 96.5;
+
+                $minLat = $loc['lat'] - $latDelta;
+                $maxLat = $loc['lat'] + $latDelta;
+                $minLng = $loc['lng'] - $lngDelta;
+                $maxLng = $loc['lng'] + $lngDelta;
+
+                $qGeo = clone $baseQuery;
+                $qGeo->where(function ($qGeoOuter) use ($loc, $minLat, $maxLat, $minLng, $maxLng) {
+                    $qGeoOuter->where(function ($inner) use ($minLat, $maxLat, $minLng, $maxLng) {
+                        $inner->whereNotNull('latitude')
+                              ->whereNotNull('longitude')
+                              ->whereBetween('latitude', [$minLat, $maxLat])
+                              ->whereBetween('longitude', [$minLng, $maxLng]);
+                    })
+                    ->orWhere('city', 'like', '%' . $loc['label'] . '%')
+                    ->orWhere('locality', 'like', '%' . $loc['label'] . '%');
+                });
+
+                $applySorting($qGeo);
+                $properties = $qGeo->paginate(24)->withQueryString();
+            }
+        }
+
+
         // Final fallback: whatever filters remain (no city/locality/sector gating)
         if ($properties === null || $properties->total() === 0) {
             $q0 = clone $baseQuery;

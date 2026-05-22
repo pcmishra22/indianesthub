@@ -26,11 +26,15 @@ class BannerController extends Controller
             'status' => 'nullable|in:active,inactive',
         ]);
         $path = $request->file('image')->store('banners', 'public');
+        $status = $request->status ?? 'active';
+        $statusBool = $status === 'inactive' ? false : true;
+
         Banner::create([
             'title'  => $request->title,
             'image'  => $path,
-            'status' => $request->status ?? 'active',
+            'status' => $statusBool,
         ]);
+
         return redirect()->route('admin.banners.index')->with('success', 'Banner created successfully.');
     }
 
@@ -48,7 +52,11 @@ class BannerController extends Controller
             'image'  => 'nullable|image|max:2048',
             'status' => 'nullable|in:active,inactive',
         ]);
-        $data = ['title' => $request->title, 'status' => $request->status ?? $banner->status];
+        $status = $request->status ?? ($banner->status ? 'active' : 'inactive');
+        $statusBool = $status === 'inactive' ? false : true;
+
+        $data = ['title' => $request->title, 'status' => $statusBool];
+
         if ($request->hasFile('image')) {
             $data['image'] = $request->file('image')->store('banners', 'public');
         }
