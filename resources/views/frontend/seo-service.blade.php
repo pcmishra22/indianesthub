@@ -153,24 +153,26 @@
         {{-- How it works --}}
         <div class="mt-4 d-flex flex-column gap-3">
           @if($serviceType === 'loan')
-            @foreach([
+            @php $steps = [
               ['1', 'Fill your details', 'Name, phone & loan amount — takes 60 seconds'],
               ['2', 'Our expert calls you', 'Within 2 hours — free eligibility check'],
               ['3', 'Get bank offers', 'Compare rates from 20+ banks, choose the best'],
-            ] as $step)
+            ]; @endphp
           @elseif($serviceType === 'insurance')
-            @foreach([
+            @php $steps = [
               ['1', 'Share property details', 'Type, value, city — takes 60 seconds'],
               ['2', 'Get instant quotes', 'Compare 10+ insurers side by side — free'],
               ['3', 'Buy your policy', 'Pay online, get policy instantly via email'],
-            ] as $step)
+            ]; @endphp
           @else
-            @foreach([
+            @php $steps = [
               ['1', 'Describe your issue', 'Select issue type and add a brief note'],
               ['2', 'Expert contacts you', 'Verified lawyer calls within 24 hours'],
               ['3', 'Get legal guidance', 'Free first consultation — no upfront fee'],
-            ] as $step)
+            ]; @endphp
           @endif
+
+          @foreach($steps as $step)
             <div class="d-flex gap-3 align-items-start">
               <div class="step-circle">{{ $step[0] }}</div>
               <div>
