@@ -103,6 +103,12 @@ Route::middleware('auth')->group(function () {
     Route::post('/verify-otp', [\App\Http\Controllers\Auth\OtpController::class, 'verify'])->name('phone.otp.verify');
 });
 Route::get('/', [HomeController::class, 'index'])->name('home');
+
+// Banner ad-serving tracking (impressions + clicks)
+Route::get('/banner/impression/{id}', [\App\Http\Controllers\Frontend\BannerServeController::class, 'impression'])
+    ->name('banner.impression');
+Route::get('/banner/click/{id}', [\App\Http\Controllers\Frontend\BannerServeController::class, 'click'])
+    ->name('banner.click');
 Route::get('/about', [AboutController::class, 'about'])->name('about');
 Route::get('/properties', [PropertiesController::class, 'index'])->name('properties');
 // SEO-friendly city search (maps to same filter logic as /properties)

@@ -730,14 +730,12 @@ section,
 # Hero Section
 --------------------------------------------------------------*/
 .hero {
-  padding-top: 80px;
   background: linear-gradient(45deg, var(--background-color) 0%, color-mix(in srgb, var(--accent-color), transparent 95%) 100%);
   min-height: 80vh;
-  display: flex;
-  align-items: center;
+  display: block;
   position: relative;
   overflow: hidden;
-  padding-bottom: 80px;
+  padding: 100px 0 80px 0;
 }
 
 .hero::before {
@@ -894,7 +892,6 @@ section,
   transform: translateY(-50%);
   color: color-mix(in srgb, var(--accent-color), transparent 30%);
   font-size: 16px;
-  margin-top: 12px;
   pointer-events: none;
 }
 
@@ -9802,14 +9799,26 @@ section,
 /*--------------------------------------------------------------
 # Banner Section
 --------------------------------------------------------------*/
-.banner-section {
-  padding: 40px 0; /* Add some padding around the banner */
-  text-align: center; /* Center the image */
-}
-
-.banner-section img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 10px; /* Optional: add some rounded corners */
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); /* Optional: add a subtle shadow */
-}
+ .banner-section {
+   display: none !important;
+   text-align: center;
+   overflow: hidden;
+   width: 100%;
+ }
+ 
+ .banner-section img {
+   max-width: 100%;
+   height: auto;
+   border-radius: 8px;
+   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+   transition: transform 0.3s ease;
+ }
+ 
+ .banner-section img:hover {
+   transform: scale(1.005);
+ }
+ 
+ .track-banner {
+   display: block;
+   width: 100%;
+ }

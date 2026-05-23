@@ -73,6 +73,13 @@
 
         <!-- Blog Hero Section -->
         <section id="blog-hero" class="blog-hero section">
+          <div class="container">
+            <div class="row">
+              <div class="col-12">
+                <x-banner-ad placement="blog_inline" />
+              </div>
+            </div>
+          </div>
           <div class="container" data-aos="fade-up" data-aos-delay="100">
             <div class="row g-4">
               <!-- Main Content Area -->

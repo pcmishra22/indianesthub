@@ -331,6 +331,11 @@
   'newLaunches'     => $newLaunches ?? collect(),
 ])
 
+{{-- Fix: ensure hero typography alignment matches live template (left aligned) --}}
+<style>
+  .hero * { text-align: left; }
+</style>
+
 {{-- ════════════════════════════════════════════════════════
      BROWSE BY PROPERTY TYPE
 ════════════════════════════════════════════════════════ --}}

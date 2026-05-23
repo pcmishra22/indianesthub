@@ -87,6 +87,11 @@
     <!-- Page-specific schema injected here -->
     @yield('schema')
 
+    <!-- Ensure bootstrap layout behaves correctly -->
+    <style>
+      body { margin: 0; }
+    </style>
+
     <!-- Favicons -->
     <link rel="icon" href="/assets/img/favicon.png">
     <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
@@ -312,6 +317,10 @@
 
     <!-- Vendor JS Files -->
     <script src="/assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <style>
+      /* Prevent sticky/floating widgets from pushing layout */
+      .floating-cta-wrap, .sticky-bottom-bar { pointer-events: auto; }
+    </style>
     <script src="/assets/vendor/php-email-form/validate.js"></script>
     <script src="/assets/vendor/aos/aos.js"></script>
     <script src="/assets/vendor/purecounter/purecounter_vanilla.js"></script>
@@ -319,6 +328,33 @@
     <!-- Main JS File -->
     <script src="/assets/js/main.js"></script>
     @yield('scripts')
+
+    {{-- ===== Banner impression tracking (ad-serving) ===== --}}
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        const els = document.querySelectorAll('.track-banner[data-banner]');
+        if (!els || !els.length) return;
+
+        const seen = new Set();
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            const id = entry.target.dataset.banner;
+            if (!id || seen.has(id)) return;
+            seen.add(id);
+
+            fetch('/banner/impression/' + id, {
+              method: 'GET',
+              headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            }).catch(() => {});
+
+            observer.unobserve(entry.target);
+          });
+        }, { threshold: 0.5 });
+
+        els.forEach(el => observer.observe(el));
+      });
+    </script>
 
     {{-- Loan, Insurance & Legal Modals (available on every page) --}}
     @include('frontend.partials.loan-eligibility-modal')

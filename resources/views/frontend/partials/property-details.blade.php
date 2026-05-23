@@ -1178,8 +1178,13 @@
       </div>{{-- End col-lg-8 --}}
 
       {{-- ===== RIGHT SIDEBAR ===== --}}
-      <div class="col-lg-4">
+<div class="col-lg-4">
         <div class="pd-sidebar">
+
+          {{-- ===== PROPERTY SIDEBAR BANNER (ad-serving) ===== --}}
+          <div class="mb-3">
+            <x-banner-ad placement="property_sidebar" />
+          </div>
 
           {{-- Price Card --}}
           <div class="pd-price-card">

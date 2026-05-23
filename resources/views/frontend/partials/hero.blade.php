@@ -106,8 +106,17 @@
 }
 </style>
 
-<section class="hs-hero">
+<section class="hs-hero" style="text-align:left;">
   <div class="hero-blob hero-blob-1"></div>
+
+  {{-- ===== HOME HERO BANNER (ad-serving) ===== --}}
+  <div class="container" style="position:relative;z-index:3;">
+    <div class="row">
+      <div class="col-12">
+        <x-banner-ad placement="homepage_top" />
+      </div>
+    </div>
+  </div>
   <div class="hero-blob hero-blob-2"></div>
   <div class="container" style="position:relative;z-index:2;">
     <div class="row align-items-center g-4">
