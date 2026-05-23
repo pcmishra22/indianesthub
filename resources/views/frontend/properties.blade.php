@@ -1,16 +1,33 @@
 @extends('frontend.layout')
 
+@php
+    // Build a canonical URL that includes relevant filters and pagination (except page 1)
+    $params = request()->query();
+    
+    // Remove redundant page=1 parameter
+    if (isset($params['page']) && $params['page'] <= 1) {
+        unset($params['page']);
+    }
+
+    // Determine the base route (SEO-friendly location path or general properties path)
+    $baseCanonical = !empty($locationLabel) 
+        ? route('properties.location', strtolower(str_replace([' ', '/'], '-', $locationLabel)))
+        : route('properties');
+        
+    $canonicalUrl = count($params) ? $baseCanonical . '?' . http_build_query($params) : $baseCanonical;
+@endphp
+
 {{-- ════════════════════════ SEO META (dynamic for location pages) ════════════════════════ --}}
 @if(!empty($locationLabel))
   @section('title', 'Properties in ' . $locationLabel . ' | Buy & Rent Flats | ' . config('app.name'))
   @section('meta_description', 'Browse ' . $properties->total() . ' verified properties in ' . $locationLabel . ' and nearby areas within ' . ($locationRadius ?? 10) . ' km. Find flats, villas & plots for sale & rent on ' . config('app.name') . '.')
-  @section('canonical', route('properties.location', strtolower(str_replace(' ', '-', $locationLabel))))
+  @section('canonical', $canonicalUrl)
   @section('og_title', 'Properties in ' . $locationLabel . ' | ' . config('app.name'))
   @section('og_description', 'Discover verified flats, villas & plots for sale and rent in ' . $locationLabel . '. Browse ' . $properties->total() . ' listings with photos and floor plans.')
 @else
   @section('title', 'Properties for Sale & Rent in Chandigarh Tricity | ' . config('app.name'))
   @section('meta_description', 'Browse ' . $properties->total() . ' verified properties for sale & rent in Chandigarh, Mohali, Zirakpur & Panchkula. Filter by BHK, budget, location and property type on ' . config('app.name') . '.')
-  @section('canonical', route('properties'))
+  @section('canonical', $canonicalUrl)
   @section('og_title', 'Properties for Sale & Rent in Tricity | ' . config('app.name'))
   @section('og_description', 'Find verified flats, villas, plots and commercial properties across Chandigarh Tricity. ' . $properties->total() . ' listings with photos and agent contact.')
 @endif

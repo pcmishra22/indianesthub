@@ -372,6 +372,14 @@ class SeoLandingController extends Controller
         ?string $areaLabel    = null,
         array   $extraFilters = []
     ) {
+        // Redirect ?page=1 to the base URL to prevent duplicate content flags
+        if (request()->has('page') && request()->get('page') == 1) {
+            $query = request()->query();
+            unset($query['page']);
+            $queryString = count($query) ? '?' . http_build_query($query) : '';
+            return redirect()->to(url()->current() . $queryString, 301);
+        }
+
         $cities = $this->getCityMap();
 
         // For predefined cities use rich metadata; for dynamic cities reconstruct from slug.
@@ -838,6 +846,14 @@ class SeoLandingController extends Controller
         $loc = $this->resolveCity($city);
         if (!$loc) abort(404);
 
+        // Redirect ?page=1 to the base URL to prevent duplicate content flags
+        if ($request->has('page') && $request->get('page') == 1) {
+            $query = $request->query();
+            unset($query['page']);
+            $queryString = count($query) ? '?' . http_build_query($query) : '';
+            return redirect()->to(url()->current() . $queryString, 301);
+        }
+
         $initialH1 = "Ready to Move Flats in {$loc['cityLabel']}"; // Store the initial H1 for SEO
         $cityLabel = $loc['cityLabel'];
         $citySlug  = $loc['citySlug'];
@@ -907,7 +923,14 @@ class SeoLandingController extends Controller
         $appName       = config('app.name');
         $seoTitle      = $isFallback ? "{$initialH1} | Verified Listings | {$appName}" : "{$initialH1} | Immediate Possession | {$appName}"; // Use initialH1 for SEO title
         $noindex       = $isFallback || $totalCount === 0;
-        $canonicalUrl  = url()->current();
+
+        // Dynamic canonical URL for pagination
+        $params = $request->query();
+        if (isset($params['page']) && $params['page'] <= 1) {
+            unset($params['page']);
+        }
+        $canonicalUrl = count($params) ? url()->current() . '?' . http_build_query($params) : url()->current();
+
         $seoDesc       = $isFallback
             ? "Find verified properties in {$cityLabel} on {$appName}. Browse photos and contact agents directly." // This description is generic, consider using initialH1 here too for stronger SEO
             : "Browse {$initialPropertiesCount} ready-to-move flats in {$cityLabel}. Immediate possession, no wait time. Verified listings with photos and owner contact on {$appName}."; // Use initialPropertiesCount for specific count

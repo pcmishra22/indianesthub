@@ -388,9 +388,9 @@
             <div class="d-flex flex-wrap gap-2">
               @foreach($cities as $slug => $name)
                 @if($slug !== $citySlug)
-                <a href="{{ $serviceType === 'loan' ? url('/home-loan-in-'.$slug)
-                          : ($serviceType === 'insurance' ? url('/property-insurance-in-'.$slug)
-                          : url('/property-legal-help-in-'.$slug)) }}"
+                <a href="{{ $serviceType === 'loan' ? url('/home-loan-in-'.strtolower($slug))
+                          : ($serviceType === 'insurance' ? url('/property-insurance-in-'.strtolower($slug))
+                          : url('/property-legal-help-in-'.strtolower($slug))) }}"
                    class="city-chip">{{ $name }}</a>
                 @endif
               @endforeach

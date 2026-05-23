@@ -1,10 +1,21 @@
 @extends('frontend.layout')
 
+@php
+    // Build a canonical URL that includes relevant filters and pagination (except page 1)
+    $params = request()->query();
+    
+    // Remove redundant page=1 parameter
+    if (isset($params['page']) && $params['page'] <= 1) {
+        unset($params['page']);
+    }
+    $canonicalUrl = count($params) ? url()->current() . '?' . http_build_query($params) : url()->current();
+@endphp
+
 {{-- ════════════════════════ SEO META ════════════════════════ --}}
 @section('title', $seoTitle)
 @section('meta_description', $seoDesc)
 @section('meta_keywords', $h1 . ', property in ' . $cityLabel . ', real estate ' . $cityLabel . ', ' . config('app.name') . ', tricity real estate')
-@section('canonical', url()->current())
+@section('canonical', $canonicalUrl)
 @section('og_title', $h1 . ' | ' . config('app.name'))
 @section('og_description', $seoDesc)
 @section('og_url', url()->current())

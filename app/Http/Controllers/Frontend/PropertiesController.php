@@ -69,6 +69,14 @@ class PropertiesController extends Controller
 
     public function locationSearch(Request $request, string $location)
     {
+        // Redirect ?page=1 to the base URL to prevent duplicate content flags
+        if ($request->has('page') && $request->get('page') == 1) {
+            $query = $request->query();
+            unset($query['page']);
+            $queryString = count($query) ? '?' . http_build_query($query) : '';
+            return redirect()->to(url()->current() . $queryString, 301);
+        }
+
         $locations = $this->getLocationMap();
         $slug = strtolower(trim($location));
 
@@ -146,6 +154,14 @@ class PropertiesController extends Controller
 
     public function index(Request $request)
     {
+        // Redirect ?page=1 to the base URL to prevent duplicate content flags
+        if ($request->has('page') && $request->get('page') == 1) {
+            $query = $request->query();
+            unset($query['page']);
+            $queryString = count($query) ? '?' . http_build_query($query) : '';
+            return redirect()->to(url()->current() . $queryString, 301);
+        }
+
         // Normalize common query params (some upstream URLs may append extra data like dates)
         $normalizeParam = function ($value): ?string {
             if ($value === null) {
