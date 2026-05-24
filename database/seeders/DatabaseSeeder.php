@@ -47,6 +47,7 @@ class DatabaseSeeder extends Seeder
             WalletSeeder::class,
             InvoiceSeeder::class,
             BlogSeeder::class,
+            MohaliRealEstateBlogSeeder::class,
             InquirySeeder::class,
             ContactSeeder::class,
             PropertyImageSeeder::class,

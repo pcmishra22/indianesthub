@@ -8,8 +8,9 @@ use Illuminate\Support\Str;
 class BlogPost extends Model
 {
     protected $fillable = [
-        'title', 'slug', 'excerpt', 'content', 'image',
-        'category', 'author', 'status', 'published_at', 'views_count',
+        'title', 'slug', 'excerpt', 'content', 'featured_image',
+        'category', 'author_id', 'status', 'published_at', 'views_count',
+        'meta_title', 'meta_description'
     ];
 
     protected $casts = [
@@ -45,7 +46,7 @@ class BlogPost extends Model
 
     public function scopePublished($query)
     {
-        return $query->where('is_published', true)
+        return $query->where('status', 'published')
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now());
     }
