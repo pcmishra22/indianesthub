@@ -140,28 +140,28 @@ Route::get('/villa-in-{city}-under-{amount}-cr',
     [\App\Http\Controllers\Frontend\SeoLandingController::class, 'villaUnderBudget'])
     ->name('seo.villa.budget')->where('amount', '[0-9]+');
 
-Route::get('/{bhk}bhk-flats-in-{city}-under-{amount}-lakh',
+Route::get('/{bhk}-bhk-flats-in-{city}-under-{amount}-lakh',
     [\App\Http\Controllers\Frontend\SeoLandingController::class, 'bhkFlatsUnderBudget'])
     ->name('seo.bhk.budget')->where(['bhk' => '[1-5]', 'amount' => '[0-9]+']);
 
-Route::get('/{bhk}bhk-house-in-{city}-under-{amount}-lakh',
+Route::get('/{bhk}-bhk-house-in-{city}-under-{amount}-lakh',
     [\App\Http\Controllers\Frontend\SeoLandingController::class, 'bhkHouseUnderBudget'])
     ->name('seo.bhk.house.budget')->where(['bhk' => '[1-5]', 'amount' => '[0-9]+']);
 
-Route::get('/{bhk}bhk-villa-in-{city}-under-{amount}-lakh',
+Route::get('/{bhk}-bhk-villa-in-{city}-under-{amount}-lakh',
     [\App\Http\Controllers\Frontend\SeoLandingController::class, 'bhkVillaUnderBudget'])
     ->name('seo.bhk.villa.budget')->where(['bhk' => '[1-5]', 'amount' => '[0-9]+']);
 
 // ── BHK × Property Type × Sale ─────────────────────────────────────────
-Route::get('/{bhk}bhk-house-for-sale-in-{city}',
+Route::get('/{bhk}-bhk-house-for-sale-in-{city}',
     [\App\Http\Controllers\Frontend\SeoLandingController::class, 'bhkHouseForSaleInCity'])
     ->name('seo.bhk.house.city')->where('bhk', '[1-5]');
 
-Route::get('/{bhk}bhk-villa-for-sale-in-{city}',
+Route::get('/{bhk}-bhk-villa-for-sale-in-{city}',
     [\App\Http\Controllers\Frontend\SeoLandingController::class, 'bhkVillaForSaleInCity'])
     ->name('seo.bhk.villa.city')->where('bhk', '[1-5]');
 
-Route::get('/{bhk}bhk-duplex-for-sale-in-{city}',
+Route::get('/{bhk}-bhk-duplex-for-sale-in-{city}',
     [\App\Http\Controllers\Frontend\SeoLandingController::class, 'bhkDuplexForSaleInCity'])
     ->name('seo.bhk.duplex.city')->where('bhk', '[1-5]');
 
@@ -170,15 +170,15 @@ Route::get('/house-for-rent-in-{city}',
     [\App\Http\Controllers\Frontend\SeoLandingController::class, 'houseForRentInCity'])
     ->name('seo.house.rent.city');
 
-Route::get('/{bhk}bhk-flat-for-rent-in-{city}',
+Route::get('/{bhk}-bhk-flat-for-rent-in-{city}',
     [\App\Http\Controllers\Frontend\SeoLandingController::class, 'bhkFlatForRentInCity'])
     ->name('seo.bhk.rent.city')->where('bhk', '[1-5]');
 
-Route::get('/{bhk}bhk-house-for-rent-in-{city}',
+Route::get('/{bhk}-bhk-house-for-rent-in-{city}',
     [\App\Http\Controllers\Frontend\SeoLandingController::class, 'bhkHouseForRentInCity'])
     ->name('seo.bhk.house.rent.city')->where('bhk', '[1-5]');
 
-Route::get('/{bhk}bhk-villa-for-rent-in-{city}',
+Route::get('/{bhk}-bhk-villa-for-rent-in-{city}',
     [\App\Http\Controllers\Frontend\SeoLandingController::class, 'bhkVillaForRentInCity'])
     ->name('seo.bhk.villa.rent.city')->where('bhk', '[1-5]');
 
@@ -281,7 +281,7 @@ Route::get('/plots-in-{city}',          [\App\Http\Controllers\Frontend\SeoLandi
 Route::get('/villas-in-{city}',         [\App\Http\Controllers\Frontend\SeoLandingController::class, 'villasInCity'])->name('seo.villas.city');
 Route::get('/new-projects-in-{city}',   [\App\Http\Controllers\Frontend\SeoLandingController::class, 'newProjectsInCity'])->name('seo.projects.city');
 Route::get('/ready-to-move-flats-in-{city}', [\App\Http\Controllers\Frontend\SeoLandingController::class, 'readyToMoveIn'])->name('seo.rtm.city');
-Route::get('/{bhk}bhk-flats-in-{city}', [\App\Http\Controllers\Frontend\SeoLandingController::class, 'bhkFlatsInCity'])
+Route::get('/{bhk}-bhk-flats-in-{city}', [\App\Http\Controllers\Frontend\SeoLandingController::class, 'bhkFlatsInCity'])
      ->name('seo.bhk.city')
      ->where('bhk', '[1-5]');
 Route::get('/agents', [AgentsController::class, 'index'])->name('agents');

@@ -238,76 +238,76 @@
       </p>
       <div class="d-flex flex-wrap gap-2" style="font-size:.8rem;">
         {{-- High-Intent Keywords (MOST IMPORTANT) --}}
-        <a href="{{ url('/flats-in-zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">flats for sale in zirakpur</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/flats-in-zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">apartments for sale in zirakpur</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/2bhk-flats-in-zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 bhk flats in zirakpur</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/3bhk-flats-in-zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 bhk flats in zirakpur</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/ready-to-move-flats-zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">ready to move flats in zirakpur</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/new-projects-in-zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">new flats in zirakpur</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/properties/in/zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">property for sale in zirakpur</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/flats-in-zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">buy flat in zirakpur</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/properties/in/zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">zirakpur property listings</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/flats-in-zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">zirakpur real estate</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.flats.city', 'zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">flats for sale in zirakpur</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.flats.city', 'zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">apartments for sale in zirakpur</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.bhk.city', ['bhk' => 2, 'city' => 'zirakpur']) }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 bhk flats in zirakpur</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.bhk.city', ['bhk' => 3, 'city' => 'zirakpur']) }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 bhk flats in zirakpur</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.rtm.city', 'zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">ready to move flats in zirakpur</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.projects.city', 'zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">new flats in zirakpur</a><span style="color:#334155;">·</span>
+        <a href="{{ route('properties.location', 'zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">property for sale in zirakpur</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.flats.city', 'zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">buy flat in zirakpur</a><span style="color:#334155;">·</span>
+        <a href="{{ route('properties.location', 'zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">zirakpur property listings</a><span style="color:#334155;">·</span>
+        <a href="{{ route('properties.location', 'zirakpur') }}"    style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">zirakpur real estate</a><span style="color:#334155;">·</span>
 
         {{-- Mohali Keywords --}}
-        <a href="{{ url('/flats-in-mohali') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">flats for sale in mohali</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/2bhk-flats-in-mohali') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 bhk flats in mohali</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/3bhk-flats-in-mohali') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 bhk flats in mohali</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/ready-to-move-flats-mohali') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">ready to move flats in mohali</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/new-projects-in-mohali') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">new flats in mohali</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/properties/in/mohali') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">property for sale in mohali</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/affordable-flats-in-mohali') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">affordable flats in mohali</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/resale-flats-in-mohali') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">resale flats in mohali</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.flats.city', 'mohali') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">flats for sale in mohali</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.bhk.city', ['bhk' => 2, 'city' => 'mohali']) }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 bhk flats in mohali</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.bhk.city', ['bhk' => 3, 'city' => 'mohali']) }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 bhk flats in mohali</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.rtm.city', 'mohali') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">ready to move flats in mohali</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.projects.city', 'mohali') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">new flats in mohali</a><span style="color:#334155;">·</span>
+        <a href="{{ route('properties.location', 'mohali') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">property for sale in mohali</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.affordable.city', 'mohali') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">affordable flats in mohali</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.resale.city', 'mohali') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">resale flats in mohali</a><span style="color:#334155;">·</span>
 
         {{-- Chandigarh Keywords --}}
-        <a href="{{ url('/flats-in-chandigarh') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">flats for sale in chandigarh</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/2bhk-flats-in-chandigarh') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 bhk flats in chandigarh</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/3bhk-flats-in-chandigarh') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 bhk flats in chandigarh</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/ready-to-move-flats-chandigarh') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">ready to move flats in chandigarh</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/new-projects-in-chandigarh') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">new flats in chandigarh</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/properties/in/chandigarh') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">property for sale in chandigarh</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/affordable-flats-in-chandigarh') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">affordable flats in chandigarh</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/resale-flats-in-chandigarh') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">resale flats in chandigarh</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.flats.city', 'chandigarh') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">flats for sale in chandigarh</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.bhk.city', ['bhk' => 2, 'city' => 'chandigarh']) }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 bhk flats in chandigarh</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.bhk.city', ['bhk' => 3, 'city' => 'chandigarh']) }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 bhk flats in chandigarh</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.rtm.city', 'chandigarh') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">ready to move flats in chandigarh</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.projects.city', 'chandigarh') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">new flats in chandigarh</a><span style="color:#334155;">·</span>
+        <a href="{{ route('properties.location', 'chandigarh') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">property for sale in chandigarh</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.affordable.city', 'chandigarh') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">affordable flats in chandigarh</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.resale.city', 'chandigarh') }}"  style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">resale flats in chandigarh</a><span style="color:#334155;">·</span>
 
         {{-- Panchkula Keywords --}}
-        <a href="{{ url('/flats-in-panchkula') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">flats for sale in panchkula</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/2bhk-flats-in-panchkula') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 bhk flats in panchkula</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/3bhk-flats-in-panchkula') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 bhk flats in panchkula</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/ready-to-move-flats-panchkula') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">ready to move flats in panchkula</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/new-projects-in-panchkula') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">new flats in panchkula</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/properties/in/panchkula') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">property for sale in panchkula</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/affordable-flats-in-panchkula') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">affordable flats in panchkula</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/resale-flats-in-panchkula') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">resale flats in panchkula</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.flats.city', 'panchkula') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">flats for sale in panchkula</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.bhk.city', ['bhk' => 2, 'city' => 'panchkula']) }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 bhk flats in panchkula</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.bhk.city', ['bhk' => 3, 'city' => 'panchkula']) }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 bhk flats in panchkula</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.rtm.city', 'panchkula') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">ready to move flats in panchkula</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.projects.city', 'panchkula') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">new flats in panchkula</a><span style="color:#334155;">·</span>
+        <a href="{{ route('properties.location', 'panchkula') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">property for sale in panchkula</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.affordable.city', 'panchkula') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">affordable flats in panchkula</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.resale.city', 'panchkula') }}"   style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">resale flats in panchkula</a><span style="color:#334155;">·</span>
 
         {{-- Kharar Keywords --}}
-        <a href="{{ url('/flats-in-kharar') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">flats for sale in kharar</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/2bhk-flats-in-kharar') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 bhk flats in kharar</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/3bhk-flats-in-kharar') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 bhk flats in kharar</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/ready-to-move-flats-kharar') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">ready to move flats in kharar</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/new-projects-in-kharar') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">new flats in kharar</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/properties/in/kharar') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">property for sale in kharar</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/affordable-flats-in-kharar') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">affordable flats in kharar</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/resale-flats-in-kharar') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">resale flats in kharar</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.flats.city', 'kharar') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">flats for sale in kharar</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.bhk.city', ['bhk' => 2, 'city' => 'kharar']) }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 bhk flats in kharar</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.bhk.city', ['bhk' => 3, 'city' => 'kharar']) }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 bhk flats in kharar</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.rtm.city', 'kharar') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">ready to move flats in kharar</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.projects.city', 'kharar') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">new flats in kharar</a><span style="color:#334155;">·</span>
+        <a href="{{ route('properties.location', 'kharar') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">property for sale in kharar</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.affordable.city', 'kharar') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">affordable flats in kharar</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.resale.city', 'kharar') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">resale flats in kharar</a><span style="color:#334155;">·</span>
 
         {{-- Mullanpur Keywords --}}
-        <a href="{{ url('/flats-in-mullanpur') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">flats for sale in mullanpur</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/2bhk-flats-in-mullanpur') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 bhk flats in mullanpur</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/3bhk-flats-in-mullanpur') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 bhk flats in mullanpur</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/ready-to-move-flats-mullanpur') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">ready to move flats in mullanpur</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/new-projects-in-mullanpur') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">new flats in mullanpur</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/properties/in/mullanpur') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">property for sale in mullanpur</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/affordable-flats-in-mullanpur') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">affordable flats in mullanpur</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/resale-flats-in-mullanpur') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">resale flats in mullanpur</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.flats.city', 'mullanpur') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">flats for sale in mullanpur</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.bhk.city', ['bhk' => 2, 'city' => 'mullanpur']) }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 bhk flats in mullanpur</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.bhk.city', ['bhk' => 3, 'city' => 'mullanpur']) }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 bhk flats in mullanpur</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.rtm.city', 'mullanpur') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">ready to move flats in mullanpur</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.projects.city', 'mullanpur') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">new flats in mullanpur</a><span style="color:#334155;">·</span>
+        <a href="{{ route('properties.location', 'mullanpur') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">property for sale in mullanpur</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.affordable.city', 'mullanpur') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">affordable flats in mullanpur</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.resale.city', 'mullanpur') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">resale flats in mullanpur</a><span style="color:#334155;">·</span>
 
         {{-- Derabassi Keywords --}}
-        <a href="{{ url('/flats-in-derabassi') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">flats for sale in derabassi</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/2bhk-flats-in-derabassi') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 bhk flats in derabassi</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/3bhk-flats-in-derabassi') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 bhk flats in derabassi</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/ready-to-move-flats-derabassi') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">ready to move flats in derabassi</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/new-projects-in-derabassi') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">new flats in derabassi</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/properties/in/derabassi') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">property for sale in derabassi</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/affordable-flats-in-derabassi') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">affordable flats in derabassi</a><span style="color:#334155;">·</span>
-        <a href="{{ url('/resale-flats-in-derabassi') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">resale flats in derabassi</a>
+        <a href="{{ route('seo.flats.city', 'derabassi') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">flats for sale in derabassi</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.bhk.city', ['bhk' => 2, 'city' => 'derabassi']) }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">2 bhk flats in derabassi</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.bhk.city', ['bhk' => 3, 'city' => 'derabassi']) }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">3 bhk flats in derabassi</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.rtm.city', 'derabassi') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">ready to move flats in derabassi</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.projects.city', 'derabassi') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">new flats in derabassi</a><span style="color:#334155;">·</span>
+        <a href="{{ route('properties.location', 'derabassi') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">property for sale in derabassi</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.affordable.city', 'derabassi') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">affordable flats in derabassi</a><span style="color:#334155;">·</span>
+        <a href="{{ route('seo.resale.city', 'derabassi') }}"      style="color:#94a3b8;text-decoration:none;" class="footer-seo-link">resale flats in derabassi</a>
 
         {{-- Long-Tail Keywords (LOW COMPETITION + HIGH LEADS) --}}
         {{-- Zirakpur Long-Tail --}}
@@ -493,7 +493,7 @@
         <h4>Quick Links</h4>
         <ul>
           <li><i class="bi bi-chevron-right"></i><a href="{{ url('/') }}">Home</a></li>
-          <li><i class="bi bi-chevron-right"></i><a href="{{ url('/properties') }}">Properties</a></li>
+          <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties') }}">Properties</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ url('/agents') }}">Agents</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ route('builders.index') }}">Builders</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ url('/blog') }}">Blog</a></li>
@@ -507,12 +507,12 @@
       <div class="col-lg-2 col-6 footer-links">
         <h4>Explore</h4>
         <ul>
-          <li><i class="bi bi-chevron-right"></i><a href="{{ url('/properties?looking_for=Sale') }}">Buy Property</a></li>
-          <li><i class="bi bi-chevron-right"></i><a href="{{ url('/properties?looking_for=Rent') }}">Rent Property</a></li>
-          <li><i class="bi bi-chevron-right"></i><a href="{{ url('/properties?looking_for=PG') }}">PG / Co-living</a></li>
-          <li><i class="bi bi-chevron-right"></i><a href="{{ url('/properties?property_type=Flat') }}">Flats</a></li>
-          <li><i class="bi bi-chevron-right"></i><a href="{{ url('/properties?property_type=Villa') }}">Villas</a></li>
-          <li><i class="bi bi-chevron-right"></i><a href="{{ url('/properties?property_type=Plot') }}">Plots</a></li>
+          <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties', ['looking_for' => 'Sale']) }}">Buy Property</a></li>
+          <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties', ['looking_for' => 'Rent']) }}">Rent Property</a></li>
+          <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties', ['looking_for' => 'PG']) }}">PG / Co-living</a></li>
+          <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties', ['property_type' => 'Apartment']) }}">Flats</a></li>
+          <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties', ['property_type' => 'Villa']) }}">Villas</a></li>
+          <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties', ['property_type' => 'Plot']) }}">Plots</a></li>
         </ul>
       </div>
 
