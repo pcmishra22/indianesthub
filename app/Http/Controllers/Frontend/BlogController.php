@@ -40,7 +40,14 @@ class BlogController extends Controller
      */
     public function show(BlogPost $blog)
     {
-        abort_if(!($blog->is_published && !empty($blog->published_at) && $blog->published_at <= now()), 404);
+        // Data may exist with `published_at` unset (NULL) even when `status=p ublished`.
+        // Treat the model as published as long as status is published (model scope) and either
+        // `published_at` is NULL or it's not in the future.
+        abort_if(!(
+            $blog->status === 'published' && (
+                empty($blog->published_at) || $blog->published_at <= now()
+            )
+        ), 404);
 
         // Increment views
         $blog->increment('views_count');

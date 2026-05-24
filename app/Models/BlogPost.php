@@ -46,8 +46,13 @@ class BlogPost extends Model
 
     public function scopePublished($query)
     {
+        // Existing data in this project may have `status=published` but `published_at` unset.
+        // To avoid hiding all posts, treat `status=published` as the primary published flag.
         return $query->where('status', 'published')
-            ->whereNotNull('published_at')
-            ->where('published_at', '<=', now());
+            ->where(function ($q) {
+                $q->whereNull('published_at')
+                  ->orWhere('published_at', '<=', now());
+            });
     }
+
 }
