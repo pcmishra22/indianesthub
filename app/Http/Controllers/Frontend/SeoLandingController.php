@@ -471,6 +471,16 @@ class SeoLandingController extends Controller
         // Soft 404 Mitigation: If we had to fallback or have 0 results, tell Google not to index this specific URL
         $noindex = $isFallback || $properties->total() === 0;
 
+        $params = $request->query();
+
+        if (isset($params['page']) && $params['page'] <= 1) {
+            unset($params['page']);
+        }
+
+        $canonicalUrl = count($params)
+            ? url()->current() . '?' . http_build_query($params)
+            : url()->current();
+
         // ── Builder projects (new-projects / upcoming / best-projects) ────
         $newProjects = null;
         if (in_array($pageType, ['new-projects', 'upcoming', 'best-projects'])) {
@@ -533,25 +543,30 @@ class SeoLandingController extends Controller
                 $bhkNum = preg_replace('/[^0-9]/', '', $bhkNum);
                 $bhkNum = $bhkNum ?: $bhkType;
 
-                // ── 2 BHK ZIRAKPUR OPTIMIZATION ──
-                if ($bhkNum == '2') {
-                    $h1 = "2 BHK Flats in Zirakpur";
-                    $seoTitle = "2 BHK Flats in Zirakpur | Luxury & Affordable Apartments 2026";
-                    $seoDesc  = "Explore verified 2 BHK flats in Zirakpur. Find premium apartments on VIP Road, Patiala Road & near Chandigarh Highway. Detailed price trends, nearby schools, and RERA projects for 2026.";
-                    
-                    // 1200-2000 Words Structured Content
+                // ── BHK ZIRAKPUR OPTIMIZATION (2, 3, 4 BHK) ──
+                if (in_array($bhkNum, ['2', '3', '4']) && !$maxPrice) {
+                    $h1 = "{$bhkNum} BHK Flats in Zirakpur";
+                    $seoTitle = "{$bhkNum} BHK Flats in Zirakpur – Luxury & Affordable Apartments for Sale";
+                    $seoDesc = "Explore verified {$bhkNum} BHK flats in Zirakpur with prices, floor plans, amenities and gated societies. Find apartments near VIP Road, Patiala Road and Chandigarh Highway.";
+
+                    $targetAudience = match($bhkNum) {
+                        '2' => 'nuclear families and IT professionals',
+                        '3' => 'growing families and professionals seeking extra space for home offices',
+                        '4' => 'large families and premium buyers seeking luxury living and extra space',
+                    };
+
                     $longContent = [
-                        'intro' => "Zirakpur has emerged as the satellite town of choice for home buyers in the Tricity. If you are looking for 2 BHK flats in Zirakpur, you are tapping into a market that offers a perfect blend of urban convenience and suburban peace. As we head into 2026, the demand for 2-bedroom configurations has spiked among nuclear families and IT professionals.",
+                        'intro' => "Zirakpur has emerged as the satellite town of choice for home buyers in the Tricity. If you are looking for {$bhkNum} BHK flats in Zirakpur, you are tapping into a market that offers a perfect blend of urban convenience and suburban peace. As we head into 2026, the demand for {$bhkNum}-bedroom configurations has spiked among {$targetAudience}.",
                         'best_areas' => [
-                            'title' => 'Best Areas in Zirakpur for 2 BHK Apartments',
+                            'title' => "Best Areas in Zirakpur for {$bhkNum} BHK Apartments",
                             'content' => 'VIP Road remains the crown jewel for those wanting commercial accessibility. Patiala Road is preferred for its wide roads and connectivity to the NH-64. Peer Muchalla is the go-to for buyers wanting to stay close to Panchkula Sector 20.'
                         ],
                         'price_trends' => [
                             'title' => 'Zirakpur Real Estate Price Trends 2026',
-                            'content' => 'The average price per square foot in Zirakpur has seen a 12% Y-O-Y growth. 2 BHK apartments are currently priced between ₹3,800 to ₹5,200 per sq. ft. depending on the builder\'s grade and project age.'
+                            'content' => "The average price per square foot in Zirakpur has seen a 12% Y-O-Y growth. {$bhkNum} BHK apartments are priced competitively depending on the builder's grade, project age, and available modern amenities."
                         ],
                         'ready_to_move' => [
-                            'title' => 'Ready to Move 2 BHK Flats',
+                            'title' => "Ready to Move {$bhkNum} BHK Flats",
                             'content' => 'For immediate possession, societies like NK Savitry Greens and Maya Garden City offer established communities with functional amenities. Buying ready-to-move helps you save on GST and immediate rent.'
                         ],
                         'highway_connectivity' => [
@@ -559,42 +574,35 @@ class SeoLandingController extends Controller
                             'content' => 'Living near the Chandigarh-Ambala Highway (NH-44) ensures you are just 15 minutes away from the Tribune Chowk and 10 minutes from the Chandigarh International Airport.'
                         ],
                         'investment_benefits' => [
-                            'title' => 'Investment Benefits of 2 BHK Units',
-                            'content' => 'Rental demand for 2 BHKs is extremely high in Zirakpur. Investors can expect monthly rentals of ₹12,000 to ₹18,000, making it a lucrative asset class for passive income.'
+                            'title' => "Investment Benefits of {$bhkNum} BHK Units",
+                            'content' => "Rental demand for {$bhkNum} BHKs is extremely high in Zirakpur. Investors can expect strong yields and capital appreciation, making it a lucrative asset class for passive income."
                         ],
                         'social_infra' => [
                             'title' => 'Schools and Hospitals Nearby',
                             'content' => 'Educational institutions like Delhi Public School (DPS) and Ryan International are within a 3km radius. Healthcare is robust with Fortis Hospital and Max Hospital located within a 15-minute drive.'
                         ],
                         'builder_projects' => [
-                            'title' => 'Top Builder Projects with 2 BHK Config',
+                            'title' => "Top Builder Projects with {$bhkNum} BHK Config",
                             'content' => 'Top choices include SBP City of Dreams, Sushma Grande, and Motia Royal Citi. These projects are RERA verified and offer gated security with multi-tier amenities.'
                         ]
                     ];
                 }
                 
-                if ($maxPrice && $maxPrice <= 5000000 && $bhkNum == '2') {
-                    $seoTitle = "2 BHK Flats in Zirakpur Under 50 Lakh | Verified Listings | {$appName}";
-                    $seoDesc  = "Find verified 2 BHK flats in Zirakpur under 50 Lakh. Browse budget apartments with photos, floor plans and direct agent contact on {$appName}.";
-                }
-                // /3bhk-flats-in-zirakpur-under-80-lakh
-                else if ($maxPrice && $maxPrice <= 8000000 && $bhkNum == '3') {
-                    $seoTitle = "3 BHK Flats in Zirakpur Under 80 Lakh | Verified Listings | {$appName}";
-                    $seoDesc  = "Find verified 3 BHK flats in Zirakpur under 80 Lakh. Browse premium budget apartments with photos, floor plans and direct agent contact on {$appName}.";
-                }
-                else {
+                if ($maxPrice) {
+                    if ($maxPrice <= 5000000 && $bhkNum == '2') {
+                        $seoTitle = "2 BHK Flats in Zirakpur Under 50 Lakh | Verified Listings | {$appName}";
+                        $seoDesc  = "Find verified 2 BHK flats in Zirakpur under 50 Lakh. Browse budget apartments with photos, floor plans and direct agent contact on {$appName}.";
+                    }
+                    // /3bhk-flats-in-zirakpur-under-80-lakh
+                    else if ($maxPrice <= 8000000 && $bhkNum == '3') {
+                        $seoTitle = "3 BHK Flats in Zirakpur Under 80 Lakh | Verified Listings | {$appName}";
+                        $seoDesc  = "Find verified 3 BHK flats in Zirakpur under 80 Lakh. Browse premium budget apartments with photos, floor plans and direct agent contact on {$appName}.";
+                    }
+                } elseif (!in_array($bhkNum, ['2', '3', '4'])) {
                     switch ($bhkNum) {
                         case '1':
                             $seoTitle = "1 BHK Flats for Sale in Zirakpur | Affordable Apartments | {$appName}";
                             $seoDesc  = "Looking for affordable 1 BHK flats in Zirakpur? Browse verified listings with photos, floor plans and direct agent contact on {$appName}.";
-                            break;
-                        case '2':
-                            $seoTitle = "2 BHK Flats for Sale in Zirakpur | Best Gated Societies | {$appName}";
-                            $seoDesc  = "Find the best 2 BHK flats for sale in Zirakpur's top gated societies. Browse verified listings with real photos, amenities, and floor plans on {$appName}.";
-                            break;
-                        case '3':
-                            $seoTitle = "3 BHK Flats for Sale in Zirakpur | Luxury & Spacious | {$appName}";
-                            $seoDesc  = "Explore premium 3 BHK flats for sale in Zirakpur. Spacious layouts, world-class amenities, and verified listings with direct agent contact on {$appName}.";
                             break;
                         default:
                             $seoTitle = "{$bhkType} Flats for Sale in Zirakpur | Verified Listings | {$appName}";
@@ -706,8 +714,8 @@ class SeoLandingController extends Controller
                 $bhkNum = trim(str_replace('BHK', '', $bhkType));
                 $bhkNum = preg_replace('/[^0-9]/', '', $bhkNum);
                 $bhkNum = $bhkNum ?: $bhkType;
-                $seoTitle = "{$bhkType} Flats for Sale in Panchkula | Verified Listings | {$appName}";
-                $seoDesc  = "Find verified {$bhkNum} BHK flats for sale in Panchkula. Browse listings with photos, floor plans and direct agent contact on {$appName}.";
+                $seoTitle = "{$bhkType} Flats in Panchkula – Luxury & Affordable Apartments for Sale";
+                $seoDesc = "Explore verified {$bhkType} flats in Panchkula with prices, floor plans, amenities and gated societies. Find premium residential options through trusted agents on {$appName}.";
             }
         }
 
@@ -767,8 +775,8 @@ class SeoLandingController extends Controller
                 $seoDesc  = "Browse verified flats and property listings for sale in {$locName}. Find apartments, villas, and plots with photos and agent contact on {$appName}.";
             }
             else if ($pageType === 'bhk-flats' && $bhkType) {
-                $seoTitle = "{$bhkType} Flats for Sale in {$locName} | Verified Listings | {$appName}";
-                $seoDesc  = "Looking for {$bhkType} flats in {$locName}? Explore verified listings with floor plans and direct contact. Best real estate deals in {$locName}.";
+                $seoTitle = "{$bhkType} Flats in {$locName} – Luxury & Affordable Apartments for Sale";
+                $seoDesc = "Explore verified {$bhkType} flats in {$locName} with prices, floor plans, amenities and gated societies. Find the best real estate deals on {$appName}.";
             }
             else if ($pageType === 'ready-to-move') {
                 $seoTitle = "Ready to Move Flats in {$locName} | Immediate Possession | {$appName}";
@@ -784,8 +792,8 @@ class SeoLandingController extends Controller
             $bhkNum = trim(str_replace('BHK', '', $bhkType));
             $bhkNum = preg_replace('/[^0-9]/', '', $bhkNum);
             $bhkNum = $bhkNum ?: $bhkType;
-            $seoTitle = "{$bhkType} Flats for Sale in {$locationLabel} | Verified Listings | {$appName}";
-            $seoDesc  = "Looking for {$bhkType} flats in {$locationLabel}? Browse verified listings with photos, floor plans and direct agent contact. Perfect residential options in Zirakpur belt.";
+            $seoTitle = "{$bhkType} Flats in {$locationLabel} – Luxury & Affordable Apartments for Sale";
+            $seoDesc = "Explore verified {$bhkType} flats in {$locationLabel} with prices, floor plans, amenities and gated societies. Find premium residential options through trusted agents on {$appName}.";
         }
 
         // ── 10. OTHER CITIES (Fallback) ────────────────────────────────────
@@ -800,12 +808,52 @@ class SeoLandingController extends Controller
         $seoTitle = $seoTitle ?? ($h1 . " | Verified Listings | " . $appName);
         $seoDesc  = $seoDesc  ?? ("Find {$totalCount}+ verified {$h1} on {$appName}.");
 
+        $breadcrumbSchema = [
+            '@context' => 'https://schema.org',
+            '@type' => 'BreadcrumbList',
+            'itemListElement' => [
+                [
+                    '@type' => 'ListItem',
+                    'position' => 1,
+                    'name' => 'Home',
+                    'item' => url('/')
+                ],
+                [
+                    '@type' => 'ListItem',
+                    'position' => 2,
+                    'name' => $cityLabel,
+                    'item' => url('/flats-in-' . $citySlug)
+                ],
+                [
+                    '@type' => 'ListItem',
+                    'position' => 3,
+                    'name' => $h1,
+                    'item' => url()->current()
+                ]
+            ]
+        ];
+
+        $faqSchema = [
+            '@context' => 'https://schema.org',
+            '@type' => 'FAQPage',
+            'mainEntity' => collect($faqs)->map(function ($faq) {
+                return [
+                    '@type' => 'Question',
+                    'name' => $faq['q'],
+                    'acceptedAnswer' => [
+                        '@type' => 'Answer',
+                        'text' => strip_tags($faq['a'])
+                    ]
+                ];
+            })->values()
+        ];
+
         return view('frontend.seo-landing', compact(
             'properties', 'newProjects', 'pageDealers',
             'cityLabel', 'citySlug', 'h1',
             'seoTitle', 'seoDesc', 'subLocalities', 'faqs', 'allCities',
             'totalCount', 'pageType', 'city', 'areaLabel', 'budgetLabel',
-            'cityCluster', 'longContent'
+            'cityCluster', 'longContent', 'noindex', 'canonicalUrl', 'faqSchema', 'breadcrumbSchema'
         ));
     }
 

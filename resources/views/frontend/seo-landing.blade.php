@@ -1,38 +1,24 @@
 @extends('frontend.layout')
 
-@php
-    // Build a canonical URL that includes relevant filters and pagination (except page 1)
-    $params = request()->query();
-    
-    // Remove redundant page=1 parameter
-    if (isset($params['page']) && $params['page'] <= 1) {
-        unset($params['page']);
-    }
-    $canonicalUrl = count($params) ? url()->current() . '?' . http_build_query($params) : url()->current();
-@endphp
-
 {{-- ════════════════════════ SEO META ════════════════════════ --}}
 @section('title', $seoTitle)
 @section('meta_description', $seoDesc)
 @section('meta_keywords', $h1 . ', property in ' . $cityLabel . ', real estate ' . $cityLabel . ', ' . config('app.name') . ', tricity real estate')
 @section('canonical', $canonicalUrl)
+@if($noindex)
+    @section('robots', 'noindex, follow')
+@endif
 @section('og_title', $h1 . ' | ' . config('app.name'))
 @section('og_description', $seoDesc)
 @section('og_url', url()->current())
 
 @section('schema')
+@if(!empty($breadcrumbSchema))
 <script type="application/ld+json">
-{
-  "@@context": "https://schema.org",
-  "@type": "BreadcrumbList",
-  "itemListElement": [
-    {"@type":"ListItem","position":1,"name":"Home","item":"{{ url('/') }}"},
-    {"@type":"ListItem","position":2,"name":"Properties","item":"{{ route('properties') }}"},
-    {"@type":"ListItem","position":3,"name":"{{ $cityLabel }}","item":"{{ url('/properties/in/' . $citySlug) }}"},
-    {"@type":"ListItem","position":4,"name":"{{ $h1 }}","item":"{{ url()->current() }}"}
-  ]
-}
+    {!! json_encode($breadcrumbSchema, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) !!}
 </script>
+@endif
+
 @if($totalCount > 0)
 <script type="application/ld+json">
 {
@@ -45,24 +31,10 @@
 }
 </script>
 @endif
-@if(count($faqs) > 0)
+
+@if(!empty($faqSchema) && !empty($faqSchema['mainEntity']) && count($faqSchema['mainEntity']) > 0)
 <script type="application/ld+json">
-{
-  "@@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    @foreach($faqs as $i => $faq)
-    {
-      "@type": "Question",
-      "name": "{{ addslashes($faq['q']) }}",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "{{ addslashes($faq['a']) }}"
-      }
-    }{{ $i < count($faqs)-1 ? ',' : '' }}
-    @endforeach
-  ]
-}
+    {!! json_encode($faqSchema, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) !!}
 </script>
 @endif
 @endsection
@@ -299,6 +271,53 @@
       {{ $properties->links('vendor.pagination.indianesthub') }}
     </div>
     @endif
+
+    {{-- ════════════════════ DETAILED SEO CONTENT ════════════════════ --}}
+    @if(!empty($longContent))
+      <section class="seo-content py-5 border-top">
+        <div class="container p-0">
+          <h2 class="fw-800 mb-4" style="color:#0a2d5e;">Why Buy {{ $h1 }}?</h2>
+
+          @if(isset($longContent['intro']))
+            <div class="intro-text mb-4" style="color:#475569; font-size:1.05rem; line-height:1.8;">
+              <p>{{ $longContent['intro'] }}</p>
+            </div>
+          @endif
+
+          <div class="row">
+            @foreach($longContent as $key => $section)
+              @if(is_array($section) && isset($section['title']))
+                <div class="col-md-12 mb-4">
+                  <h3 class="h5 fw-700" style="color:#0078d4;">{{ $section['title'] }}</h3>
+                  @if(isset($section['content']))
+                    <p class="text-muted" style="line-height:1.7;">{{ $section['content'] }}</p>
+                  @endif
+                </div>
+              @endif
+            @endforeach
+          </div>
+
+          <p class="text-muted mt-3">
+            Last Updated: {{ now()->format('F Y') }}
+          </p>
+        </div>
+      </section>
+    @endif
+
+    {{-- ════════════════════ INTERNAL LINKING ════════════════════ --}}
+    <section class="related-links py-4 border-top">
+      <div class="container p-0">
+        <h2 class="fw-800 mb-3" style="font-size:1.3rem;color:#0a2d5e;">
+          <span class="section-title-line">Explore More Properties in {{ $cityLabel }}</span>
+        </h2>
+        <ul class="list-unstyled d-flex flex-wrap gap-4 mt-3">
+          <li><a href="/flats-in-{{ $citySlug }}" class="text-decoration-none fw-600" style="color:#0078d4;"><i class="bi bi-link-45deg me-1"></i>Flats in {{ $cityLabel }}</a></li>
+          <li><a href="/3bhk-flats-in-{{ $citySlug }}" class="text-decoration-none fw-600" style="color:#0078d4;"><i class="bi bi-link-45deg me-1"></i>3 BHK Flats in {{ $cityLabel }}</a></li>
+          <li><a href="/ready-to-move-flats-in-{{ $citySlug }}" class="text-decoration-none fw-600" style="color:#0078d4;"><i class="bi bi-link-45deg me-1"></i>Ready to Move Flats in {{ $cityLabel }}</a></li>
+          <li><a href="/new-projects-in-{{ $citySlug }}" class="text-decoration-none fw-600" style="color:#0078d4;"><i class="bi bi-link-45deg me-1"></i>New Projects in {{ $cityLabel }}</a></li>
+        </ul>
+      </div>
+    </section>
 
     {{-- ════════════════════ EXPLORE LOCALITIES ════════════════════ --}}
     @if(count($subLocalities) > 0)
