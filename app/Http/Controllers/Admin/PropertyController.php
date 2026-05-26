@@ -27,10 +27,12 @@ class PropertyController extends Controller
         return back();
     }
 
-    public function toggleFeatured($id)
+    public function toggleFeatured(Property $property)
     {
-        // feature/unfeature logic (existing placeholder)
-        return back();
+        $property->is_featured = !$property->is_featured;
+        $property->save();
+
+        return back()->with('success', 'Property featured status updated.');
     }
 
     public function togglePublicContact(Request $request, Property $property)
@@ -42,4 +44,3 @@ class PropertyController extends Controller
         return back()->with('success', 'Public contact setting updated successfully.');
     }
 }
-

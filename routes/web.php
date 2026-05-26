@@ -476,13 +476,23 @@ Route::prefix('admin')->middleware('auth:admin')->name('admin.')->group(function
     Route::resource('users', AdminUserController::class)->only(['index', 'show', 'destroy']);
     Route::post('/users/{user}/toggle-status', [AdminUserController::class, 'toggleStatus'])->name('users.toggle-status');
 
+    // Dealer Bulk Email
+    Route::get('/dealers/bulk-email', [\App\Http\Controllers\Admin\DealerBulkEmailController::class, 'index'])->name('dealers.bulk-email.index');
+    Route::get('/dealers/bulk-email/create', [\App\Http\Controllers\Admin\DealerBulkEmailController::class, 'create'])->name('dealers.bulk-email.create');
+    Route::post('/dealers/bulk-email', [\App\Http\Controllers\Admin\DealerBulkEmailController::class, 'store'])->name('dealers.bulk-email.store');
+    Route::get('/dealers/bulk-email/{id}/edit', [\App\Http\Controllers\Admin\DealerBulkEmailController::class, 'edit'])->name('dealers.bulk-email.edit');
+    Route::put('/dealers/bulk-email/{id}', [\App\Http\Controllers\Admin\DealerBulkEmailController::class, 'update'])->name('dealers.bulk-email.update');
+    Route::delete('/dealers/bulk-email/{id}', [\App\Http\Controllers\Admin\DealerBulkEmailController::class, 'destroy'])->name('dealers.bulk-email.destroy');
+    Route::post('/dealers/bulk-email/{id}/queue', [\App\Http\Controllers\Admin\DealerBulkEmailController::class, 'queue'])->name('dealers.bulk-email.queue');
+
     // Manage Dealers
     Route::resource('dealers', AdminDealerController::class);
     Route::post('/dealers/{dealer}/toggle-status', [AdminDealerController::class, 'toggleStatus'])->name('dealers.toggle-status');
 
+
     // Manage Properties
     Route::resource('properties', AdminPropertyController::class)->only(['index', 'show', 'destroy']);
-Route::post('/properties/{property}/toggle-featured', [AdminPropertyController::class, 'toggleFeatured'])->name('properties.toggle-featured');
+Route::post('/properties/{property:id}/toggle-featured', [AdminPropertyController::class, 'toggleFeatured'])->name('properties.toggle-featured');
 
 require __DIR__ . '/admin_properties.php';
 
