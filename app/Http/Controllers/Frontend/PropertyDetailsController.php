@@ -28,13 +28,13 @@ class PropertyDetailsController extends Controller
         $property->load('images', 'dealer', 'builder');
 
         // Mask dealer contact details if the user is not logged in
-        if (!Auth::check() && $property->dealer) {
+        if (!Auth::check() && !$property->public_contact_enabled && $property->dealer) {
             $property->dealer->phone = 'Login to view';
             $property->dealer->email = 'Login to view';
         }
 
         // Mask builder contact details if the user is not logged in
-        if (!Auth::check() && $property->builder) {
+        if (!Auth::check() && !$property->public_contact_enabled && $property->builder) {
             $property->builder->phone = 'Login to view';
             $property->builder->email = 'Login to view';
         }
@@ -105,8 +105,10 @@ class PropertyDetailsController extends Controller
      */
     public function submitInquiry(Request $request)
     {
-        // Restrict inquiry submission to logged-in users
-        if (!Auth::check()) {
+        $property = Property::find($request->property_id);
+
+        // Restrict inquiry submission to logged-in users unless public contact is enabled for this property
+        if (!Auth::check() && (!$property || !$property->public_contact_enabled)) {
             if ($request->ajax() || $request->wantsJson()) {
                 return response()->json(['success' => false, 'message' => 'Please login to send an inquiry.'], 401);
             }
@@ -121,7 +123,6 @@ class PropertyDetailsController extends Controller
             'property_id' => 'required|integer|exists:properties,id',
         ]);
 
-        $property = Property::find($validated['property_id']);
         $brokerId = $property ? $property->property_dealer_id : null;
 
         $inquiry = new Inquiry();

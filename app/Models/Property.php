@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -9,8 +10,11 @@ class Property extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
+protected $fillable = [
         'property_dealer_id', 'title', 'description', 'property_type', 'bhk_type', 'option_type',
+        // Public contact flag (admin-controlled)
+        'public_contact_enabled',
+
         'looking_for', 'listing_type', 'address', 'city', 'state', 'latitude', 'longitude', 'map_url', 'price',
         'bedrooms', 'bathrooms', 'balconies', 'total_floors', 'floor_number', 'facing', 'property_age', 'furnishing_status',
         'parking', 'pet_friendly', 'area', 'furnishing', 'amenities',
@@ -18,7 +22,7 @@ class Property extends Model
         'ownership_type', 'property_approval', 'rera_id', 'rera_verified', 'occupancy_certificate', 'completion_certificate', 'legal_clearance_status',
         'cover_image', 'gallery_images', 'floor_plan_images', 'video_url', 'virtual_tour_url', 'brochure_pdf',
         'user_id', 'contact_name', 'contact_phone', 'contact_email', 'company_name', 'license_number', 'verified_user',
-'status', 'listing_status', 'isreal', 'possession_date', 'price_range', 'floor_plan', 'floor_plan_details',
+        'status', 'listing_status', 'isreal', 'possession_date', 'price_range', 'floor_plan', 'floor_plan_details',
         // Location fields
         'country', 'locality', 'sub_locality', 'society_name', 'landmark', 'pincode',
         // Pricing & Transaction fields
@@ -39,6 +43,8 @@ class Property extends Model
         'security_deposit', 'is_featured', 'is_premium', 'share_with_agents', 'floor',
         // Builder fields
         'builder_id', 'builder_project_id',
+        // Public contact flag (admin-controlled)
+        'public_contact_enabled',
     ];
 
     protected $casts = [
@@ -67,6 +73,7 @@ class Property extends Model
         'inquiries_count' => 'integer',
         'last_viewed_at' => 'datetime',
         'expiry_date' => 'date',
+        'public_contact_enabled' => 'boolean',
     ];
 
     /**
@@ -109,7 +116,7 @@ class Property extends Model
         return $slug;
     }
 
-    // ── Relationships ──────────────────────────────────────────────
+    // Relationships
 
     public function dealer()
     {
@@ -136,46 +143,48 @@ class Property extends Model
         return $this->hasMany(PropertyImage::class);
     }
 
-    public function ratings() {
+    public function ratings()
+    {
         return $this->hasMany(Rating::class);
     }
-    public function reviews() {
+
+    public function reviews()
+    {
         return $this->hasMany(Review::class);
     }
-    public function wishlists() {
+
+    public function wishlists()
+    {
         return $this->hasMany(Wishlist::class);
     }
 
-    public function appointments() {
+    public function appointments()
+    {
         return $this->hasMany(Appointment::class);
     }
 
-    public function recentlyViewed() {
+    public function recentlyViewed()
+    {
         return $this->hasMany(RecentlyViewed::class);
     }
 
-    public function chatMessages() {
+    public function chatMessages()
+    {
         return $this->hasMany(ChatMessage::class);
     }
 
-    /**
-     * Payments for this property
-     */
     public function payments()
     {
         return $this->hasMany(\App\Models\Payment::class, 'property_id');
     }
 
-    /**
-     * Scope: Only properties with valid paid listings for the given dealer
-     */
     public function scopePaidAndValid($query, $dealerId = null)
     {
-        $query->whereHas('payments', function($q) use ($dealerId) {
+        $query->whereHas('payments', function ($q) use ($dealerId) {
             $q->whereIn('status', ['completed', '1', 1])
               ->where('payment_type', 'property_listing')
               ->where('listing_end_date', '>=', now())
-              ->when($dealerId, function($subQ) use ($dealerId) {
+              ->when($dealerId, function ($subQ) use ($dealerId) {
                   $subQ->where('dealer_id', $dealerId);
               });
         });
@@ -189,3 +198,5 @@ class Property extends Model
         return null;
     }
 }
+
+

@@ -1242,7 +1242,11 @@
               </div>
             </div>
 
-            @auth
+            @php
+              $canViewContact = auth()->check() || (!empty($property->public_contact_enabled));
+            @endphp
+
+            @if($canViewContact)
             <div class="pd-contact-row">
               @if($property->dealer->phone)
               <div class="pd-contact-detail">
@@ -1275,7 +1279,7 @@
             <div class="alert alert-info py-2 mb-0" style="font-size: .85rem;">
               <i class="bi bi-info-circle me-1"></i> Please <a href="{{ route('login') }}" class="fw-bold">Login</a> to view contact details.
             </div>
-            @endauth
+            @endif
 
             <div class="pd-trust-row mt-3">
               <span class="pd-trust-badge"><i class="bi bi-shield-check-fill"></i> Safe & Verified</span>
@@ -1285,8 +1289,9 @@
           @endif
 
           {{-- Inquiry Form --}}
-          @auth
+          @if($canViewContact)
           <div class="pd-inquiry-card" id="inquiry-form-sidebar">
+
             <h5><i class="bi bi-envelope-fill me-2 text-primary"></i>Send Your Inquiry</h5>
             <form action="{{ route('property.inquiry.submit') }}" method="POST" id="property-inquiry-form">
               @csrf
@@ -1314,7 +1319,12 @@
               </button>
             </form>
           </div>
-          @endauth
+          @else
+          <div class="alert alert-info py-2 mb-0" style="font-size: .85rem;">
+            <i class="bi bi-info-circle me-1"></i> Please <a href="{{ route('login') }}" class="fw-bold">Login</a> to send an inquiry.
+          </div>
+          @endif
+
 
           {{-- Schedule a Site Visit --}}
           @if($property->property_dealer_id)

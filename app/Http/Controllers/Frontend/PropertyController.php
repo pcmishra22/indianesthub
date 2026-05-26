@@ -14,7 +14,7 @@ class PropertyController extends Controller
         $property = Property::where('slug', $slug)->with(['images', 'dealer'])->firstOrFail();
 
         // Mask dealer contact details if the user is not logged in
-        if (!Auth::check() && $property->dealer) {
+        if (!Auth::check() && !$property->public_contact_enabled && $property->dealer) {
             $property->dealer->phone = 'Login to view';
             $property->dealer->email = 'Login to view';
         }

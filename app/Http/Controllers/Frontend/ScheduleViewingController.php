@@ -16,8 +16,10 @@ class ScheduleViewingController extends Controller
 {
     public function submit(Request $request)
     {
-        // Restrict scheduling viewings to logged-in users
-        if (!Auth::check()) {
+        $property = Property::find($request->property_id);
+
+        // Restrict scheduling viewings to logged-in users unless public contact is enabled
+        if (!Auth::check() && (!$property || !$property->public_contact_enabled)) {
             return response()->json(['success' => false, 'message' => 'Please login to schedule a viewing.'], 401);
         }
 

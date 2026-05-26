@@ -15,6 +15,7 @@
 						<th>Price</th>
 						<th>Status</th>
 						<th>Actions</th>
+
 					</tr>
 				</thead>
 				<tbody>
@@ -33,9 +34,19 @@
 							@endif
 						</td>
 						<td>
-							<a href="{{ route('admin.properties.show', $property->id) }}" class="btn btn-sm btn-primary">View</a>
+							<div class="d-flex align-items-center gap-2">
+								<form method="POST" action="{{ route('admin.properties.togglePublicContact', $property->id) }}">
+									@csrf
+									<input type="hidden" name="enabled" value="0">
+									<label class="form-check-label mb-0" style="cursor:pointer;" title="Guest users will see dealer phone & enquiry when enabled">
+										<input class="form-check-input" type="checkbox" name="enabled" value="1" {{ $property->public_contact_enabled ? 'checked' : '' }} onchange="this.form.submit()">
+									</label>
+								</form>
+								<a href="{{ route('admin.properties.show', $property->id) }}" class="btn btn-sm btn-primary">View</a>
+							</div>
 						</td>
 					</tr>
+
 				@empty
 					<tr>
 						<td colspan="7" class="text-center">No properties found.</td>

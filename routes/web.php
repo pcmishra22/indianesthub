@@ -482,7 +482,10 @@ Route::prefix('admin')->middleware('auth:admin')->name('admin.')->group(function
 
     // Manage Properties
     Route::resource('properties', AdminPropertyController::class)->only(['index', 'show', 'destroy']);
-    Route::post('/properties/{property}/toggle-featured', [AdminPropertyController::class, 'toggleFeatured'])->name('properties.toggle-featured');
+Route::post('/properties/{property}/toggle-featured', [AdminPropertyController::class, 'toggleFeatured'])->name('properties.toggle-featured');
+
+require __DIR__ . '/admin_properties.php';
+
 
     // Property viewers (guest token based tracking)
         Route::get('/properties/{property}/viewers', [\App\Http\Controllers\Admin\PropertyViewersController::class, 'index'])
