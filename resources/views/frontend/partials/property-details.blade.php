@@ -2033,4 +2033,165 @@ document.getElementById('property-inquiry-form').addEventListener('submit', func
     alert('Something went wrong. Please try again.');
   });
 });
+
+// ── Sticky bottom urgency bar (desktop) ───────────────────────────────────
+(function() {
+  const bar = document.getElementById('pd-sticky-bar');
+  if (!bar) return;
+  window.addEventListener('scroll', function() {
+    const scrolled = window.scrollY > 400;
+    bar.style.transform = scrolled ? 'translateY(0)' : 'translateY(110%)';
+  }, { passive: true });
+})();
+
+// ── Exit-intent popup ──────────────────────────────────────────────────────
+(function() {
+  let shown = false;
+  const popup = document.getElementById('pd-exit-popup');
+  if (!popup) return;
+  document.addEventListener('mouseleave', function(e) {
+    if (!shown && e.clientY < 10) {
+      shown = true;
+      popup.style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+    }
+  });
+  document.getElementById('pd-exit-popup-close')?.addEventListener('click', function() {
+    popup.style.display = 'none';
+    document.body.style.overflow = '';
+  });
+  popup.addEventListener('click', function(e) {
+    if (e.target === popup) { popup.style.display = 'none'; document.body.style.overflow = ''; }
+  });
+})();
 </script>
+
+{{-- ═══════════════════════════════════════════════════════════════════
+     STICKY BOTTOM BAR (desktop, appears after scrolling 400px)
+════════════════════════════════════════════════════════════════════ --}}
+<style>
+#pd-sticky-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 1050;
+  background: #fff; border-top: 2px solid #e2e8f0;
+  box-shadow: 0 -4px 20px rgba(0,0,0,.12);
+  padding: 12px 0;
+  transform: translateY(110%);
+  transition: transform .35s cubic-bezier(.4,0,.2,1);
+}
+#pd-sticky-bar .sb-inner { display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+#pd-sticky-bar .sb-title { font-size:.95rem; font-weight:700; color:#1e293b; }
+#pd-sticky-bar .sb-price { font-size:1.3rem; font-weight:800; color:#0078d4; }
+#pd-sticky-bar .sb-meta  { font-size:.75rem; color:#64748b; }
+#pd-sticky-bar .sb-urgency { background:#fff7ed; border:1px solid #fed7aa; border-radius:6px; padding:4px 10px; font-size:.72rem; font-weight:600; color:#c2410c; display:flex; align-items:center; gap:4px; }
+#pd-sticky-bar .sb-actions { display:flex; gap:8px; flex-shrink:0; }
+@media(max-width:768px) { #pd-sticky-bar { display:none; } }
+
+/* Mobile floating CTA */
+#pd-mobile-cta {
+  display:none;
+  position:fixed; bottom:0; left:0; right:0; z-index:1050;
+  background:#fff; border-top:2px solid #e2e8f0;
+  box-shadow:0 -4px 20px rgba(0,0,0,.12);
+  padding:10px 16px; gap:8px;
+}
+@media(max-width:768px) {
+  #pd-mobile-cta { display:flex; }
+}
+#pd-mobile-cta .btn { flex:1; border-radius:8px; font-weight:700; font-size:.85rem; padding:11px 8px; }
+
+/* Exit-intent popup */
+#pd-exit-popup {
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,.6);
+  z-index:9999; align-items:center; justify-content:center; padding:16px;
+}
+.pd-exit-card {
+  background:#fff; border-radius:16px; padding:32px 28px; max-width:420px; width:100%;
+  position:relative; text-align:center;
+  box-shadow:0 20px 60px rgba(0,0,0,.25);
+}
+.pd-exit-icon { font-size:3rem; margin-bottom:12px; }
+.pd-exit-title { font-size:1.3rem; font-weight:800; color:#1e293b; margin-bottom:8px; }
+.pd-exit-sub   { font-size:.88rem; color:#64748b; margin-bottom:20px; line-height:1.5; }
+#pd-exit-popup-close { position:absolute; top:14px; right:18px; font-size:1.4rem; cursor:pointer; color:#94a3b8; line-height:1; }
+</style>
+
+<div id="pd-sticky-bar">
+  <div class="container">
+    <div class="sb-inner">
+      <div>
+        <div class="sb-title">{{ Str::limit($property->title, 50) }}</div>
+        <div class="sb-meta">
+          <i class="bi bi-geo-alt me-1"></i>{{ $property->city }}
+          @if($property->bhk_type) · {{ $property->bhk_type }} BHK@endif
+          @if($property->area) · {{ number_format($property->area) }} sq.ft@endif
+        </div>
+      </div>
+      <div class="d-flex align-items-center gap-3">
+        <div>
+          <div class="sb-price">₹{{ number_format($property->price) }}</div>
+          @if(isset($inquiriesThisWeek) && $inquiriesThisWeek > 0)
+          <div class="sb-urgency">
+            <i class="bi bi-fire"></i> {{ $inquiriesThisWeek }} {{ Str::plural('enquiry', $inquiriesThisWeek) }} this week
+          </div>
+          @endif
+        </div>
+        <div class="sb-actions">
+          @if($property->dealer && $property->dealer->phone)
+          <a href="tel:{{ $property->dealer->phone }}" class="btn btn-success" style="border-radius:8px;font-weight:700;">
+            <i class="bi bi-telephone-fill me-1"></i>Call Now
+          </a>
+          @endif
+          <button class="btn btn-primary" style="border-radius:8px;font-weight:700;"
+                  onclick="document.getElementById('schedule-visit-card').scrollIntoView({behavior:'smooth'})">
+            <i class="bi bi-calendar-check me-1"></i>Request Site Visit
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{-- Mobile floating CTA --}}
+<div id="pd-mobile-cta">
+  @if($property->dealer && $property->dealer->phone)
+  <a href="tel:{{ $property->dealer->phone }}" class="btn btn-success">
+    <i class="bi bi-telephone-fill me-1"></i>Call
+  </a>
+  @if($property->dealer->phone)
+  <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $property->dealer->whatsapp_number ?? $property->dealer->phone) }}?text=Hi, I'm interested in {{ urlencode($property->title) }}"
+     target="_blank" class="btn btn-whatsapp" style="background:#25d366;color:#fff;">
+    <i class="bi bi-whatsapp me-1"></i>WhatsApp
+  </a>
+  @endif
+  @endif
+  <button class="btn btn-primary"
+          onclick="document.getElementById('inquiry-form-sidebar').scrollIntoView({behavior:'smooth'})">
+    <i class="bi bi-send me-1"></i>Enquire
+  </button>
+</div>
+
+{{-- Exit-Intent Popup --}}
+<div id="pd-exit-popup">
+  <div class="pd-exit-card">
+    <span id="pd-exit-popup-close">&times;</span>
+    <div class="pd-exit-icon">🏠</div>
+    <div class="pd-exit-title">Wait! Before you go…</div>
+    <div class="pd-exit-sub">
+      Get a <strong>free callback</strong> from our property expert on
+      <strong>{{ $property->title }}</strong>.
+      No obligation. No brokerage.
+    </div>
+    @if($property->dealer && $property->dealer->phone)
+    <a href="tel:{{ $property->dealer->phone }}" class="btn btn-success w-100 mb-2" style="border-radius:8px;font-weight:700;padding:13px;">
+      <i class="bi bi-telephone-fill me-2"></i>Call Now — {{ $property->dealer->phone }}
+    </a>
+    @endif
+    <button class="btn btn-primary w-100" style="border-radius:8px;font-weight:700;padding:12px;"
+            onclick="document.getElementById('pd-exit-popup').style.display='none';document.body.style.overflow='';document.getElementById('inquiry-form-sidebar').scrollIntoView({behavior:'smooth'})">
+      <i class="bi bi-send me-2"></i>Send Quick Enquiry
+    </button>
+    <div class="mt-3" style="font-size:.72rem;color:#94a3b8;">
+      <i class="bi bi-shield-check me-1 text-success"></i>100% free · No brokerage · Safe & secure
+    </div>
+  </div>
+</div>

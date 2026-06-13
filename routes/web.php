@@ -628,7 +628,10 @@ Route::prefix('builder')->middleware('auth:builder')->name('builder.')->group(fu
 
     // Leads Management
     Route::get('/leads',                         [BuilderLeadsController::class, 'index'])->name('leads.index');
+    Route::get('/leads/export',                  [BuilderLeadsController::class, 'export'])->name('leads.export');
     Route::patch('/leads/{lead}/status',         [BuilderLeadsController::class, 'updateStatus'])->name('leads.update-status');
+    Route::post('/leads/{lead}/notes',           [BuilderLeadsController::class, 'saveNotes'])->name('leads.save-notes');
+    Route::post('/leads/{lead}/call-log',        [BuilderLeadsController::class, 'addCallLog'])->name('leads.add-call-log');
     Route::delete('/leads/{lead}',               [BuilderLeadsController::class, 'destroy'])->name('leads.destroy');
 });
 

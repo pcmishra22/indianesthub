@@ -52,6 +52,15 @@
 /* Info card */
 .bp-card { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 22px; margin-bottom: 20px; }
 
+/* Project filter tabs */
+.bp-filter-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
+.bp-filter-tab {
+  padding: 6px 16px; border-radius: 20px; border: 1.5px solid #e2e8f0;
+  font-size: .78rem; font-weight: 600; cursor: pointer; color: #64748b;
+  background: #fff; transition: all .2s;
+}
+.bp-filter-tab.active, .bp-filter-tab:hover { background: #0078d4; color: #fff; border-color: #0078d4; }
+
 /* Project card */
 .bp-proj-card {
   background: #fff; border-radius: 12px; border: 1px solid #e2e8f0;
@@ -89,6 +98,31 @@
   color: #16a34a; font-size: .75rem; font-weight: 600;
   padding: 4px 10px; border-radius: 6px;
 }
+
+/* Builder lead form (sidebar) */
+.bp-lead-form {
+  background: linear-gradient(135deg,#0078d4 0%,#1565c0 100%);
+  border-radius: 12px; padding: 22px; color: #fff; position: sticky; top: 80px;
+}
+.bp-lead-form h5 { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+.bp-lead-form p  { font-size: .8rem; opacity: .85; margin-bottom: 14px; }
+.bp-lead-form .form-control {
+  background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3);
+  color: #fff; border-radius: 8px; padding: 9px 12px; font-size: .83rem; margin-bottom: 8px;
+}
+.bp-lead-form .form-control::placeholder { color: rgba(255,255,255,.6); }
+.bp-lead-form .form-control:focus { background: rgba(255,255,255,.2); border-color: rgba(255,255,255,.6); color: #fff; box-shadow: none; }
+.bp-lead-btn { width:100%; background:#fff; color:#0078d4; border:none; border-radius:8px; padding:11px; font-size:.88rem; font-weight:700; cursor:pointer; transition:all .2s; margin-top:4px; }
+.bp-lead-btn:hover { background:#eff6ff; }
+
+/* Builder Trust Timeline */
+.bp-trust-timeline { position:relative; padding-left:28px; }
+.bp-trust-timeline::before { content:''; position:absolute; left:9px; top:8px; bottom:8px; width:2px; background:#e2e8f0; }
+.bp-tt-item { position:relative; margin-bottom:18px; }
+.bp-tt-item:last-child { margin-bottom:0; }
+.bp-tt-dot { position:absolute; left:-24px; top:4px; width:16px; height:16px; border-radius:50%; background:#0078d4; border:2px solid #fff; box-shadow:0 0 0 2px #dbeafe; }
+.bp-tt-year { font-size:.7rem; font-weight:700; color:#0078d4; text-transform:uppercase; letter-spacing:.5px; }
+.bp-tt-text { font-size:.82rem; color:#334155; margin-top:1px; }
 
 @media(max-width:768px) {
   .bp-builder-name { font-size: 1.3rem; }
@@ -211,13 +245,59 @@
         </div>
         @endif
 
-        {{-- Projects Grid --}}
-        <div class="bp-section-title"><i class="bi bi-diagram-3-fill"></i> Projects ({{ $projects->total() }})</div>
+        {{-- Trust Timeline --}}
+        @if($builder->established_year || $builder->total_delivered_projects)
+        <div class="bp-card mb-4">
+          <div class="bp-section-title"><i class="bi bi-clock-history"></i> Builder Track Record</div>
+          <div class="bp-trust-timeline">
+            @if($builder->established_year)
+            <div class="bp-tt-item">
+              <div class="bp-tt-dot"></div>
+              <div class="bp-tt-year">{{ $builder->established_year }}</div>
+              <div class="bp-tt-text">Company founded · {{ date('Y') - $builder->established_year }} years of experience</div>
+            </div>
+            @endif
+            @if($builder->total_delivered_projects)
+            <div class="bp-tt-item">
+              <div class="bp-tt-dot" style="background:#22c55e;box-shadow:0 0 0 2px #dcfce7;"></div>
+              <div class="bp-tt-year">Projects Delivered</div>
+              <div class="bp-tt-text">{{ $builder->total_delivered_projects }} completed projects — {{ number_format($totalUnits ?? 0) }} families housed</div>
+            </div>
+            @endif
+            @if($builder->rera_registration)
+            <div class="bp-tt-item">
+              <div class="bp-tt-dot" style="background:#7c3aed;box-shadow:0 0 0 2px #ede9fe;"></div>
+              <div class="bp-tt-year">RERA Registered</div>
+              <div class="bp-tt-text">Reg. {{ $builder->rera_registration }} — Legally compliant & government-approved</div>
+            </div>
+            @endif
+            <div class="bp-tt-item">
+              <div class="bp-tt-dot" style="background:#f59e0b;box-shadow:0 0 0 2px #fef3c7;"></div>
+              <div class="bp-tt-year">Active Projects</div>
+              <div class="bp-tt-text">{{ $builder->projects_count - ($builder->total_delivered_projects ?? 0) }} ongoing projects across {{ $citiesServed->count() }} {{ Str::plural('city', $citiesServed->count()) }}</div>
+            </div>
+          </div>
+        </div>
+        @endif
+
+        {{-- Projects Grid with filter tabs --}}
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+          <div class="bp-section-title mb-0"><i class="bi bi-diagram-3-fill"></i> Projects ({{ $projects->total() }})</div>
+        </div>
+
+        {{-- Status filter tabs --}}
+        <div class="bp-filter-tabs">
+          <span class="bp-filter-tab active" onclick="filterProjects('all', this)">All</span>
+          <span class="bp-filter-tab" onclick="filterProjects('Under Construction', this)">Under Construction</span>
+          <span class="bp-filter-tab" onclick="filterProjects('Ready to Move', this)">Ready to Move</span>
+          <span class="bp-filter-tab" onclick="filterProjects('Upcoming', this)">Upcoming</span>
+          <span class="bp-filter-tab" onclick="filterProjects('Completed', this)">Completed</span>
+        </div>
 
         @if($projects->count())
-        <div class="row g-3 mb-3">
+        <div class="row g-3 mb-3" id="bp-projects-grid">
           @foreach($projects as $project)
-          <div class="col-md-6">
+          <div class="col-md-6 bp-proj-item" data-status="{{ $project->status }}">
             <div class="bp-proj-card">
               <div class="bp-proj-img">
                 @if($project->cover_image)
@@ -227,7 +307,6 @@
                     <i class="bi bi-buildings-fill"></i>
                   </div>
                 @endif
-                {{-- Status badge --}}
                 @php
                   $statusColors = [
                     'Upcoming' => 'background:#3b82f6;color:#fff;',
@@ -247,9 +326,9 @@
                 @endif
                 @if($project->price_from || $project->price_to)
                 <p class="bp-proj-price">
-                  ₹{{ $project->price_from ? number_format($project->price_from / 100000, 1) . 'L' : '' }}
+                  @if($project->price_from) ₹{{ number_format($project->price_from/100000,1) }}L @endif
                   @if($project->price_from && $project->price_to) – @endif
-                  {{ $project->price_to ? '₹' . number_format($project->price_to / 10000000, 2) . 'Cr' : '' }}
+                  @if($project->price_to) ₹{{ number_format($project->price_to/10000000,2) }}Cr @endif
                 </p>
                 @endif
                 <a href="{{ route('projects.show', $project) }}" class="bp-proj-btn">
@@ -272,6 +351,42 @@
 
       {{-- ===== RIGHT SIDEBAR ===== --}}
       <div class="col-lg-4">
+
+        {{-- ★ Lead capture form (NEW) --}}
+        <div class="bp-lead-form mb-4">
+          <h5><i class="bi bi-chat-dots-fill me-2"></i>Talk to {{ $builder->company_name ?: $builder->name }}</h5>
+          <p>Free consultation · No brokerage · Respond within 2 hours</p>
+
+          <div id="bp-lead-success" style="display:none;text-align:center;padding:16px 0;">
+            <i class="bi bi-check-circle-fill d-block mb-2" style="font-size:2.5rem;color:#4ade80;"></i>
+            <strong>We'll contact you shortly!</strong>
+          </div>
+
+          <form id="bp-lead-form-el" action="{{ route('projects.lead', $builder->projects->first() ?? 0) }}" method="POST">
+            @csrf
+            <input type="hidden" name="lead_type" value="general">
+            <input type="text"  name="name"  class="form-control" placeholder="Your Name *" required>
+            <input type="tel"   name="phone" class="form-control" placeholder="Phone Number *" required>
+            <input type="email" name="email" class="form-control" placeholder="Email (optional)">
+            <select name="lead_type" class="form-control" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:8px;padding:9px 12px;font-size:.83rem;margin-bottom:8px;">
+              <option value="general" style="color:#1e293b;background:#fff;">General Enquiry</option>
+              <option value="visit"   style="color:#1e293b;background:#fff;">Schedule Site Visit</option>
+              <option value="callback" style="color:#1e293b;background:#fff;">Request Callback</option>
+              <option value="brochure" style="color:#1e293b;background:#fff;">Get Brochure</option>
+            </select>
+            <button type="submit" class="bp-lead-btn" id="bp-lead-submit-btn">
+              <i class="bi bi-send-fill me-2"></i>Send Enquiry
+            </button>
+          </form>
+
+          @if($builder->phone)
+          <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $builder->phone) }}"
+             target="_blank"
+             style="display:block;margin-top:10px;text-align:center;background:#25d366;color:#fff;border-radius:8px;padding:10px;font-size:.85rem;font-weight:600;text-decoration:none;">
+            <i class="bi bi-whatsapp me-2"></i>Chat on WhatsApp
+          </a>
+          @endif
+        </div>
 
         {{-- Quick Contact --}}
         <div class="bp-card mb-4">
@@ -360,3 +475,48 @@
 
   <div style="height:48px;"></div>
 </main>
+
+<script>
+// Project status filter
+function filterProjects(status, el) {
+  document.querySelectorAll('.bp-filter-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.bp-proj-item').forEach(function(item) {
+    if (status === 'all' || item.dataset.status === status) {
+      item.style.display = '';
+    } else {
+      item.style.display = 'none';
+    }
+  });
+}
+
+// Builder lead form AJAX
+const bpForm = document.getElementById('bp-lead-form-el');
+if (bpForm) {
+  bpForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('bp-lead-submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending...';
+    fetch(this.action, {
+      method: 'POST',
+      body: new FormData(this),
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        bpForm.style.display = 'none';
+        document.getElementById('bp-lead-success').style.display = 'block';
+      } else {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-send-fill me-2"></i>Send Enquiry';
+      }
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-send-fill me-2"></i>Send Enquiry';
+    });
+  });
+}
+</script>

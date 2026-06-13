@@ -136,6 +136,35 @@
   .pd-hero-stats { width: 100%; }
   .pd-cover { height: 220px; }
 }
+/* ===== TIMELINE ===== */
+.pd-timeline-track { display:flex; align-items:flex-start; gap:0; overflow-x:auto; padding:4px 0; }
+.pd-tl-item { display:flex; flex-direction:column; align-items:center; flex-shrink:0; width:90px; text-align:center; }
+.pd-tl-dot { width:34px; height:34px; border-radius:50%; border:2px solid; display:flex; align-items:center; justify-content:center; margin-bottom:6px; }
+.pd-tl-item.done .pd-tl-label { font-weight:700; color:#1e293b; }
+.pd-tl-label { font-size:.68rem; color:#94a3b8; line-height:1.2; }
+.pd-tl-line { flex:1; height:2px; background:#e2e8f0; margin-top:17px; min-width:20px; }
+.pd-tl-line.done { background:#22c55e; }
+
+/* ===== TRUST SEALS ===== */
+.pd-trust-seals-card { background:linear-gradient(135deg,#f0fdf4 0%,#fff 70%); }
+.pd-trust-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.pd-trust-item { display:flex; align-items:flex-start; gap:9px; padding:10px; background:rgba(255,255,255,.8); border-radius:8px; border:1px solid #e2e8f0; }
+.pd-ti-icon { width:32px; height:32px; border-radius:8px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:.85rem; }
+.pd-ti-label { font-size:.72rem; font-weight:700; color:#334155; }
+.pd-ti-val   { font-size:.68rem; color:#64748b; margin-top:1px; }
+
+/* ===== STICKY PROJECT BAR ===== */
+#proj-sticky-bar {
+  position:fixed; bottom:0; left:0; right:0; z-index:1050;
+  background:linear-gradient(90deg,#0a2d5e 0%,#0078d4 100%);
+  color:#fff; padding:10px 0;
+  transform:translateY(110%); transition:transform .35s cubic-bezier(.4,0,.2,1);
+}
+#proj-sticky-bar .psb-inner { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+#proj-sticky-bar .psb-title { font-size:.88rem; font-weight:700; opacity:.95; }
+#proj-sticky-bar .psb-price { font-size:1.1rem; font-weight:800; }
+#proj-sticky-bar .psb-units { font-size:.72rem; opacity:.8; }
+@media(max-width:576px) { .pd-trust-grid { grid-template-columns:1fr; } }
 </style>
 
 {{-- Lightbox --}}
@@ -420,6 +449,94 @@
           </div>
         </div>
         @endif
+
+        {{-- ===== POSSESSION TIMELINE ===== --}}
+        @if($project->possession_date || $project->status)
+        <div class="pd-card">
+          <div class="pd-section-title"><i class="bi bi-calendar2-range-fill"></i> Project Timeline</div>
+          <div class="pd-timeline">
+            @php
+              $milestones = [
+                ['label' => 'Project Launched',      'icon' => 'bi-flag-fill',            'done' => true,  'color' => '#22c55e'],
+                ['label' => 'Construction Started',  'icon' => 'bi-building-fill',         'done' => in_array($project->status, ['Under Construction', 'Ready to Move', 'Completed']), 'color' => '#3b82f6'],
+                ['label' => 'Structure Complete',    'icon' => 'bi-buildings-fill',        'done' => in_array($project->status, ['Ready to Move', 'Completed']), 'color' => '#8b5cf6'],
+                ['label' => 'Ready to Move',         'icon' => 'bi-key-fill',              'done' => in_array($project->status, ['Ready to Move', 'Completed']), 'color' => '#f59e0b'],
+                ['label' => $project->possession_date ? 'Possession: ' . \Carbon\Carbon::parse($project->possession_date)->format('M Y') : 'Possession', 'icon' => 'bi-house-check-fill', 'done' => $project->status === 'Completed', 'color' => '#0078d4'],
+              ];
+            @endphp
+            <div class="pd-timeline-track">
+              @foreach($milestones as $i => $ms)
+              <div class="pd-tl-item {{ $ms['done'] ? 'done' : '' }}">
+                <div class="pd-tl-dot" style="background:{{ $ms['done'] ? $ms['color'] : '#e2e8f0' }};border-color:{{ $ms['done'] ? $ms['color'] : '#cbd5e1' }};">
+                  <i class="bi {{ $ms['icon'] }}" style="font-size:.65rem;color:{{ $ms['done'] ? '#fff' : '#94a3b8' }};"></i>
+                </div>
+                <div class="pd-tl-label">{{ $ms['label'] }}</div>
+              </div>
+              @if($i < count($milestones)-1)
+              <div class="pd-tl-line {{ ($milestones[$i+1]['done'] ?? false) ? 'done' : '' }}"></div>
+              @endif
+              @endforeach
+            </div>
+          </div>
+        </div>
+        @endif
+
+        {{-- ===== TRUST SEALS ===== --}}
+        <div class="pd-card pd-trust-seals-card">
+          <div class="pd-section-title"><i class="bi bi-shield-fill-check" style="color:#22c55e;"></i> Why Trust This Project</div>
+          <div class="pd-trust-grid">
+            @if($project->rera_id)
+            <div class="pd-trust-item">
+              <div class="pd-ti-icon" style="background:#f0fdf4;color:#16a34a;"><i class="bi bi-patch-check-fill"></i></div>
+              <div>
+                <div class="pd-ti-label">RERA Registered</div>
+                <div class="pd-ti-val">{{ $project->rera_id }}</div>
+              </div>
+            </div>
+            @endif
+            @if($project->builder->is_verified)
+            <div class="pd-trust-item">
+              <div class="pd-ti-icon" style="background:#eff6ff;color:#1d4ed8;"><i class="bi bi-building-check"></i></div>
+              <div>
+                <div class="pd-ti-label">Verified Builder</div>
+                <div class="pd-ti-val">{{ $project->builder->company_name ?: $project->builder->name }}</div>
+              </div>
+            </div>
+            @endif
+            @if($project->total_units)
+            <div class="pd-trust-item">
+              <div class="pd-ti-icon" style="background:#fff7ed;color:#c2410c;"><i class="bi bi-people-fill"></i></div>
+              <div>
+                <div class="pd-ti-label">Total Units</div>
+                <div class="pd-ti-val">{{ number_format($project->total_units) }} homes planned</div>
+              </div>
+            </div>
+            @endif
+            @if($project->builder->total_delivered_projects)
+            <div class="pd-trust-item">
+              <div class="pd-ti-icon" style="background:#ecfdf5;color:#059669;"><i class="bi bi-trophy-fill"></i></div>
+              <div>
+                <div class="pd-ti-label">Track Record</div>
+                <div class="pd-ti-val">{{ $project->builder->total_delivered_projects }} projects delivered</div>
+              </div>
+            </div>
+            @endif
+            <div class="pd-trust-item">
+              <div class="pd-ti-icon" style="background:#f5f3ff;color:#7c3aed;"><i class="bi bi-headset"></i></div>
+              <div>
+                <div class="pd-ti-label">Free Consultation</div>
+                <div class="pd-ti-val">No brokerage · No hidden charges</div>
+              </div>
+            </div>
+            <div class="pd-trust-item">
+              <div class="pd-ti-icon" style="background:#fff1f2;color:#e11d48;"><i class="bi bi-bank2"></i></div>
+              <div>
+                <div class="pd-ti-label">Home Loan Available</div>
+                <div class="pd-ti-val">All major banks supported</div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {{-- Related Projects --}}
         @if($relatedProjects->count())
@@ -722,4 +839,51 @@ document.getElementById('leadForm').addEventListener('submit', function(e) {
     btn.innerHTML = '<i class="bi bi-send-fill me-2"></i>Submit Enquiry';
   });
 });
+
+// Sticky project bar
+(function() {
+  const bar = document.getElementById('proj-sticky-bar');
+  if (!bar) return;
+  window.addEventListener('scroll', function() {
+    bar.style.transform = window.scrollY > 500 ? 'translateY(0)' : 'translateY(110%)';
+  }, { passive: true });
+})();
 </script>
+
+{{-- ===== STICKY PROJECT BOTTOM BAR ===== --}}
+<div id="proj-sticky-bar">
+  <div class="container">
+    <div class="psb-inner">
+      <div>
+        <div class="psb-title">{{ Str::limit($project->title, 50) }}</div>
+        <div class="psb-units">
+          @if($project->available_units) {{ $project->available_units }} units available · @endif
+          {{ $project->city }}
+        </div>
+      </div>
+      @if($minPrice)
+      <div class="psb-price">
+        ₹{{ $minPrice >= 10000000 ? number_format($minPrice/10000000,2).'Cr' : number_format($minPrice/100000,1).'L' }}
+        @if($maxPrice && $maxPrice != $minPrice)
+          – ₹{{ $maxPrice >= 10000000 ? number_format($maxPrice/10000000,2).'Cr' : number_format($maxPrice/100000,1).'L' }}
+        @endif
+      </div>
+      @endif
+      <div class="d-flex gap-2">
+        @if($project->builder->phone)
+        <a href="tel:{{ $project->builder->phone }}" class="btn btn-light text-primary" style="border-radius:8px;font-weight:700;font-size:.85rem;">
+          <i class="bi bi-telephone-fill me-1"></i>Call
+        </a>
+        <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $project->builder->phone) }}?text={{ urlencode('Hi! I am interested in ' . $project->title . '. Please share more details.') }}"
+           target="_blank" class="btn" style="background:#25d366;color:#fff;border-radius:8px;font-weight:700;font-size:.85rem;">
+          <i class="bi bi-whatsapp me-1"></i>WhatsApp
+        </a>
+        @endif
+        <button class="btn btn-warning" style="border-radius:8px;font-weight:700;font-size:.85rem;color:#1e293b;"
+                onclick="document.getElementById('lead-form-section').scrollIntoView({behavior:'smooth'})">
+          <i class="bi bi-calendar-check me-1"></i>Book Site Visit
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

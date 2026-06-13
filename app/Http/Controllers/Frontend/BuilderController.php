@@ -153,7 +153,12 @@ class BuilderController extends Controller
             'lead_type'          => $validated['lead_type'],
             'source'             => 'website',
             'status'             => 'new',
+            'ip_address'         => $request->ip(),
+            'user_agent'         => $request->userAgent(),
         ]);
+
+        // Compute initial hot score
+        $lead->recomputeHotScore();
 
         // Update leads count on project
         $project->increment('leads_count');
