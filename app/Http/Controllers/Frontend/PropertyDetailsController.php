@@ -25,7 +25,7 @@ class PropertyDetailsController extends Controller
      */
     public function show(Property $property)
     {
-        $property->load('images', 'dealer', 'builder');
+        $property->load('images', 'dealer', 'builder', 'builderProject');
 
         // Mask dealer contact details if the user is not logged in
         if (!Auth::check() && !$property->public_contact_enabled && $property->dealer) {
@@ -47,8 +47,7 @@ class PropertyDetailsController extends Controller
         $device    = $this->detectDevice($userAgent);
         $browser   = $this->detectBrowser($userAgent);
 
-        // Log detailed visit in property_views
-// Stable visitor token (guest fingerprint)
+        // Stable visitor token (guest fingerprint)
         $visitorToken = request()->cookie('visitor_token');
         if (empty($visitorToken)) {
             $visitorToken = (string) \Illuminate\Support\Str::uuid();
@@ -88,16 +87,61 @@ class PropertyDetailsController extends Controller
             );
         }
 
-        // Similar properties (same city + type, exclude current)
+        // ── Social proof numbers ────────────────────────────────────────────
+        // Views in last 7 days
+        $viewsThisWeek = PropertyView::where('property_id', $property->id)
+            ->where('viewed_at', '>=', now()->subDays(7))
+            ->count();
+
+        // Inquiries in last 7 days
+        $inquiriesThisWeek = Inquiry::where('property_id', $property->id)
+            ->where('created_at', '>=', now()->subDays(7))
+            ->count();
+
+        // ── Similar properties (same city + type + BHK, exclude current) ──
         $similarProperties = Property::with('images')
             ->where('id', '!=', $property->id)
             ->where('city', $property->city)
             ->where('property_type', $property->property_type)
+            ->when($property->bhk_type, fn($q) => $q->where('bhk_type', $property->bhk_type))
             ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired'])
-            ->limit(4)
+            ->limit(6)
             ->get();
 
-        return view('frontend.property-details', compact('property', 'similarProperties'));
+        // Fallback: relax BHK filter if too few results
+        if ($similarProperties->count() < 3) {
+            $similarProperties = Property::with('images')
+                ->where('id', '!=', $property->id)
+                ->where('city', $property->city)
+                ->where('property_type', $property->property_type)
+                ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired'])
+                ->limit(6)
+                ->get();
+        }
+
+        // ── Builder context ────────────────────────────────────────────────
+        $builderProperties = collect();
+        $builderTotalProjects = 0;
+
+        if ($property->builder) {
+            $builderProperties = Property::with('images')
+                ->where('builder_id', $property->builder_id)
+                ->where('id', '!=', $property->id)
+                ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired'])
+                ->limit(4)
+                ->get();
+
+            $builderTotalProjects = $property->builder->projects()->count();
+        }
+
+        return view('frontend.property-details', compact(
+            'property',
+            'similarProperties',
+            'viewsThisWeek',
+            'inquiriesThisWeek',
+            'builderProperties',
+            'builderTotalProjects'
+        ));
     }
 
     /**
@@ -132,7 +176,7 @@ class PropertyDetailsController extends Controller
         $inquiry->message     = $validated['message'];
         $inquiry->property_id = $validated['property_id'];
         $inquiry->broker_id   = $brokerId;
-$inquiry->ip_address     = $request->ip();
+        $inquiry->ip_address     = $request->ip();
         $inquiry->user_agent     = $request->userAgent();
         $inquiry->visitor_token  = $request->cookie('visitor_token');
         $inquiry->source         = 'website';
@@ -142,15 +186,15 @@ $inquiry->ip_address     = $request->ip();
         $fromAddress = config('mail.from.address', 'support@indianesthub.com');
         $fromName = config('mail.from.name', 'India Nest Hub');
 
-// 1) Notify the dealer about the new inquiry
+        // 1) Notify the dealer about the new inquiry
         $dealer = null;
         if ($property && $property->property_dealer_id) {
             $dealer = Dealer::find($property->property_dealer_id);
             Log::info("Property Dealer ID: " . $property->property_dealer_id . " - Dealer found: " . ($dealer ? $dealer->email : 'null'));
-if ($dealer && $dealer->email) {
+            if ($dealer && $dealer->email) {
                 Log::info("Sending dealer email to: " . $dealer->email);
                 Mail::to($dealer->email)->send(new PropertyInquiryToDealer($inquiry, $property));
-                
+
                 // WhatsApp notification to dealer
                 if ($dealer->phone) {
                     Log::info("Sending WhatsApp to dealer: " . $dealer->phone);
@@ -164,10 +208,10 @@ if ($dealer && $dealer->email) {
             Log::warning("Property has no property_dealer_id set. Property ID: " . ($property ? $property->id : 'null'));
         }
 
-// 2) Send confirmation to the buyer
+        // 2) Send confirmation to the buyer
         Mail::to($inquiry->email)->send(new PropertyInquiryConfirmation($inquiry, $property));
 
-        // 3) Send notification to admins (admin@indianesthub.com and pcmishra22@gmail.com)
+        // 3) Send notification to admins
         $adminRecipients = array_unique(array_filter([
             config('app.contact_email'),
             'admin@indianesthub.com',
@@ -189,7 +233,7 @@ if ($dealer && $dealer->email) {
                     ->subject('New Property Inquiry - Admin Notification');
             });
 
-// WhatsApp notification to admin
+            // WhatsApp notification to admin
             $adminWhatsAppNumber = config('app.whatsapp_number', '7340753780');
             Log::info("Admin WhatsApp number: " . $adminWhatsAppNumber);
             if ($adminWhatsAppNumber) {
@@ -253,7 +297,7 @@ if ($dealer && $dealer->email) {
         return 'Other';
     }
 
-/**
+    /**
      * Send WhatsApp notification using the WhatsAppNotificationService.
      */
     private function sendWhatsAppNotification(string $recipientNumber, string $message): void

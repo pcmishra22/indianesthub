@@ -530,6 +530,52 @@
   .pd-overview-grid { grid-template-columns: 1fr 1fr; }
 }
 </style>
+<style>
+/* ===== SOCIAL PROOF STRIP ===== */
+.pd-social-proof-strip { display: flex; flex-wrap: wrap; gap: 6px; }
+.pd-sp-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: .74rem; font-weight: 600; padding: 4px 10px;
+  border-radius: 20px; white-space: nowrap;
+}
+.pd-sp-badge.sp-views     { background:#eff6ff; color:#1d4ed8; }
+.pd-sp-badge.sp-inquiries { background:#fff7ed; color:#c2410c; }
+.pd-sp-badge.sp-verified  { background:#f0fdf4; color:#15803d; }
+.pd-sp-badge.sp-rera      { background:#ecfdf5; color:#065f46; }
+.pd-sp-badge.sp-builder-verified { background:#f5f3ff; color:#6d28d9; }
+
+/* ===== BUILDER CARD ===== */
+.pd-builder-card { border-left: 3px solid var(--pd-primary); }
+.pd-builder-profile { display:flex; align-items:center; gap:14px; margin-bottom:14px; }
+.pd-builder-logo { width:60px; height:60px; object-fit:contain; border-radius:8px; border:1px solid var(--pd-gray-200); background:#fff; padding:4px; }
+.pd-builder-logo-placeholder { width:60px; height:60px; border-radius:8px; background:#e8f1fc; display:flex; align-items:center; justify-content:center; color:var(--pd-primary); font-size:1.6rem; }
+.pd-builder-name { font-size:1.05rem; font-weight:700; color:var(--pd-gray-800); }
+.pd-builder-meta { font-size:.78rem; color:var(--pd-gray-500); margin-top:2px; }
+.pd-builder-verified { display:inline-flex; align-items:center; gap:4px; font-size:.72rem; font-weight:600; color:#15803d; background:#f0fdf4; padding:2px 8px; border-radius:12px; margin-top:4px; }
+.pd-builder-stats { display:flex; gap:0; background:var(--pd-gray-50); border-radius:8px; border:1px solid var(--pd-gray-200); margin-bottom:12px; overflow:hidden; }
+.pd-bstat { flex:1; text-align:center; padding:10px 8px; border-right:1px solid var(--pd-gray-200); }
+.pd-bstat:last-child { border-right:none; }
+.pd-bstat-num { font-size:1.3rem; font-weight:800; color:var(--pd-primary); line-height:1; }
+.pd-bstat-label { font-size:.68rem; color:var(--pd-gray-500); margin-top:3px; }
+.pd-builder-desc { font-size:.82rem; color:var(--pd-gray-600); line-height:1.5; margin-bottom:10px; }
+.pd-project-info { background:var(--pd-gray-50); border-radius:8px; border:1px solid var(--pd-gray-200); padding:12px 14px; }
+.pd-project-label { font-size:.7rem; font-weight:700; text-transform:uppercase; color:var(--pd-gray-500); letter-spacing:.5px; margin-bottom:4px; }
+.pd-project-name { font-size:.95rem; font-weight:700; color:var(--pd-gray-800); margin-bottom:6px; }
+.pd-project-status { font-size:.68rem; font-weight:700; padding:2px 8px; border-radius:10px; }
+.pd-project-rera, .pd-project-meta { font-size:.78rem; color:var(--pd-gray-600); margin-top:5px; }
+
+/* ===== WHY BUY HERE ===== */
+.pd-why-buy-card { background:linear-gradient(135deg,#fefce8 0%,#fff 60%); }
+.pd-why-buy-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.pd-why-item { display:flex; align-items:flex-start; gap:10px; background:rgba(255,255,255,.7); border-radius:8px; padding:10px; border:1px solid #fef9c3; }
+.pd-why-icon { width:34px; height:34px; border-radius:8px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:.9rem; }
+.pd-why-label { font-size:.78rem; font-weight:700; color:var(--pd-gray-700); }
+.pd-why-val   { font-size:.74rem; color:var(--pd-gray-500); margin-top:2px; }
+@media (max-width: 576px) {
+  .pd-why-buy-grid { grid-template-columns:1fr; }
+  .pd-social-proof-strip { gap:4px; }
+}
+</style>
 
 <main class="pd-page">
 
@@ -574,6 +620,41 @@
             <span class="text-muted mx-1">·</span>
             <span>ID #{{ $property->id }}</span>
           </div>
+
+          {{-- ===== SOCIAL PROOF STRIP ===== --}}
+          <div class="pd-social-proof-strip mt-2">
+            @if(isset($viewsThisWeek) && $viewsThisWeek > 0)
+            <span class="pd-sp-badge sp-views">
+              <i class="bi bi-graph-up-arrow"></i>
+              {{ $viewsThisWeek }} views this week
+            </span>
+            @endif
+            @if(isset($inquiriesThisWeek) && $inquiriesThisWeek > 0)
+            <span class="pd-sp-badge sp-inquiries">
+              <i class="bi bi-chat-dots-fill"></i>
+              {{ $inquiriesThisWeek }} {{ Str::plural('enquiry', $inquiriesThisWeek) }} this week
+            </span>
+            @endif
+            @if($property->dealer)
+            <span class="pd-sp-badge sp-verified">
+              <i class="bi bi-patch-check-fill"></i>
+              Verified Dealer
+            </span>
+            @endif
+            @if($property->rera_verified || $property->rera_id)
+            <span class="pd-sp-badge sp-rera">
+              <i class="bi bi-shield-fill-check"></i>
+              RERA Verified
+            </span>
+            @endif
+            @if($property->builder && $property->builder->is_verified)
+            <span class="pd-sp-badge sp-builder-verified">
+              <i class="bi bi-building-check"></i>
+              Verified Builder
+            </span>
+            @endif
+          </div>
+
         </div>
 
         <div class="col-lg-5">
@@ -1146,10 +1227,193 @@
         </div>
         @endif
 
+        {{-- ===== BUILDER / PROJECT CARD ===== --}}
+        @if($property->builder)
+        <div class="pd-card pd-builder-card">
+          <div class="pd-card-title"><i class="bi bi-building"></i> Builder & Project Info</div>
+          <div class="pd-builder-profile">
+            <div class="pd-builder-logo-wrap">
+              @if($property->builder->logo)
+                <img src="{{ asset('storage/' . $property->builder->logo) }}" alt="{{ $property->builder->display_name }}" class="pd-builder-logo">
+              @else
+                <div class="pd-builder-logo-placeholder"><i class="bi bi-building-fill"></i></div>
+              @endif
+            </div>
+            <div class="pd-builder-info">
+              <div class="pd-builder-name">{{ $property->builder->display_name }}</div>
+              @if($property->builder->established_year)
+              <div class="pd-builder-meta"><i class="bi bi-calendar3 me-1"></i>Est. {{ $property->builder->established_year }}</div>
+              @endif
+              @if($property->builder->is_verified)
+              <span class="pd-builder-verified"><i class="bi bi-patch-check-fill me-1"></i>Verified Builder</span>
+              @endif
+            </div>
+          </div>
+
+          <div class="pd-builder-stats">
+            <div class="pd-bstat">
+              <div class="pd-bstat-num">{{ $builderTotalProjects }}</div>
+              <div class="pd-bstat-label">Total Projects</div>
+            </div>
+            @if($property->builder->total_delivered_projects)
+            <div class="pd-bstat">
+              <div class="pd-bstat-num">{{ $property->builder->total_delivered_projects }}</div>
+              <div class="pd-bstat-label">Delivered</div>
+            </div>
+            @endif
+            @if($property->builder->rating)
+            <div class="pd-bstat">
+              <div class="pd-bstat-num">{{ number_format($property->builder->rating, 1) }}<span style="font-size:.75rem;">★</span></div>
+              <div class="pd-bstat-label">Rating</div>
+            </div>
+            @endif
+          </div>
+
+          @if($property->builder->description)
+          <p class="pd-builder-desc">{{ Str::limit($property->builder->description, 160) }}</p>
+          @endif
+
+          @if($property->builderProject)
+          <div class="pd-project-info">
+            <div class="pd-project-label"><i class="bi bi-layers me-1"></i>Project</div>
+            <div class="pd-project-name">{{ $property->builderProject->title }}</div>
+            @if($property->builderProject->status)
+            <span class="pd-project-status {{ $property->builderProject->status_badge_class ?? 'bg-info' }}">{{ $property->builderProject->status }}</span>
+            @endif
+            @if($property->builderProject->rera_id)
+            <div class="pd-project-rera"><i class="bi bi-shield-fill-check text-success me-1"></i>RERA: {{ $property->builderProject->rera_id }}</div>
+            @endif
+            @if($property->builderProject->possession_date)
+            <div class="pd-project-meta"><i class="bi bi-calendar-check me-1"></i>Possession: {{ $property->builderProject->possession_date->format('M Y') }}</div>
+            @endif
+          </div>
+          @endif
+
+          @if($property->builder->slug)
+          <a href="{{ route('builder.show', $property->builder->slug) }}" class="btn btn-outline-primary btn-sm w-100 mt-3" style="border-radius:7px;font-weight:600;">
+            <i class="bi bi-arrow-right-circle me-1"></i>View All by {{ $property->builder->display_name }}
+          </a>
+          @endif
+        </div>
+        @endif
+
+        {{-- ===== OTHER PROPERTIES BY SAME BUILDER ===== --}}
+        @if(isset($builderProperties) && $builderProperties->count())
+        <div class="pd-card">
+          <div class="pd-card-title"><i class="bi bi-building-fill"></i> More from {{ $property->builder->display_name ?? 'Builder' }}</div>
+          <div class="pd-similar-grid">
+            @foreach($builderProperties as $bp)
+            <a href="{{ route('property-details', $bp) }}" class="pd-similar-card">
+              @if($bp->images && $bp->images->count())
+                <img src="{{ url('storage/dealer/' . $bp->property_dealer_id . '/' . $bp->id . '/images/' . basename($bp->images->first()->image_path)) }}" alt="{{ $bp->title }}">
+              @elseif($bp->cover_image)
+                <img src="{{ asset('storage/' . $bp->cover_image) }}" alt="{{ $bp->title }}">
+              @else
+                <img src="/assets/img/real-estate/property-exterior-4.webp" alt="{{ $bp->title }}">
+              @endif
+              <div class="similar-body">
+                <div class="sim-price">₹{{ number_format($bp->price) }}@if($bp->looking_for == 'Rent')<span style="font-size:.75rem;font-weight:500;color:#64748b">/mo</span>@endif</div>
+                <div class="sim-title">{{ Str::limit($bp->title, 45) }}</div>
+                <div class="sim-specs">
+                  @if($bp->bedrooms)<span><i class="bi bi-house-door"></i> {{ $bp->bedrooms }} Bed</span>@endif
+                  @if($bp->area)<span><i class="bi bi-arrows-angle-expand"></i> {{ number_format($bp->area) }} sqft</span>@endif
+                </div>
+              </div>
+            </a>
+            @endforeach
+          </div>
+        </div>
+        @endif
+
+        {{-- ===== WHY BUY HERE? ===== --}}
+        @if($property->city || $property->locality || $property->nearby_schools || $property->nearby_hospitals)
+        <div class="pd-card pd-why-buy-card">
+          <div class="pd-card-title"><i class="bi bi-star-fill" style="color:#f59e0b;"></i>
+            Why Buy in {{ $property->locality ?? $property->city }}?
+          </div>
+          <div class="pd-why-buy-grid">
+            @if($property->nearby_schools)
+            <div class="pd-why-item">
+              <div class="pd-why-icon" style="background:#eff6ff;color:#1d4ed8;"><i class="bi bi-mortarboard-fill"></i></div>
+              <div>
+                <div class="pd-why-label">Schools Nearby</div>
+                <div class="pd-why-val">{{ Str::limit($property->nearby_schools, 60) }}</div>
+              </div>
+            </div>
+            @endif
+            @if($property->nearby_hospitals)
+            <div class="pd-why-item">
+              <div class="pd-why-icon" style="background:#fef2f2;color:#dc2626;"><i class="bi bi-hospital-fill"></i></div>
+              <div>
+                <div class="pd-why-label">Hospitals Nearby</div>
+                <div class="pd-why-val">{{ Str::limit($property->nearby_hospitals, 60) }}</div>
+              </div>
+            </div>
+            @endif
+            @if($property->nearby_metro)
+            <div class="pd-why-item">
+              <div class="pd-why-icon" style="background:#ecfdf5;color:#059669;"><i class="bi bi-train-lightrail-front-fill"></i></div>
+              <div>
+                <div class="pd-why-label">Metro / Transit</div>
+                <div class="pd-why-val">{{ Str::limit($property->nearby_metro, 60) }}</div>
+              </div>
+            </div>
+            @endif
+            @if($property->nearby_malls)
+            <div class="pd-why-item">
+              <div class="pd-why-icon" style="background:#fffbeb;color:#d97706;"><i class="bi bi-shop-window"></i></div>
+              <div>
+                <div class="pd-why-label">Shopping</div>
+                <div class="pd-why-val">{{ Str::limit($property->nearby_malls, 60) }}</div>
+              </div>
+            </div>
+            @endif
+            @if($property->gated_society)
+            <div class="pd-why-item">
+              <div class="pd-why-icon" style="background:#f0fdf4;color:#16a34a;"><i class="bi bi-shield-lock-fill"></i></div>
+              <div>
+                <div class="pd-why-label">Gated Community</div>
+                <div class="pd-why-val">24×7 Security & Access Control</div>
+              </div>
+            </div>
+            @endif
+            @if($property->vastu_compliant)
+            <div class="pd-why-item">
+              <div class="pd-why-icon" style="background:#fff7ed;color:#ea580c;"><i class="bi bi-compass-fill"></i></div>
+              <div>
+                <div class="pd-why-label">Vastu Compliant</div>
+                <div class="pd-why-val">Designed as per Vastu Shastra</div>
+              </div>
+            </div>
+            @endif
+            @if($property->rera_id)
+            <div class="pd-why-item">
+              <div class="pd-why-icon" style="background:#eff6ff;color:#2563eb;"><i class="bi bi-patch-check-fill"></i></div>
+              <div>
+                <div class="pd-why-label">RERA Registered</div>
+                <div class="pd-why-val">{{ $property->rera_id }} — Legally Secured</div>
+              </div>
+            </div>
+            @endif
+            @if($property->possession_status)
+            <div class="pd-why-item">
+              <div class="pd-why-icon" style="background:#f0fdf4;color:#16a34a;"><i class="bi bi-key-fill"></i></div>
+              <div>
+                <div class="pd-why-label">Possession</div>
+                <div class="pd-why-val">{{ $property->possession_status }}@if($property->possession_date) · {{ \Carbon\Carbon::parse($property->possession_date)->format('M Y') }}@endif</div>
+              </div>
+            </div>
+            @endif
+          </div>
+        </div>
+        @endif
+
         {{-- ===== SIMILAR PROPERTIES ===== --}}
         @if(isset($similarProperties) && $similarProperties->count())
         <div class="pd-card">
-          <div class="pd-card-title"><i class="bi bi-grid-3x2-gap-fill"></i> Similar Properties</div>
+          <div class="pd-card-title"><i class="bi bi-grid-3x2-gap-fill"></i> Similar Properties
+            @if($property->bhk_type)<small class="text-muted fw-normal ms-1">· {{ $property->bhk_type }} BHK in {{ $property->city }}</small>@endif
+          </div>
           <div class="pd-similar-grid">
             @foreach($similarProperties as $similar)
             <a href="{{ route('property-details', $similar) }}" class="pd-similar-card">
@@ -1271,8 +1535,8 @@
                 <i class="bi bi-whatsapp"></i> WhatsApp
               </a>
               @endif
-              <button class="btn btn-outline-primary" onclick="document.getElementById('inquiry-form-sidebar').scrollIntoView({behavior:'smooth'})">
-                <i class="bi bi-chat-text"></i> Send Message
+              <button class="btn btn-outline-primary" onclick="document.getElementById('schedule-visit-card').scrollIntoView({behavior:'smooth'})">
+                <i class="bi bi-calendar2-check"></i> Request Site Visit
               </button>
             </div>
             @else
