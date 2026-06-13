@@ -2120,11 +2120,15 @@ document.getElementById('property-inquiry-form').addEventListener('submit', func
     <div class="sb-inner">
       <div>
         <div class="sb-title">{{ Str::limit($property->title, 50) }}</div>
-        <div class="sb-meta">
-          <i class="bi bi-geo-alt me-1"></i>{{ $property->city }}
-          @if($property->bhk_type) · {{ $property->bhk_type }} BHK@endif
-          @if($property->area) · {{ number_format($property->area) }} sq.ft@endif
-        </div>
+          <div class="sb-meta">
+              <i class="bi bi-geo-alt me-1"></i>
+
+              {{ collect([
+                  $property->city,
+                  $property->bhk_type ? $property->bhk_type . ' BHK' : null,
+                  $property->area ? number_format($property->area) . ' sq.ft' : null,
+              ])->filter()->implode(' · ') }}
+          </div>
       </div>
       <div class="d-flex align-items-center gap-3">
         <div>
