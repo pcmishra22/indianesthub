@@ -476,6 +476,15 @@ Route::prefix('admin')->middleware('auth:admin')->name('admin.')->group(function
     Route::resource('users', AdminUserController::class)->only(['index', 'show', 'destroy']);
     Route::post('/users/{user}/toggle-status', [AdminUserController::class, 'toggleStatus'])->name('users.toggle-status');
 
+    // User Bulk Email
+    Route::get('/users/bulk-email', [\App\Http\Controllers\Admin\UserBulkEmailController::class, 'index'])->name('users.bulk-email.index');
+    Route::get('/users/bulk-email/create', [\App\Http\Controllers\Admin\UserBulkEmailController::class, 'create'])->name('users.bulk-email.create');
+    Route::post('/users/bulk-email', [\App\Http\Controllers\Admin\UserBulkEmailController::class, 'store'])->name('users.bulk-email.store');
+    Route::get('/users/bulk-email/{id}/edit', [\App\Http\Controllers\Admin\UserBulkEmailController::class, 'edit'])->name('users.bulk-email.edit');
+    Route::put('/users/bulk-email/{id}', [\App\Http\Controllers\Admin\UserBulkEmailController::class, 'update'])->name('users.bulk-email.update');
+    Route::delete('/users/bulk-email/{id}', [\App\Http\Controllers\Admin\UserBulkEmailController::class, 'destroy'])->name('users.bulk-email.destroy');
+    Route::post('/users/bulk-email/{id}/queue', [\App\Http\Controllers\Admin\UserBulkEmailController::class, 'queue'])->name('users.bulk-email.queue');
+
     // Dealer Bulk Email
     Route::get('/dealers/bulk-email', [\App\Http\Controllers\Admin\DealerBulkEmailController::class, 'index'])->name('dealers.bulk-email.index');
     Route::get('/dealers/bulk-email/create', [\App\Http\Controllers\Admin\DealerBulkEmailController::class, 'create'])->name('dealers.bulk-email.create');

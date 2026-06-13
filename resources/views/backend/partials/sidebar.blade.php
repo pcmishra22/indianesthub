@@ -15,6 +15,11 @@
                     <i class="align-middle" data-feather="users"></i> <span class="align-middle">Users</span>
                 </a>
             </li>
+            <li class="sidebar-item {{ request()->routeIs('admin.users.bulk-email.*') ? 'active' : '' }}">
+                <a class="sidebar-link" href="{{ route('admin.users.bulk-email.index') }}">
+                    <i class="align-middle" data-feather="mail"></i> <span class="align-middle">User Bulk Email</span>
+                </a>
+            </li>
             <li class="sidebar-item {{ request()->routeIs('admin.dealers.*') ? 'active' : '' }}">
                 <a class="sidebar-link" href="{{ route('admin.dealers.index') }}">
                     <i class="align-middle" data-feather="user-check"></i> <span class="align-middle">Dealers</span>
