@@ -18,6 +18,7 @@
 </style>
 
   <header id="header" class="header d-flex align-items-center sticky-top" style="overflow: visible;">
+    <div class="container-fluid container-xl position-relative d-flex align-items-center justify-content-between">
 
       <a href="{{ url('/') }}" class="logo d-flex align-items-center">
         <!-- Uncomment the line below if you also wish to use an image logo -->
@@ -106,8 +107,8 @@
             </li>
           @endauth
         </ul>
-        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
       </nav>
+      <i class="mobile-nav-toggle d-xl-none bi bi-list ms-auto"></i>
 
       {{-- Desktop auth buttons --}}
       <div class="d-none d-xl-flex align-items-center gap-2">
@@ -164,4 +165,5 @@
           </div>
         @endauth
       </div>
+    </div><!-- End container-fluid -->
   </header>
