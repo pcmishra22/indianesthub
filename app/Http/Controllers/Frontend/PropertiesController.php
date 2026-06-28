@@ -95,9 +95,16 @@ class PropertiesController extends Controller
         $maxLng = $loc['lng'] + $lngDelta;
 
         $query = Property::with(['images', 'dealer', 'builder'])
-            ->paidAndValid()
             ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
             ->whereNotNull('price')
+            ->where(function ($qs) {
+                $qs->whereHas('payments', function ($p) {
+                        $p->whereIn('status', ['completed', '1', 1])
+                          ->where('payment_type', 'property_listing')
+                          ->where('listing_end_date', '>=', now());
+                    })
+                    ->orWhereIn('listing_status', ['active', 'published']);
+            })
             ->where('price', '>', 0)
             ->where(function ($q) use ($loc, $minLat, $maxLat, $minLng, $maxLng) {
                 $q->where(function ($inner) use ($minLat, $maxLat, $minLng, $maxLng) {
@@ -207,10 +214,17 @@ class PropertiesController extends Controller
         $buildBaseQuery = function($lFor = null) use ($request) {
 
             $q = Property::with(['images', 'dealer', 'builder'])
-                ->paidAndValid()
                 ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
                 ->whereNotNull('price')
-                ->where('listing_status', 'active')
+                ->where(function ($qs) {
+                    // Show properties that are either paid+valid OR have listing_status active/published
+                    $qs->whereHas('payments', function ($p) {
+                            $p->whereIn('status', ['completed', '1', 1])
+                              ->where('payment_type', 'property_listing')
+                              ->where('listing_end_date', '>=', now());
+                        })
+                        ->orWhereIn('listing_status', ['active', 'published']);
+                })
                 ->where('price', '>', 0);
 
             if ($request->filled('keyword')) {
@@ -392,9 +406,15 @@ class PropertiesController extends Controller
             // Ultimate Fallback: Just show latest properties in the city if any, or any properties
             if ($properties->total() === 0) {
                 $properties = Property::with(['images', 'dealer', 'builder'])
-                    ->paidAndValid()
                     ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
-                    ->where('listing_status', 'active')
+                    ->where(function ($qs) {
+                        $qs->whereHas('payments', function ($p) {
+                                $p->whereIn('status', ['completed', '1', 1])
+                                  ->where('payment_type', 'property_listing')
+                                  ->where('listing_end_date', '>=', now());
+                            })
+                            ->orWhereIn('listing_status', ['active', 'published']);
+                    })
                     ->when($city, function($q) use ($city) {
                         $q->where('city', 'like', "%{$city}%");
                     })

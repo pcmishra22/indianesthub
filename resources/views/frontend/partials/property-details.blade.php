@@ -1482,11 +1482,12 @@
                 <i class="bi bi-chat-dots-fill me-1"></i>Enquire
               </button>
               @endif
-              @else
+              @endauth
+              @guest
               <a href="{{ route('login') }}" class="btn btn-light text-primary w-100">
                 <i class="bi bi-lock-fill me-1"></i> Login to Contact
               </a>
-              @endauth
+              @endguest
             </div>
           </div>
 
