@@ -213,6 +213,64 @@ if ($uri === '/api/sectors') {
     exit;
 }
 
+// ── Save a signal with price + target for EOD tracking ────────
+if ($uri === '/api/signal/save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    $today = date('Y-m-d');
+    $file  = STORAGE . '/eod_signals_' . $today . '.json';
+    $saved = file_exists($file) ? json_decode(file_get_contents($file), true) : [];
+    $sym   = strtoupper(trim($_POST['symbol'] ?? ''));
+    $entry = [
+        'symbol'       => $sym,
+        'name'         => trim($_POST['name'] ?? $sym),
+        'signal'       => trim($_POST['signal'] ?? ''),
+        'entry_price'  => (float)($_POST['entry_price'] ?? 0),
+        'target_price' => (float)($_POST['target_price'] ?? 0),
+        'stoploss'     => (float)($_POST['stoploss'] ?? 0),
+        'target2'      => (float)($_POST['target2'] ?? 0),
+        'saved_at'     => date('H:i:s'),
+        'ts'           => time(),
+        'hit'          => null,   // filled at EOD check
+        'close_price'  => null,
+    ];
+    // Overwrite if same symbol already saved today
+    $idx = array_search($sym, array_column($saved, 'symbol'));
+    if ($idx !== false) $saved[$idx] = $entry;
+    else $saved[] = $entry;
+    if (!is_dir(STORAGE)) mkdir(STORAGE, 0755, true);
+    file_put_contents($file, json_encode($saved));
+    echo json_encode(['ok' => true, 'entry' => $entry]);
+    exit;
+}
+
+// ── EOD Report: list today's signals + live price check ───────
+if ($uri === '/api/eod/report') {
+    header('Content-Type: application/json');
+    echo json_encode(apiEodReport());
+    exit;
+}
+
+// ── EOD Report: check current prices vs targets ───────────────
+if ($uri === '/api/eod/check') {
+    header('Content-Type: application/json');
+    echo json_encode(apiEodCheck());
+    exit;
+}
+
+// ── EOD Report: list all dates that have saved signal files ───
+if ($uri === '/api/eod/dates') {
+    header('Content-Type: application/json');
+    $files = glob(STORAGE . '/eod_signals_*.json') ?: [];
+    $dates = [];
+    foreach ($files as $f) {
+        preg_match('/eod_signals_(\d{4}-\d{2}-\d{2})\.json$/', $f, $m);
+        if ($m[1] ?? null) $dates[] = $m[1];
+    }
+    rsort($dates);
+    echo json_encode(['dates' => $dates]);
+    exit;
+}
+
 dashboardPage($APP_NAME, $_SESSION['user'] ?? 'Trader');
 
 // ══════════════════════════════════════════════════════════════
@@ -1425,6 +1483,56 @@ function apiLeaders(): array
     ];
 }
 
+
+// ══════════════════════════════════════════════════════════════
+//  EOD REPORT FUNCTIONS
+// ══════════════════════════════════════════════════════════════
+
+function apiEodReport(string $date = ''): array
+{
+    if (!$date) $date = date('Y-m-d');
+    $file = STORAGE . '/eod_signals_' . $date . '.json';
+    if (!file_exists($file)) return ['date' => $date, 'signals' => [], 'summary' => null];
+    $signals = json_decode(file_get_contents($file), true) ?? [];
+    if (empty($signals)) return ['date' => $date, 'signals' => [], 'summary' => null];
+    $nsSyms = array_map(fn($s) => str_ends_with($s['symbol'], '.NS') ? $s['symbol'] : $s['symbol'] . '.NS', $signals);
+    $prices = [];
+    if ($nsSyms) {
+        $url  = 'https://query2.finance.yahoo.com/v8/finance/quote?symbols=' . implode(',', array_map('urlencode', $nsSyms)) . '&fields=regularMarketPrice,regularMarketPreviousClose&lang=en-US&region=IN';
+        $raw  = httpGet($url, 15);
+        $data = $raw ? json_decode($raw, true) : null;
+        foreach ($data['quoteResponse']['result'] ?? [] as $q) {
+            $key = str_replace('.NS', '', $q['symbol']);
+            $prices[$key] = ['price' => $q['regularMarketPrice'] ?? 0, 'prev' => $q['regularMarketPreviousClose'] ?? 0];
+        }
+    }
+    $hits = 0; $misses = 0; $pending = 0;
+    foreach ($signals as &$sig) {
+        $sym  = str_replace('.NS', '', $sig['symbol']);
+        $live = $prices[$sym]['price'] ?? 0;
+        $sig['current_price'] = round($live, 2);
+        $sig['price_change_pct'] = $sig['entry_price'] > 0 ? round((($live - $sig['entry_price']) / $sig['entry_price']) * 100, 2) : 0;
+        if ($live <= 0) { $pending++; $sig['status'] = 'pending'; continue; }
+        $target = $sig['target_price']; $sl = $sig['stoploss']; $isBuy = strtolower($sig['signal']) === 'buy';
+        if ($isBuy) {
+            if ($live >= $target) { $sig['status'] = 'target_hit'; $hits++; }
+            elseif ($sl > 0 && $live <= $sl) { $sig['status'] = 'sl_hit'; $misses++; }
+            else { $sig['status'] = 'open'; $pending++; }
+        } else {
+            if ($live <= $target) { $sig['status'] = 'target_hit'; $hits++; }
+            elseif ($sl > 0 && $live >= $sl) { $sig['status'] = 'sl_hit'; $misses++; }
+            else { $sig['status'] = 'open'; $pending++; }
+        }
+    }
+    unset($sig);
+    $total = count($signals); $resolved = $hits + $misses;
+    $hitPct = $resolved > 0 ? round($hits / $resolved * 100) : null;
+    $summary = ['total' => $total, 'hits' => $hits, 'misses' => $misses, 'pending' => $pending, 'hit_pct' => $hitPct, 'date' => $date];
+    return ['date' => $date, 'signals' => $signals, 'summary' => $summary];
+}
+
+function apiEodCheck(): array { return apiEodReport(); }
+
 function apiNews(): array
 {
     $cacheFile = STORAGE . '/news_cache.json';
@@ -2443,6 +2551,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <button class="nb" onclick="showTab('news',this)">📰 News</button>
       <button class="nb" onclick="showTab('leaders',this)">🏆 Leaders</button>
       <button class="nb" onclick="showTab('intraday',this)">📉 Chart</button>
+      <button class="nb" onclick="showTab('eodreport',this);loadEodReport()">📋 EOD Report</button>
     </nav>
   </div>
   <div class="topbar-r">
@@ -2651,6 +2760,61 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </div>
 </div>
 
+<!-- EOD REPORT TAB -->
+<div class="tab-pane" id="tab-eodreport">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+    <div>
+      <h2 style="font-size:1.1rem;font-weight:700;color:#fff">📋 End-of-Day Signal Report</h2>
+      <div style="font-size:12px;color:var(--muted);margin-top:3px">Track every Buy/Sell signal given today — see if targets were hit ✅ or missed ❌</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select id="eodDatePicker" onchange="loadEodReport(this.value)"
+        style="background:var(--panel2);border:1px solid var(--border2);border-radius:8px;padding:7px 12px;color:#fff;font-size:12px;outline:none">
+        <option value="">Today</option>
+      </select>
+      <button class="btn btn-primary" onclick="loadEodReport()" style="padding:7px 16px">🔄 Refresh</button>
+    </div>
+  </div>
+
+  <!-- Summary KPI row -->
+  <div id="eodSummary" style="display:none;margin-bottom:16px">
+    <div class="kpi-row">
+      <div class="kpi blue"><div class="kpi-label">Total Signals</div><div class="kpi-val" id="eodTotal">—</div><div class="kpi-sub">tracked today</div></div>
+      <div class="kpi green"><div class="kpi-label">Targets Hit ✅</div><div class="kpi-val" id="eodHits">—</div><div class="kpi-sub" id="eodHitSub">achieved target</div></div>
+      <div class="kpi red"><div class="kpi-label">SL Hit / Missed ❌</div><div class="kpi-val" id="eodMisses">—</div><div class="kpi-sub">stopped out</div></div>
+      <div class="kpi orange"><div class="kpi-label">Still Open ⏳</div><div class="kpi-val" id="eodPending">—</div><div class="kpi-sub">awaiting outcome</div></div>
+      <div class="kpi" style="border-top:3px solid #a78bfa"><div class="kpi-label">Hit Rate</div><div class="kpi-val" id="eodHitPct" style="font-size:2rem">—</div><div class="kpi-sub">of resolved signals</div></div>
+    </div>
+    <!-- Hit rate progress bar -->
+    <div id="eodProgressWrap" style="background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-size:12px;font-weight:600;color:#fff">Overall Accuracy</span>
+        <span id="eodAccLabel" style="font-size:13px;font-weight:700;color:var(--green)"></span>
+      </div>
+      <div style="height:12px;background:rgba(255,255,255,.07);border-radius:6px;overflow:hidden">
+        <div id="eodProgressBar" style="height:100%;border-radius:6px;background:linear-gradient(90deg,var(--green),#34d399);width:0%;transition:width .6s ease"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:10px;color:var(--muted)">
+        <span>0% Miss</span><span>50% Neutral</span><span>100% Perfect</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Signals table -->
+  <div class="panel" id="eodPanel">
+    <div id="eodLoading" style="padding:50px;text-align:center;color:var(--muted)">
+      <div class="spin" style="width:28px;height:28px;margin:0 auto 14px"></div>
+      <div>Loading EOD report…</div>
+    </div>
+    <div id="eodTable" style="display:none"></div>
+    <div id="eodEmpty" style="display:none;padding:50px;text-align:center;color:var(--muted)">
+      <div style="font-size:40px;margin-bottom:12px;opacity:.4">📋</div>
+      <div style="font-weight:600;color:#fff;margin-bottom:6px">No signals tracked yet for this date</div>
+      <div style="font-size:12px">Signals are saved automatically when you view the Watchlist with Buy/Sell recommendations.<br>They will appear here with live target tracking.</div>
+    </div>
+  </div>
+</div>
+
 </div><!-- /wrap -->
 
 <script>
@@ -2797,10 +2961,20 @@ function renderWatchlist(d){
     const skC=sk>80?'var(--red)':sk<20?'var(--green)':'var(--accent2)';
     const pp=s.pivot_pp?`PP:${parseFloat(s.pivot_pp).toFixed(0)} R1:${parseFloat(s.pivot_r1||0).toFixed(0)} S1:${parseFloat(s.pivot_s1||0).toFixed(0)}`:'';
     const dirIcon=s.direction==='rising'?'🚀':s.direction==='falling'?'📉':'➡️';
+    // Price vs target gap %
+    const tgt=parseFloat(s.target)||0;
+    const curP=parseFloat(s.price)||0;
+    const tgtGap=curP>0&&tgt>0?((tgt-curP)/curP*100):0;
+    const isBuySignal=sig==='Buy'||sig==='Strong Buy';
+    const tgtGapStr=tgtGap!==0?`(${tgtGap>0?'+':''}${tgtGap.toFixed(1)}%)`:'';
+    const sl=parseFloat(s.stoploss)||0;
+    const slGap=curP>0&&sl>0?(((sl-curP)/curP)*100):0;
+    // Auto-save signal to EOD tracker (fire-and-forget)
+    if(sig==='Buy'||sig==='Sell'){saveSignalEod(s);}
     return `<tr>
       <td style="font-size:11px;color:var(--muted);text-align:center">#${rank}</td>
       <td><div class="sym">${escHtml(s.symbol||'')}</div><div class="co-name">${escHtml(s.name||'')}</div></td>
-      <td class="price">₹${fmtNum(s.price)}</td>
+      <td class="price" style="font-weight:700;font-size:13px">₹${fmtNum(curP)}</td>
       <td class="${chg>=0?'chg-up':'chg-dn'}" style="font-weight:600">${chg>=0?'▲':'▼'}${Math.abs(chg).toFixed(2)}%</td>
       <td class="${chg5>=0?'chg-up':'chg-dn'}" style="font-size:11px">${chg5>=0?'+':''}${chg5.toFixed(2)}%</td>
       <td>${momBar(s.momentum_score)}</td>
@@ -2813,7 +2987,26 @@ function renderWatchlist(d){
       <td style="font-size:10px;color:var(--muted)">${escHtml(s.obv_trend||'—')}</td>
       <td><span class="badge ${bc}">${escHtml(sig)}</span></td>
       <td style="font-size:10px;color:var(--muted2);max-width:100px">${escHtml(s.pattern||'')}</td>
-      <td><div style="font-size:11px"><span style="color:var(--green)">T: ₹${fmtNum(s.target)}</span> <span style="color:var(--red)">SL: ₹${fmtNum(s.stoploss)}</span></div>${pp?`<div style="font-size:9px;color:var(--muted);margin-top:1px">${pp}</div>`:''}</td>
+      <td style="min-width:140px">
+        <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:7px 10px">
+          <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Price → Target</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+            <span style="font-size:11px;color:var(--muted2)">Now</span>
+            <span style="font-weight:700;color:#fff;font-size:13px">₹${fmtNum(curP)}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+            <span style="font-size:11px;color:var(--muted2)">T1</span>
+            <span style="font-weight:700;color:var(--green);font-size:13px">₹${fmtNum(tgt)}</span>
+            <span style="font-size:10px;color:var(--green);opacity:.8">${tgtGapStr}</span>
+          </div>
+          ${sl?`<div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:11px;color:var(--muted2)">SL</span>
+            <span style="font-weight:600;color:var(--red);font-size:12px">₹${fmtNum(sl)}</span>
+            <span style="font-size:10px;color:var(--red);opacity:.8">(${slGap.toFixed(1)}%)</span>
+          </div>`:''}
+          ${pp?`<div style="font-size:9px;color:var(--muted);margin-top:4px;padding-top:4px;border-top:1px solid var(--border)">${pp}</div>`:''}
+        </div>
+      </td>
       <td>
         <button class="action-btn" onclick="analyzeFromWatch('${escHtml(s.symbol||'')}')" style="display:block;margin-bottom:3px">Analyze →</button>
         <button class="action-btn" onclick="setAlert('${escHtml(s.symbol||'')}',${s.price||0})" style="font-size:10px">🔔 Alert</button>
@@ -3106,14 +3299,32 @@ function renderAnalysis(el,d){
     <!-- Trade Setup -->
     <div style="font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:8px">🎯 Trade Setup (ATR-based)</div>
     <div class="trade-setup" style="margin-bottom:8px">
-      <div class="ts-box"><div class="ts-label">Entry</div><div class="ts-val ts-entry">₹${fmtNum(ts.entry)}</div></div>
-      <div class="ts-box"><div class="ts-label">Target 1</div><div class="ts-val ts-t1">₹${fmtNum(ts.target_1)}</div></div>
-      <div class="ts-box"><div class="ts-label">Target 2</div><div class="ts-val ts-t2">₹${fmtNum(ts.target_2)}</div></div>
-      <div class="ts-box"><div class="ts-label">Stop Loss</div><div class="ts-val ts-sl">₹${fmtNum(ts.stoploss)}</div></div>
+      <div class="ts-box">
+        <div class="ts-label">Current Price</div>
+        <div class="ts-val ts-entry">₹${fmtNum(ts.entry)}</div>
+      </div>
+      <div class="ts-box" style="position:relative">
+        <div class="ts-label">Target 1</div>
+        <div class="ts-val ts-t1">₹${fmtNum(ts.target_1)}</div>
+        ${ts.entry>0?`<div style="font-size:10px;color:var(--green);margin-top:3px">${((ts.target_1-ts.entry)/ts.entry*100).toFixed(1)}% upside</div>`:''}
+      </div>
+      <div class="ts-box">
+        <div class="ts-label">Target 2</div>
+        <div class="ts-val ts-t2">₹${fmtNum(ts.target_2)}</div>
+        ${ts.entry>0?`<div style="font-size:10px;color:var(--green2);margin-top:3px">${((ts.target_2-ts.entry)/ts.entry*100).toFixed(1)}% upside</div>`:''}
+      </div>
+      <div class="ts-box">
+        <div class="ts-label">Stop Loss</div>
+        <div class="ts-val ts-sl">₹${fmtNum(ts.stoploss)}</div>
+        ${ts.entry>0?`<div style="font-size:10px;color:var(--red);margin-top:3px">${((ts.stoploss-ts.entry)/ts.entry*100).toFixed(1)}% risk</div>`:''}
+      </div>
     </div>
-    <div style="display:flex;gap:12px;font-size:12px;color:var(--muted);margin-bottom:14px;flex-wrap:wrap">
+    <div style="display:flex;gap:12px;font-size:12px;color:var(--muted);margin-bottom:8px;flex-wrap:wrap">
       ${ts.risk_reward?`<span>Risk/Reward: <strong style="color:#fff">${escHtml(ts.risk_reward)}</strong></span>`:''}
       ${ts.holding_period?`<span>Holding: <strong style="color:#fff">${escHtml(ts.holding_period)}</strong></span>`:''}
+    </div>
+    <div style="margin-bottom:14px">
+      <button class="btn btn-outline" style="font-size:11px;padding:5px 14px" onclick="saveSignalManual('${escHtml(d.symbol||'')}','${escHtml(d.name||d.symbol||'')}','${escHtml(d.signal||'')}',${ts.entry||0},${ts.target_1||0},${ts.stoploss||0},${ts.target_2||0})">📌 Track in EOD Report</button>
     </div>
 
     <!-- Fibonacci Levels -->
@@ -3725,6 +3936,216 @@ async function resetWatchlist(){
   });
   renderWatchlistManager([]);
   loadWatchlist(true);
+}
+
+// ══ EOD REPORT ═══════════════════════════════════════════════
+let eodLoaded=false;
+
+// Auto-save a Buy/Sell signal to EOD tracker (called from stockRow)
+const _eodSaved=new Set();
+async function saveSignalEod(s){
+  const key=s.symbol+'_'+(s.signal||'');
+  if(_eodSaved.has(key))return; // don't double-save per session
+  _eodSaved.add(key);
+  try{
+    const fd=new FormData();
+    fd.append('symbol', s.symbol||'');
+    fd.append('name',   s.name||s.symbol||'');
+    fd.append('signal', s.signal||'');
+    fd.append('entry_price',  s.price||0);
+    fd.append('target_price', s.target||0);
+    fd.append('stoploss',     s.stoploss||0);
+    fd.append('target2',      0);
+    await fetch(apiUrl('api/signal/save'),{method:'POST',body:fd});
+  }catch(e){}
+}
+
+// Manually save from Analyze tab's "Track in EOD Report" button
+async function saveSignalManual(sym,name,signal,entry,target1,sl,target2){
+  try{
+    const fd=new FormData();
+    fd.append('symbol',sym); fd.append('name',name);
+    fd.append('signal',signal); fd.append('entry_price',entry);
+    fd.append('target_price',target1); fd.append('stoploss',sl);
+    fd.append('target2',target2);
+    await fetch(apiUrl('api/signal/save'),{method:'POST',body:fd});
+    // Flash confirmation
+    const btn=event&&event.target;
+    if(btn){const orig=btn.textContent;btn.textContent='✅ Saved!';btn.style.color='var(--green)';setTimeout(()=>{btn.textContent=orig;btn.style.color='';},2000);}
+  }catch(e){alert('Could not save signal: '+e.message);}
+}
+
+async function loadEodReport(date){
+  eodLoaded=true;
+  // Load available dates into picker
+  try{
+    const dr=await fetch(apiUrl('api/eod/dates'));
+    const dd=await dr.json();
+    const picker=document.getElementById('eodDatePicker');
+    if(picker){
+      const today=new Date().toISOString().slice(0,10);
+      picker.innerHTML='<option value="">Today</option>';
+      (dd.dates||[]).forEach(d=>{
+        if(d!==today){
+          const opt=document.createElement('option');
+          opt.value=d; opt.textContent=d;
+          if(d===date) opt.selected=true;
+          picker.appendChild(opt);
+        }
+      });
+    }
+  }catch(e){}
+
+  document.getElementById('eodLoading').style.display='block';
+  document.getElementById('eodTable').style.display='none';
+  document.getElementById('eodEmpty').style.display='none';
+  document.getElementById('eodSummary').style.display='none';
+
+  try{
+    const url=apiUrl('api/eod/report')+(date?'?date='+encodeURIComponent(date):'');
+    const r=await fetch(url);
+    const d=await r.json();
+    document.getElementById('eodLoading').style.display='none';
+
+    if(!d.signals||!d.signals.length){
+      document.getElementById('eodEmpty').style.display='block';
+      return;
+    }
+    renderEodReport(d);
+  }catch(e){
+    document.getElementById('eodLoading').innerHTML='<div class="err-box" style="margin:16px">'+escHtml(e.message)+'</div>';
+  }
+}
+
+function renderEodReport(d){
+  const sum=d.summary||{};
+  const sigs=d.signals||[];
+
+  // Summary KPIs
+  document.getElementById('eodSummary').style.display='block';
+  document.getElementById('eodTotal').textContent=sum.total||0;
+  document.getElementById('eodHits').textContent=sum.hits||0;
+  document.getElementById('eodMisses').textContent=sum.misses||0;
+  document.getElementById('eodPending').textContent=sum.pending||0;
+  const pct=sum.hit_pct;
+  const pctLabel=pct!==null&&pct!==undefined?pct+'%':'—';
+  document.getElementById('eodHitPct').textContent=pctLabel;
+  document.getElementById('eodHitPct').style.color=pct>=70?'var(--green)':pct>=50?'var(--orange)':'var(--red)';
+  document.getElementById('eodHitSub').textContent=pct!==null?`${pct}% accuracy`:'targets given';
+
+  // Progress bar
+  const bar=document.getElementById('eodProgressBar');
+  const accLabel=document.getElementById('eodAccLabel');
+  if(pct!==null){
+    bar.style.width=pct+'%';
+    bar.style.background=pct>=70?'linear-gradient(90deg,var(--green),#34d399)':pct>=50?'linear-gradient(90deg,var(--orange),#fbbf24)':'linear-gradient(90deg,var(--red),#f87171)';
+    accLabel.textContent=pct+'% Hit Rate';
+    accLabel.style.color=pct>=70?'var(--green)':pct>=50?'var(--orange)':'var(--red)';
+  } else {
+    bar.style.width='0%';
+    accLabel.textContent='No resolved signals yet';
+  }
+  document.getElementById('eodProgressWrap').style.display='block';
+
+  // Build table
+  const rows=sigs.map(s=>{
+    const isBuy=(s.signal||'').toLowerCase()==='buy';
+    const status=s.status||'pending';
+    const statusIcon=status==='target_hit'?'✅':status==='sl_hit'?'❌':'⏳';
+    const statusLabel=status==='target_hit'?'Target Hit':status==='sl_hit'?'SL Hit':'Open';
+    const statusColor=status==='target_hit'?'var(--green)':status==='sl_hit'?'var(--red)':'var(--orange)';
+    const statusBg=status==='target_hit'?'rgba(16,185,129,.1)':status==='sl_hit'?'rgba(239,68,68,.1)':'rgba(245,158,11,.1)';
+    const sigBadge=isBuy?'badge-buy':'badge-sell';
+    const curP=s.current_price||0;
+    const entryP=s.entry_price||0;
+    const tgtP=s.target_price||0;
+    const slP=s.stoploss||0;
+    const chgPct=s.price_change_pct||0;
+    const tgtPct=entryP>0&&tgtP>0?((tgtP-entryP)/entryP*100):0;
+    const slPct=entryP>0&&slP>0?((slP-entryP)/entryP*100):0;
+    // Progress toward target
+    let progress=0;
+    if(entryP>0&&tgtP>0&&tgtP!==entryP){
+      if(isBuy) progress=Math.min(100,Math.max(0,((curP-entryP)/(tgtP-entryP))*100));
+      else progress=Math.min(100,Math.max(0,((entryP-curP)/(entryP-tgtP))*100));
+    }
+    const progColor=status==='target_hit'?'var(--green)':status==='sl_hit'?'var(--red)':'var(--accent)';
+
+    return `<tr style="${status==='target_hit'?'background:rgba(16,185,129,.04)':status==='sl_hit'?'background:rgba(239,68,68,.04)':''}">
+      <td>
+        <div class="sym">${escHtml(s.symbol||'')}</div>
+        <div class="co-name">${escHtml(s.name||'')}</div>
+      </td>
+      <td><span class="badge ${sigBadge}">${escHtml(s.signal||'')}</span></td>
+      <td style="font-size:12px;color:var(--muted2)">${escHtml(s.saved_at||'—')}</td>
+      <td style="font-weight:700;color:var(--accent2)">₹${fmtNum(entryP)}</td>
+      <td>
+        <div style="font-weight:700;color:var(--green)">₹${fmtNum(tgtP)}</div>
+        <div style="font-size:10px;color:var(--green);opacity:.8">${tgtPct>=0?'+':''}${tgtPct.toFixed(1)}% from entry</div>
+      </td>
+      <td>
+        <div style="font-weight:600;color:var(--red)">₹${fmtNum(slP)}</div>
+        <div style="font-size:10px;color:var(--red);opacity:.8">${slPct.toFixed(1)}% risk</div>
+      </td>
+      <td>
+        <div style="font-weight:700;color:${chgPct>=0?'var(--green)':'var(--red)'}">₹${fmtNum(curP)}</div>
+        <div style="font-size:10px;color:${chgPct>=0?'var(--green)':'var(--red)'}">${chgPct>=0?'+':''}${chgPct.toFixed(2)}%</div>
+      </td>
+      <td style="min-width:110px">
+        <div style="height:5px;background:rgba(255,255,255,.07);border-radius:3px;margin-bottom:4px;overflow:hidden">
+          <div style="width:${progress.toFixed(0)}%;height:100%;background:${progColor};border-radius:3px;transition:width .4s"></div>
+        </div>
+        <div style="font-size:10px;color:var(--muted)">${progress.toFixed(0)}% to target</div>
+      </td>
+      <td>
+        <div style="display:inline-flex;align-items:center;gap:6px;background:${statusBg};border:1px solid ${statusColor};border-radius:20px;padding:4px 12px;font-size:12px;font-weight:700;color:${statusColor}">
+          ${statusIcon} ${statusLabel}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const buySigs=sigs.filter(s=>(s.signal||'').toLowerCase()==='buy');
+  const sellSigs=sigs.filter(s=>(s.signal||'').toLowerCase()==='sell');
+  const buyHits=buySigs.filter(s=>s.status==='target_hit').length;
+  const sellHits=sellSigs.filter(s=>s.status==='target_hit').length;
+
+  const el=document.getElementById('eodTable');
+  el.innerHTML=`
+    <!-- Mini stats -->
+    <div style="display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+      <div style="font-size:12px;color:var(--muted)">
+        <span style="color:var(--green);font-weight:700">📈 Buy signals: ${buySigs.length}</span>
+        <span style="color:var(--muted);margin-left:4px">(${buyHits} hit)</span>
+      </div>
+      <div style="font-size:12px;color:var(--muted)">
+        <span style="color:var(--red);font-weight:700">📉 Sell signals: ${sellSigs.length}</span>
+        <span style="color:var(--muted);margin-left:4px">(${sellHits} hit)</span>
+      </div>
+      <div style="margin-left:auto;font-size:11px;color:var(--muted)">
+        Date: ${escHtml(d.date||'')} · Auto-refreshes on page load
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+    <table>
+      <thead><tr>
+        <th>Symbol</th>
+        <th>Signal</th>
+        <th>Saved At</th>
+        <th>Entry Price</th>
+        <th>Target</th>
+        <th>Stop Loss</th>
+        <th>Current Price</th>
+        <th>Progress</th>
+        <th>Result</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    </div>
+    <div style="padding:10px 16px;font-size:10px;color:var(--muted);border-top:1px solid var(--border)">
+      ✅ Target Hit = price reached the target &nbsp;|&nbsp; ❌ SL Hit = stop-loss triggered &nbsp;|&nbsp; ⏳ Open = still in play &nbsp;|&nbsp; Signals auto-saved from Watchlist and Analyze tabs
+    </div>`;
+  el.style.display='block';
 }
 
 // ── Boot ──────────────────────────────────────────────────────
