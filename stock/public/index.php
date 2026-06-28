@@ -1,11 +1,114 @@
 <?php
 declare(strict_types=1);
+ini_set('display_errors', '1');
+error_reporting(E_ALL);
 
 // ─── Bootstrap ────────────────────────────────────────────────
 define('BASE',       dirname(__DIR__));
 define('STORAGE',    BASE . '/storage');
 define('WL_FILE',    STORAGE . '/watchlist.json');
 define('ALERT_FILE', STORAGE . '/alerts.json');
+
+// ── Constants (moved before page render) ─────────────────
+define('WATCHLIST_SYMBOLS', [
+    // ── NIFTY 50 ─────────────────────────────────────────────
+    'RELIANCE.NS','TCS.NS','HDFCBANK.NS','BHARTIARTL.NS','ICICIBANK.NS',
+    'INFY.NS','SBIN.NS','HINDUNILVR.NS','ITC.NS','LT.NS',
+    'KOTAKBANK.NS','AXISBANK.NS','BAJFINANCE.NS','MARUTI.NS','TITAN.NS',
+    'SUNPHARMA.NS','NTPC.NS','POWERGRID.NS','ONGC.NS','HCLTECH.NS',
+    'ADANIENT.NS','ADANIPORTS.NS','COALINDIA.NS','JSWSTEEL.NS','TATASTEEL.NS',
+    'TATACONSUM.NS','TECHM.NS','WIPRO.NS','DIVISLAB.NS','DRREDDY.NS',
+    'CIPLA.NS','APOLLOHOSP.NS','BAJAJFINSV.NS','BAJAJ-AUTO.NS','EICHERMOT.NS',
+    'HEROMOTOCO.NS','TATAMOTORS.NS','M&M.NS','NESTLEIND.NS','BRITANNIA.NS',
+    'ULTRACEMCO.NS','GRASIM.NS','INDUSINDBK.NS','HINDALCO.NS','VEDL.NS',
+    'BPCL.NS','IOC.NS','HDFCLIFE.NS','SBILIFE.NS','SHRIRAMFIN.NS',
+
+    // ── NIFTY NEXT 50 ─────────────────────────────────────────
+    'SIEMENS.NS','ABB.NS','PIDILITIND.NS','HAVELLS.NS','MUTHOOTFIN.NS',
+    'CHOLAFIN.NS','PFC.NS','RECLTD.NS','IRFC.NS','NAUKRI.NS',
+    'DMART.NS','TRENT.NS','COLPAL.NS','MARICO.NS','DABUR.NS',
+    'GODREJCP.NS','BERGEPAINT.NS','ASIANPAINT.NS','ASTRAL.NS','POLYCAB.NS',
+    'MOTHERSON.NS','APLAPOLLO.NS','TIINDIA.NS','CUMMINSIND.NS','THERMAX.NS',
+    'KALYANKJIL.NS','ZYDUSLIFE.NS','LUPIN.NS','TORNTPHARM.NS','GLAXO.NS',
+    'AMBUJACEM.NS','ACC.NS','SHREECEM.NS','DALBHARAT.NS','RAMCOCEM.NS',
+
+    // ── BANKING & FINANCE ─────────────────────────────────────
+    'BANKBARODA.NS','CANBK.NS','PNB.NS','UNIONBANK.NS','IDFCFIRSTB.NS',
+    'FEDERALBNK.NS','BANDHANBNK.NS','RBLBANK.NS','DCBBANK.NS','KARURVYSYA.NS',
+    'AUBANK.NS','EQUITASBNK.NS','FINPIPE.NS','MANAPPURAM.NS','BAJAJHFL.NS',
+    'LICHSGFIN.NS','PNBHOUSING.NS','AAVAS.NS','HOMEFIRST.NS','CUB.NS',
+    'ABCAPITAL.NS','ANGELONE.NS','5PAISA.NS','MOTILALOFS.NS','EDELWEISS.NS',
+
+    // ── IT & TECHNOLOGY ───────────────────────────────────────
+    'LTIM.NS','MPHASIS.NS','PERSISTENT.NS','COFORGE.NS','OFSS.NS',
+    'KPITTECH.NS','TATAELXSI.NS','RATEGAIN.NS','NEWGEN.NS','MASTEK.NS',
+    'SONATSOFTW.NS','ZENSAR.NS','NIITTECH.NS','CYIENT.NS','BIRLASOFT.NS',
+
+    // ── PHARMA & HEALTHCARE ───────────────────────────────────
+    'AUROPHARMA.NS','ALKEM.NS','IPCALAB.NS','NATCOPHARM.NS','GRANULES.NS',
+    'LAURUSLABS.NS','GLAND.NS','CONCORD.NS','AJANTPHARM.NS','JBCHEPHARM.NS',
+    'MAXHEALTH.NS','FORTIS.NS','METROPOLIS.NS','LALPATHLAB.NS','SUVENPHAR.NS',
+
+    // ── AUTO & AUTO ANCILLARY ─────────────────────────────────
+    'TVSMOTOR.NS','ASHOKLEY.NS','BHARATFORG.NS','BOSCHLTD.NS','EXIDEIND.NS',
+    'AMARAJABAT.NS','BALKRISIND.NS','CEATLTD.NS','MRF.NS','APOLLOTYRE.NS',
+    'SUNDRMFAST.NS','ENDURANCE.NS','CRAFTSMAN.NS','SWARAJENG.NS','EIHOTEL.NS',
+
+    // ── ENERGY & POWER ────────────────────────────────────────
+    'TATAPOWER.NS','ADANIGREEN.NS','ADANIENSOL.NS','TORNTPOWER.NS','CESC.NS',
+    'NHPC.NS','SJVN.NS','IREDA.NS','INOXWIND.NS','SUZLON.NS',
+    'GMRINFRA.NS','RPOWER.NS','JSWENERGY.NS','GREENKO.NS','ACMESOLAR.NS',
+
+    // ── FMCG & CONSUMER ───────────────────────────────────────
+    'MCDOWELL-N.NS','RADICO.NS','JUBLFOOD.NS','DEVYANI.NS','SAPPHIRE.NS',
+    'WESTLIFE.NS','ZOMATO.NS','NYKAA.NS','BIKAJI.NS','DOMS.NS',
+    'PATANJALI.NS','EMAMILTD.NS','BAJAJCON.NS','JYOTHYLAB.NS','GSKCONS.NS',
+
+    // ── METALS & MINING ───────────────────────────────────────
+    'NATIONALUM.NS','HINDZINC.NS','MOIL.NS','WELCORP.NS','RATNAMANI.NS',
+    'SAILNSE.NS','NMDC.NS','GMDC.NS','HINDCOPPER.NS','PATELENG.NS',
+
+    // ── CEMENT & INFRA ────────────────────────────────────────
+    'JKCEMENT.NS','BIRLACORPN.NS','HEIDELBERG.NS','ORIENTCEM.NS','NUVOCO.NS',
+    'IRB.NS','KNR.NS','PNCINFRA.NS','HG INFRA.NS','GPPL.NS',
+
+    // ── REAL ESTATE ───────────────────────────────────────────
+    'DLF.NS','GODREJPROP.NS','PRESTIGE.NS','OBEROIRLTY.NS','BRIGADE.NS',
+    'MAHLIFE.NS','SOBHA.NS','PUREIT.NS','SUNTECK.NS','KOLTEPATIL.NS',
+
+    // ── TELECOM & MEDIA ───────────────────────────────────────
+    'IDEA.NS','TATACOMM.NS','HFCL.NS','TEJAS.NS','STLTECH.NS',
+    'ZEEL.NS','SUNTV.NS','PVRINOX.NS','INOXLEISUR.NS','NETWORK18.NS',
+
+    // ── CHEMICALS & SPECIALTY ─────────────────────────────────
+    'SRF.NS','DEEPAKNITR.NS','AARTI.NS','PIIND.NS','NAVINFLUOR.NS',
+    'FLUOROCHEM.NS','VINATIORGA.NS','CLEAN.NS','BASF.NS','GALAXYSURF.NS',
+
+    // ── LOGISTICS & TRADE ─────────────────────────────────────
+    'CONCOR.NS','BLUEDART.NS','MAHINDLOG.NS','DELHIVERY.NS','GESHIP.NS',
+
+    // ── CAPITAL GOODS ─────────────────────────────────────────
+    'BEL.NS','HAL.NS','BHEL.NS','COCHINSHIP.NS','GRINDWELL.NS',
+    'AIAENG.NS','ELGIEQUIP.NS','ESCORTS.NS','KIRLOSENG.NS','TDPOWERSYS.NS',
+]);
+
+define('SECTOR_MAP', [
+    'Banking'    => ['HDFCBANK','ICICIBANK','SBIN','KOTAKBANK','AXISBANK','INDUSINDBK','BANKBARODA','CANBK','PNB','UNIONBANK','IDFCFIRSTB','FEDERALBNK','BANDHANBNK','RBLBANK','AUBANK','CUB'],
+    'Finance'    => ['BAJFINANCE','BAJAJFINSV','SHRIRAMFIN','HDFCLIFE','SBILIFE','CHOLAFIN','MUTHOOTFIN','MANAPPURAM','LICHSGFIN','ANGELONE','MOTILALOFS','ABCAPITAL'],
+    'IT'         => ['TCS','INFY','HCLTECH','WIPRO','TECHM','LTIM','MPHASIS','PERSISTENT','COFORGE','OFSS','TATAELXSI','KPITTECH'],
+    'Pharma'     => ['SUNPHARMA','DIVISLAB','DRREDDY','CIPLA','APOLLOHOSP','AUROPHARMA','LUPIN','TORNTPHARM','ALKEM','ZYDUSLIFE','NATCOPHARM','MAXHEALTH','FORTIS'],
+    'Auto'       => ['MARUTI','TATAMOTORS','M&M','BAJAJ-AUTO','EICHERMOT','HEROMOTOCO','TVSMOTOR','ASHOKLEY','BHARATFORG','BOSCHLTD','MRF'],
+    'Energy'     => ['RELIANCE','ONGC','BPCL','IOC','TATAPOWER','ADANIGREEN','NTPC','POWERGRID','COALINDIA','NHPC','SUZLON','JSWENERGY'],
+    'FMCG'       => ['HINDUNILVR','ITC','NESTLEIND','BRITANNIA','TATACONSUM','COLPAL','MARICO','DABUR','GODREJCP','EMAMILTD','JUBLFOOD','ZOMATO'],
+    'Metals'     => ['TATASTEEL','JSWSTEEL','HINDALCO','VEDL','NATIONALUM','HINDZINC','NMDC','SAILNSE','MOIL'],
+    'Cement'     => ['ULTRACEMCO','GRASIM','AMBUJACEM','ACC','SHREECEM','DALBHARAT','JKCEMENT'],
+    'RealEstate' => ['DLF','GODREJPROP','PRESTIGE','OBEROIRLTY','BRIGADE','SOBHA'],
+    'Chemicals'  => ['SRF','DEEPAKNITR','AARTI','PIIND','NAVINFLUOR','FLUOROCHEM'],
+    'CapGoods'   => ['LT','SIEMENS','ABB','BEL','HAL','BHEL','HAVELLS','POLYCAB','CUMMINSIND'],
+    'Telecom'    => ['BHARTIARTL','IDEA','TATACOMM','HFCL'],
+    'Logistics'  => ['CONCOR','BLUEDART','DELHIVERY','ADANIPORTS'],
+]);
+
 
 // Auto-create storage dir on first run
 if (!is_dir(STORAGE)) mkdir(STORAGE, 0755, true);
@@ -35,12 +138,18 @@ $PASS     = getenv('DEMO_PASS') ?: 'stockpass123';
 // If accessed directly as /stock_v3/public/index.php or /stock_v3/index.php, still resolve correctly.
 $_scriptName = $_SERVER['SCRIPT_NAME'];
 $_parts      = explode('/', trim($_scriptName, '/'));
-// Remove known trailing segments: 'public' and 'index.php'
-foreach (['index.php', 'public'] as $_seg) {
+// Remove known trailing segments in any order
+$_strip = ['index.php', 'public'];
+foreach ($_strip as $_seg) {
     if (end($_parts) === $_seg) array_pop($_parts);
 }
-$_base = count($_parts) ? '/' . implode('/', $_parts) : '';
-unset($_scriptName, $_parts, $_seg);
+// Second pass in case both were present
+foreach ($_strip as $_seg) {
+    if (end($_parts) === $_seg) array_pop($_parts);
+}
+$_base    = count($_parts) ? '/' . implode('/', $_parts) : '';
+$basePath = $_base;
+unset($_scriptName, $_parts, $_seg, $_strip);
 
 $requestUri = strtok($_SERVER['REQUEST_URI'] ?? '/', '?');
 if ($_base !== '' && str_starts_with($requestUri, $_base)) {
@@ -52,7 +161,7 @@ $uri = '/' . ltrim($uri, '/');
 if ($uri === '') $uri = '/';
 
 // Redirect helper — always correct regardless of subdir
-function redirect(string $path): never {
+function redirect(string $path): void {
     global $_base;
     header('Location: ' . $_base . '/' . ltrim($path, '/'));
     exit;
@@ -79,34 +188,34 @@ header_remove('X-Powered-By');
 
 if ($uri === '/api/watchlist') {
     header('Content-Type: application/json');
-    echo json_encode(apiWatchlist());
+    try { echo json_encode(apiWatchlist()); } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
     exit;
 }
 
 if ($uri === '/api/analyze' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
     $sym = strtoupper(trim($_POST['symbol'] ?? ''));
-    echo json_encode(apiAnalyze($sym));
+    try { echo json_encode(apiAnalyze($sym)); } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
     exit;
 }
 
 if ($uri === '/api/news') {
     header('Content-Type: application/json');
-    echo json_encode(apiNews());
+    try { echo json_encode(apiNews()); } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
     exit;
 }
 
 // Per-minute tick — fast quote fetch + signal recording
 if ($uri === '/api/tick') {
     header('Content-Type: application/json');
-    echo json_encode(apiTick());
+    try { echo json_encode(apiTick()); } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
     exit;
 }
 
 // Return accumulated signal history for leaderboard
 if ($uri === '/api/leaders') {
     header('Content-Type: application/json');
-    echo json_encode(apiLeaders());
+    try { echo json_encode(apiLeaders()); } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
     exit;
 }
 
@@ -173,7 +282,7 @@ if ($uri === '/api/intraday') {
     $sym      = strtoupper(trim($_GET['symbol'] ?? ''));
     $interval = in_array($_GET['interval'] ?? '', ['5m','15m','1h']) ? $_GET['interval'] : '5m';
     if ($sym && !str_ends_with($sym, '.NS')) $sym .= '.NS';
-    echo json_encode(apiIntraday($sym, $interval));
+    try { echo json_encode(apiIntraday($sym, $interval)); } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
     exit;
 }
 
@@ -182,7 +291,7 @@ if ($uri === '/api/pivots') {
     header('Content-Type: application/json');
     $sym = strtoupper(trim($_GET['symbol'] ?? ''));
     if ($sym && !str_ends_with($sym, '.NS')) $sym .= '.NS';
-    echo json_encode(apiPivots($sym));
+    try { echo json_encode(apiPivots($sym)); } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
     exit;
 }
 
@@ -192,7 +301,7 @@ if ($uri === '/api/cron') {
     $cronKey = getenv('CRON_KEY') ?: 'changeme';
     if (($_GET['key'] ?? '') !== $cronKey) { http_response_code(403); echo '{"error":"forbidden"}'; exit; }
     header('Content-Type: application/json');
-    echo json_encode(apiTick());
+    try { echo json_encode(apiTick()); } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
     exit;
 }
 
@@ -202,7 +311,11 @@ if ($uri === '/api/watchlist/page') {
     $page   = max(1, (int)($_GET['page']   ?? 1));
     $sector = trim($_GET['sector'] ?? '');
     $search = strtoupper(trim($_GET['search'] ?? ''));
-    echo json_encode(apiWatchlistPage($page, $sector, $search));
+    try {
+        try { echo json_encode(apiWatchlistPage($page, $sector, $search)); } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
+    } catch (\Throwable $e) {
+        echo json_encode(['error' => $e->getMessage(), 'file' => basename($e->getFile()), 'line' => $e->getLine(), 'stocks' => []]);
+    }
     exit;
 }
 
@@ -246,14 +359,14 @@ if ($uri === '/api/signal/save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 // ── EOD Report: list today's signals + live price check ───────
 if ($uri === '/api/eod/report') {
     header('Content-Type: application/json');
-    echo json_encode(apiEodReport());
+    try { echo json_encode(apiEodReport()); } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
     exit;
 }
 
 // ── EOD Report: check current prices vs targets ───────────────
 if ($uri === '/api/eod/check') {
     header('Content-Type: application/json');
-    echo json_encode(apiEodCheck());
+    try { echo json_encode(apiEodCheck()); } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
     exit;
 }
 
@@ -270,6 +383,8 @@ if ($uri === '/api/eod/dates') {
     echo json_encode(['dates' => $dates]);
     exit;
 }
+
+
 
 dashboardPage($APP_NAME, $_SESSION['user'] ?? 'Trader');
 
@@ -842,104 +957,6 @@ function momentumScore(array $quote, array $history, array $indicators): array
 //  API ENDPOINT HANDLERS
 // ══════════════════════════════════════════════════════════════
 
-define('WATCHLIST_SYMBOLS', [
-    // ── NIFTY 50 ─────────────────────────────────────────────
-    'RELIANCE.NS','TCS.NS','HDFCBANK.NS','BHARTIARTL.NS','ICICIBANK.NS',
-    'INFY.NS','SBIN.NS','HINDUNILVR.NS','ITC.NS','LT.NS',
-    'KOTAKBANK.NS','AXISBANK.NS','BAJFINANCE.NS','MARUTI.NS','TITAN.NS',
-    'SUNPHARMA.NS','NTPC.NS','POWERGRID.NS','ONGC.NS','HCLTECH.NS',
-    'ADANIENT.NS','ADANIPORTS.NS','COALINDIA.NS','JSWSTEEL.NS','TATASTEEL.NS',
-    'TATACONSUM.NS','TECHM.NS','WIPRO.NS','DIVISLAB.NS','DRREDDY.NS',
-    'CIPLA.NS','APOLLOHOSP.NS','BAJAJFINSV.NS','BAJAJ-AUTO.NS','EICHERMOT.NS',
-    'HEROMOTOCO.NS','TATAMOTORS.NS','M&M.NS','NESTLEIND.NS','BRITANNIA.NS',
-    'ULTRACEMCO.NS','GRASIM.NS','INDUSINDBK.NS','HINDALCO.NS','VEDL.NS',
-    'BPCL.NS','IOC.NS','HDFCLIFE.NS','SBILIFE.NS','SHRIRAMFIN.NS',
-
-    // ── NIFTY NEXT 50 ─────────────────────────────────────────
-    'SIEMENS.NS','ABB.NS','PIDILITIND.NS','HAVELLS.NS','MUTHOOTFIN.NS',
-    'CHOLAFIN.NS','PFC.NS','RECLTD.NS','IRFC.NS','NAUKRI.NS',
-    'DMART.NS','TRENT.NS','COLPAL.NS','MARICO.NS','DABUR.NS',
-    'GODREJCP.NS','BERGEPAINT.NS','ASIANPAINT.NS','ASTRAL.NS','POLYCAB.NS',
-    'MOTHERSON.NS','APLAPOLLO.NS','TIINDIA.NS','CUMMINSIND.NS','THERMAX.NS',
-    'KALYANKJIL.NS','ZYDUSLIFE.NS','LUPIN.NS','TORNTPHARM.NS','GLAXO.NS',
-    'AMBUJACEM.NS','ACC.NS','SHREECEM.NS','DALBHARAT.NS','RAMCOCEM.NS',
-
-    // ── BANKING & FINANCE ─────────────────────────────────────
-    'BANKBARODA.NS','CANBK.NS','PNB.NS','UNIONBANK.NS','IDFCFIRSTB.NS',
-    'FEDERALBNK.NS','BANDHANBNK.NS','RBLBANK.NS','DCBBANK.NS','KARURVYSYA.NS',
-    'AUBANK.NS','EQUITASBNK.NS','FINPIPE.NS','MANAPPURAM.NS','BAJAJHFL.NS',
-    'LICHSGFIN.NS','PNBHOUSING.NS','AAVAS.NS','HOMEFIRST.NS','CUB.NS',
-    'ABCAPITAL.NS','ANGELONE.NS','5PAISA.NS','MOTILALOFS.NS','EDELWEISS.NS',
-
-    // ── IT & TECHNOLOGY ───────────────────────────────────────
-    'LTIM.NS','MPHASIS.NS','PERSISTENT.NS','COFORGE.NS','OFSS.NS',
-    'KPITTECH.NS','TATAELXSI.NS','RATEGAIN.NS','NEWGEN.NS','MASTEK.NS',
-    'SONATSOFTW.NS','ZENSAR.NS','NIITTECH.NS','CYIENT.NS','BIRLASOFT.NS',
-
-    // ── PHARMA & HEALTHCARE ───────────────────────────────────
-    'AUROPHARMA.NS','ALKEM.NS','IPCALAB.NS','NATCOPHARM.NS','GRANULES.NS',
-    'LAURUSLABS.NS','GLAND.NS','CONCORD.NS','AJANTPHARM.NS','JBCHEPHARM.NS',
-    'MAXHEALTH.NS','FORTIS.NS','METROPOLIS.NS','LALPATHLAB.NS','SUVENPHAR.NS',
-
-    // ── AUTO & AUTO ANCILLARY ─────────────────────────────────
-    'TVSMOTOR.NS','ASHOKLEY.NS','BHARATFORG.NS','BOSCHLTD.NS','EXIDEIND.NS',
-    'AMARAJABAT.NS','BALKRISIND.NS','CEATLTD.NS','MRF.NS','APOLLOTYRE.NS',
-    'SUNDRMFAST.NS','ENDURANCE.NS','CRAFTSMAN.NS','SWARAJENG.NS','EIHOTEL.NS',
-
-    // ── ENERGY & POWER ────────────────────────────────────────
-    'TATAPOWER.NS','ADANIGREEN.NS','ADANIENSOL.NS','TORNTPOWER.NS','CESC.NS',
-    'NHPC.NS','SJVN.NS','IREDA.NS','INOXWIND.NS','SUZLON.NS',
-    'GMRINFRA.NS','RPOWER.NS','JSWENERGY.NS','GREENKO.NS','ACMESOLAR.NS',
-
-    // ── FMCG & CONSUMER ───────────────────────────────────────
-    'MCDOWELL-N.NS','RADICO.NS','JUBLFOOD.NS','DEVYANI.NS','SAPPHIRE.NS',
-    'WESTLIFE.NS','ZOMATO.NS','NYKAA.NS','BIKAJI.NS','DOMS.NS',
-    'PATANJALI.NS','EMAMILTD.NS','BAJAJCON.NS','JYOTHYLAB.NS','GSKCONS.NS',
-
-    // ── METALS & MINING ───────────────────────────────────────
-    'NATIONALUM.NS','HINDZINC.NS','MOIL.NS','WELCORP.NS','RATNAMANI.NS',
-    'SAILNSE.NS','NMDC.NS','GMDC.NS','HINDCOPPER.NS','PATELENG.NS',
-
-    // ── CEMENT & INFRA ────────────────────────────────────────
-    'JKCEMENT.NS','BIRLACORPN.NS','HEIDELBERG.NS','ORIENTCEM.NS','NUVOCO.NS',
-    'IRB.NS','KNR.NS','PNCINFRA.NS','HG INFRA.NS','GPPL.NS',
-
-    // ── REAL ESTATE ───────────────────────────────────────────
-    'DLF.NS','GODREJPROP.NS','PRESTIGE.NS','OBEROIRLTY.NS','BRIGADE.NS',
-    'MAHLIFE.NS','SOBHA.NS','PUREIT.NS','SUNTECK.NS','KOLTEPATIL.NS',
-
-    // ── TELECOM & MEDIA ───────────────────────────────────────
-    'IDEA.NS','TATACOMM.NS','HFCL.NS','TEJAS.NS','STLTECH.NS',
-    'ZEEL.NS','SUNTV.NS','PVRINOX.NS','INOXLEISUR.NS','NETWORK18.NS',
-
-    // ── CHEMICALS & SPECIALTY ─────────────────────────────────
-    'SRF.NS','DEEPAKNITR.NS','AARTI.NS','PIIND.NS','NAVINFLUOR.NS',
-    'FLUOROCHEM.NS','VINATIORGA.NS','CLEAN.NS','BASF.NS','GALAXYSURF.NS',
-
-    // ── LOGISTICS & TRADE ─────────────────────────────────────
-    'CONCOR.NS','BLUEDART.NS','MAHINDLOG.NS','DELHIVERY.NS','GESHIP.NS',
-
-    // ── CAPITAL GOODS ─────────────────────────────────────────
-    'BEL.NS','HAL.NS','BHEL.NS','COCHINSHIP.NS','GRINDWELL.NS',
-    'AIAENG.NS','ELGIEQUIP.NS','ESCORTS.NS','KIRLOSENG.NS','TDPOWERSYS.NS',
-]);
-
-define('SECTOR_MAP', [
-    'Banking'    => ['HDFCBANK','ICICIBANK','SBIN','KOTAKBANK','AXISBANK','INDUSINDBK','BANKBARODA','CANBK','PNB','UNIONBANK','IDFCFIRSTB','FEDERALBNK','BANDHANBNK','RBLBANK','AUBANK','CUB'],
-    'Finance'    => ['BAJFINANCE','BAJAJFINSV','SHRIRAMFIN','HDFCLIFE','SBILIFE','CHOLAFIN','MUTHOOTFIN','MANAPPURAM','LICHSGFIN','ANGELONE','MOTILALOFS','ABCAPITAL'],
-    'IT'         => ['TCS','INFY','HCLTECH','WIPRO','TECHM','LTIM','MPHASIS','PERSISTENT','COFORGE','OFSS','TATAELXSI','KPITTECH'],
-    'Pharma'     => ['SUNPHARMA','DIVISLAB','DRREDDY','CIPLA','APOLLOHOSP','AUROPHARMA','LUPIN','TORNTPHARM','ALKEM','ZYDUSLIFE','NATCOPHARM','MAXHEALTH','FORTIS'],
-    'Auto'       => ['MARUTI','TATAMOTORS','M&M','BAJAJ-AUTO','EICHERMOT','HEROMOTOCO','TVSMOTOR','ASHOKLEY','BHARATFORG','BOSCHLTD','MRF'],
-    'Energy'     => ['RELIANCE','ONGC','BPCL','IOC','TATAPOWER','ADANIGREEN','NTPC','POWERGRID','COALINDIA','NHPC','SUZLON','JSWENERGY'],
-    'FMCG'       => ['HINDUNILVR','ITC','NESTLEIND','BRITANNIA','TATACONSUM','COLPAL','MARICO','DABUR','GODREJCP','EMAMILTD','JUBLFOOD','ZOMATO'],
-    'Metals'     => ['TATASTEEL','JSWSTEEL','HINDALCO','VEDL','NATIONALUM','HINDZINC','NMDC','SAILNSE','MOIL'],
-    'Cement'     => ['ULTRACEMCO','GRASIM','AMBUJACEM','ACC','SHREECEM','DALBHARAT','JKCEMENT'],
-    'RealEstate' => ['DLF','GODREJPROP','PRESTIGE','OBEROIRLTY','BRIGADE','SOBHA'],
-    'Chemicals'  => ['SRF','DEEPAKNITR','AARTI','PIIND','NAVINFLUOR','FLUOROCHEM'],
-    'CapGoods'   => ['LT','SIEMENS','ABB','BEL','HAL','BHEL','HAVELLS','POLYCAB','CUMMINSIND'],
-    'Telecom'    => ['BHARTIARTL','IDEA','TATACOMM','HFCL'],
-    'Logistics'  => ['CONCOR','BLUEDART','DELHIVERY','ADANIPORTS'],
-]);
 
 
 function apiWatchlist(): array
@@ -2840,7 +2857,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
 </div><!-- /wrap -->
 
 <script>
-const BASE_PATH = '<?= rtrim(dirname($_SERVER['SCRIPT_NAME']), '/') ?>';
+const BASE_PATH = '<?php
+$_sn = $_SERVER["SCRIPT_NAME"] ?? "";
+$_sn = str_replace(["/public/index.php", "/index.php"], "", $_sn);
+echo rtrim($_sn, "/");
+?>';
 function apiUrl(path){ return BASE_PATH + '/' + path.replace(/^\//,''); }
 function tick(){document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata'});}
 setInterval(tick,1000);tick();
@@ -2888,7 +2909,18 @@ async function loadWatchlist(force=false){
       +(wlSector?'&sector='+encodeURIComponent(wlSector):'')
       +(wlSearch?'&search='+encodeURIComponent(wlSearch):'');
     const r=await fetch(url);
-    const d=await r.json();
+    const text=await r.text();
+    let d;
+    try{ d=JSON.parse(text); }
+    catch(je){
+      document.getElementById('watchLoading').innerHTML=`<div class="err-box">
+        <strong>API Error (not JSON)</strong><br>
+        URL: <code>${escHtml(url)}</code><br>
+        Status: ${r.status}<br>
+        Response starts with: <code>${escHtml(text.slice(0,200))}</code>
+      </div>`;
+      return;
+    }
     if(d.error&&!d.stocks?.length){
       document.getElementById('watchLoading').innerHTML=`<div class="err-box">${escHtml(d.error)}</div>`;
       return;
