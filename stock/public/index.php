@@ -579,6 +579,28 @@ function vwapDaily(array $history): float
     return $den > 0 ? round($num / $den, 2) : 0;
 }
 
+/** Alias: vwap() — same as vwapDaily() */
+function vwap(array $history): float { return vwapDaily($history); }
+
+/** ATR (Average True Range, 14-period) */
+function atr(array $history, int $period = 14): float
+{
+    $n = count($history);
+    if ($n < 2) return 0.0;
+    $trs = [];
+    for ($i = 1; $i < $n; $i++) {
+        $h  = $history[$i]['high'];
+        $l  = $history[$i]['low'];
+        $pc = $history[$i - 1]['close'];
+        $trs[] = max($h - $l, abs($h - $pc), abs($l - $pc));
+    }
+    $slice = array_slice($trs, -$period);
+    return count($slice) ? array_sum($slice) / count($slice) : 0.0;
+}
+
+/** Alias: candlestickPatterns() — same as detectPatterns() */
+function candlestickPatterns(array $history): array { return detectPatterns($history); }
+
 /** Detect simple candlestick patterns on last 3 candles */
 function detectPatterns(array $history): array
 {
@@ -2195,14 +2217,14 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
                 'price'         => $price,
                 'change_pct'    => round($chg, 2),
                 'change_5d'     => $chg5d,
-                'momentum_score'=> $mom,
+                'momentum_score'=> $mom['score'],
                 'signal'        => $sig['signal'],
                 'confidence'    => $sig['confidence'],
                 'trend'         => $sig['trend'],
-                'direction'     => $mom >= 15 ? 'rising' : ($mom <= -15 ? 'falling' : 'flat'),
+                'direction'     => $mom['score'] >= 15 ? 'rising' : ($mom['score'] <= -15 ? 'falling' : 'flat'),
                 'rsi'           => round($rsiLast, 1),
                 'supertrend'    => $stSuper,
-                'ema_signal'    => $ema20 && $ema50 ? ($ema20 > $ema50 ? 'Golden' : 'Death') : null,
+                'ema_signal'    => ($ema20 && $ema50) ? (end(array_filter($ema20,fn($v)=>$v!==null)) > end(array_filter($ema50,fn($v)=>$v!==null)) ? 'Golden' : 'Death') : null,
                 'macd_signal'   => end(array_filter($macdArr['hist'] ?? [], fn($v) => $v !== null)) > 0 ? 'Bullish' : 'Bearish',
                 'adx'           => $adxData['adx'],
                 'adx_strength'  => $adxData['trend_strength'] ?? null,
@@ -3594,8 +3616,8 @@ function escHtml(s){
 function fmtNum(n){
   const f=parseFloat(n);
   return isNaN(f)?'—':f.toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
-function N(n){const f=parseInt(n);return isNaN(f)?"—":f.toLocaleString("en-IN");}
 }
+function N(n){const f=parseInt(n);return isNaN(f)?"—":f.toLocaleString("en-IN");}
 
 // ── Leaders / Tick ───────────────────────────────────────────
 let tickTimer=null, leaderLoaded=false, tickCount=0;
@@ -4150,7 +4172,8 @@ function renderEodReport(d){
 
 // ── Boot ──────────────────────────────────────────────────────
 loadWatchlist();
-loadWatchlistManager();
+// Load custom watchlist chips
+(async()=>{try{const r=await fetch(apiUrl('api/watchlist/list'));const d=await r.json();renderWatchlistManager(d.watchlist||[]);}catch(e){}})();
 loadSectors();
 // Check alerts on load
 setTimeout(async()=>{
