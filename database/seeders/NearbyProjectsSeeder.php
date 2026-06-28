@@ -337,7 +337,7 @@ class NearbyProjectsSeeder extends Seeder
                 'established_year'         => '2014',
                 'is_verified'              => true,
                 'total_delivered_projects' => 1,
-                'rating'                   => null,
+'rating'                   => 0,
                 'description'              => 'Merlionn Developers is a real estate developer based in Dhakoli, Zirakpur focused on delivering quality residential apartments in the Chandigarh tricity area.',
                 'website'                  => 'https://merlionn.com',
                 'status'                   => 'active',
