@@ -37,6 +37,11 @@ class DatabaseSeeder extends Seeder
             ZirakpurProximitySeeder::class,
             ZirakpurProximitySeederBatch2::class,
             ZirakpurProximitySeederBatch3::class,
+            NearbyProjectsSeeder::class,          // 9 projects: Beliston, Palash, Jubilant, HiGreens, Motia, Skytouch, Merlionn, Bristol, SBP Olympia
+            TricityBuilderProjectsSeeder::class,  // 27 projects across Zirakpur, Panchkula, Mohali (15km radius)
+            TricityBuilderProjectsBatch3::class,  // 15 more: Ethereal, Jaipuria, Sushma Valencia, Wave, Joy Grand, Homeland Regalia etc. across Zirakpur, Panchkula, Mohali (15km radius)
+            MohaliKhararBuilderProjectsSeeder::class,
+            MohaliKhararProjectsBatch2Seeder::class,
             PropertySeeder::class,
             UserSeeder::class,
             ReviewSeeder::class,
