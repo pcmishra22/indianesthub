@@ -362,7 +362,7 @@
             <strong>We'll contact you shortly!</strong>
           </div>
 
-          <form id="bp-lead-form-el" action="{{ route('projects.lead', $builder->projects->first() ?? 0) }}" method="POST">
+          <form id="bp-lead-form-el" action="{{ route('builders.inquiry', $builder) }}" method="POST">
             @csrf
             <input type="hidden" name="lead_type" value="general">
             <input type="text"  name="name"  class="form-control" placeholder="Your Name *" required>
@@ -509,11 +509,14 @@ if (bpForm) {
         bpForm.style.display = 'none';
         document.getElementById('bp-lead-success').style.display = 'block';
       } else {
+        alert(data.message || 'Something went wrong. Please try again.');
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-send-fill me-2"></i>Send Enquiry';
       }
     })
-    .catch(() => {
+    .catch((err) => {
+      console.error('Enquiry error:', err);
+      alert('Unable to send enquiry. Please try again or call us directly.');
       btn.disabled = false;
       btn.innerHTML = '<i class="bi bi-send-fill me-2"></i>Send Enquiry';
     });

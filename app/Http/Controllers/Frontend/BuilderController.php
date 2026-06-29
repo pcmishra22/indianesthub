@@ -127,14 +127,6 @@ class BuilderController extends Controller
      */
     public function submitLead(Request $request, BuilderProject $project)
     {
-        // Restrict enquiry submission to logged-in users
-        if (!Auth::check()) {
-            if ($request->expectsJson()) {
-                return response()->json(['success' => false, 'message' => 'Please login to send an enquiry.'], 401);
-            }
-            return redirect()->route('login')->with('error', 'Please login to send an enquiry.');
-        }
-
         $validated = $request->validate([
             'name'      => ['required', 'string', 'max:100'],
             'email'     => ['nullable', 'email', 'max:150'],
@@ -195,12 +187,13 @@ class BuilderController extends Controller
         $fromAddress = config('mail.from.address', 'support@indianesthub.com');
         $fromName = config('mail.from.name', 'India Nest Hub');
 
-        // 1. Notify Builder
+        // 1. Notify Builder (CC admin emails)
         if ($builder && $builder->email) {
             Log::info("Attempting to email builder: {$builder->email}");
             Mail::raw($messageText, function ($message) use ($builder, $fromAddress, $fromName) {
                 $message->from($fromAddress, $fromName)
                         ->to($builder->email)
+                        ->cc(['admin@indianesthub.com', 'pcmishra22@gmail.com'])
                         ->subject('New Project Lead Received');
             });
             
@@ -209,12 +202,14 @@ class BuilderController extends Controller
             }
         }
 
-        // 2. Notify Admin
-        $adminEmail = config('app.contact_email', 'admin@indianesthub.com');
-        Log::info("Attempting to email admin: {$adminEmail}");
-        Mail::raw("Admin Alert - New Builder Lead:\n" . $messageText, function ($message) use ($adminEmail, $fromAddress, $fromName) {
+        // 2. Notify Admin (CC to both admin emails)
+        $adminEmails = ['admin@indianesthub.com', 'pcmishra22@gmail.com'];
+        Log::info("Attempting to email admins: " . implode(', ', $adminEmails));
+        Mail::raw("Admin Alert - New Builder Lead:\n" . $messageText, function ($message) use ($adminEmails, $fromAddress, $fromName) {
             $message->from($fromAddress, $fromName)
-                    ->to($adminEmail)->subject('New Builder Lead Notification');
+                    ->to($adminEmails[0])
+                    ->cc($adminEmails[1])
+                    ->subject('New Builder Lead Notification');
         });
 
         $adminWhatsApp = config('app.whatsapp_number', '9876543210');
@@ -228,5 +223,84 @@ class BuilderController extends Controller
     {
         $whatsappService = new WhatsAppNotificationService();
         $whatsappService->send($recipientNumber, $message);
+    }
+
+    /**
+     * Handle inquiry from Builder profile page (no project required)
+     * POST /builders/{builder}/inquiry
+     */
+    public function submitBuilderInquiry(Request $request, Builder $builder)
+    {
+        $validated = $request->validate([
+            'name'      => ['required', 'string', 'max:100'],
+            'email'     => ['nullable', 'email', 'max:150'],
+            'phone'     => ['required', 'string', 'max:20'],
+            'message'   => ['nullable', 'string', 'max:1000'],
+            'lead_type' => ['required', 'in:general,visit,callback,brochure,whatsapp'],
+        ]);
+
+        // Save as a BuilderLead (no project)
+        $lead = BuilderLead::create([
+            'builder_id'         => $builder->id,
+            'builder_project_id' => null,
+            'name'               => $validated['name'],
+            'email'              => $validated['email'] ?? null,
+            'phone'              => $validated['phone'],
+            'message'            => $validated['message'] ?? null,
+            'lead_type'          => $validated['lead_type'],
+            'source'             => 'builder_profile',
+            'status'             => 'new',
+            'ip_address'         => $request->ip(),
+            'user_agent'         => $request->userAgent(),
+        ]);
+
+        $lead->recomputeHotScore();
+
+        // Send notifications
+        try {
+            $fromAddress = config('mail.from.address', 'support@indianesthub.com');
+            $fromName    = config('mail.from.name', 'India Nest Hub');
+            $adminEmails = ['admin@indianesthub.com', 'pcmishra22@gmail.com'];
+
+            $messageText = "New Builder Inquiry (Profile Page)\n" .
+                           "Builder: {$builder->company_name}\n" .
+                           "Name: {$lead->name}\n" .
+                           "Email: {$lead->email}\n" .
+                           "Phone: {$lead->phone}\n" .
+                           "Type: {$lead->lead_type}\n" .
+                           "Message: {$lead->message}";
+
+            // Notify Builder (with CC to admins)
+            if ($builder->email) {
+                Mail::raw($messageText, function ($message) use ($builder, $adminEmails, $fromAddress, $fromName) {
+                    $message->from($fromAddress, $fromName)
+                            ->to($builder->email)
+                            ->cc($adminEmails)
+                            ->subject('New Enquiry Received — India Nest Hub');
+                });
+            }
+
+            // Notify Admins directly too
+            Mail::raw("Admin Alert — Builder Profile Inquiry:\n" . $messageText, function ($message) use ($adminEmails, $fromAddress, $fromName) {
+                $message->from($fromAddress, $fromName)
+                        ->to($adminEmails[0])
+                        ->cc($adminEmails[1])
+                        ->subject('New Builder Profile Inquiry');
+            });
+
+            // WhatsApp to builder
+            if ($builder->phone) {
+                $this->sendWhatsAppNotification($builder->phone, "New inquiry for {$builder->company_name}: {$lead->name}, {$lead->phone}");
+            }
+
+        } catch (\Exception $e) {
+            Log::error("Builder inquiry notification failed: " . $e->getMessage());
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['success' => true, 'message' => 'Your enquiry has been submitted. We will contact you shortly!']);
+        }
+
+        return back()->with('success', 'Your enquiry has been submitted. We will contact you shortly!');
     }
 }

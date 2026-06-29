@@ -830,11 +830,14 @@ document.getElementById('leadForm').addEventListener('submit', function(e) {
         <strong>${data.message}</strong>
       </div>`;
     } else {
+      alert(data.message || 'Something went wrong. Please try again.');
       btn.disabled = false;
       btn.innerHTML = '<i class="bi bi-send-fill me-2"></i>Submit Enquiry';
     }
   })
-  .catch(() => {
+  .catch((err) => {
+    console.error('Enquiry error:', err);
+    alert('Unable to send enquiry. Please try again or contact us directly.');
     btn.disabled = false;
     btn.innerHTML = '<i class="bi bi-send-fill me-2"></i>Submit Enquiry';
   });
