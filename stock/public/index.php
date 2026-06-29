@@ -201,7 +201,7 @@ if ($uri === '/api/debug/quicktest') {
     // CHECKPOINT 1: Stooq single symbol (raw HTTP + CSV parse)
     // ══════════════════════════════════════════════════════
     $t0 = microtime(true);
-    $stooqUrl = 'https://stooq.com/q/l/?s=reliance.ns&f=sd2t2ohlcv&h&e=csv'; // .ns format (correct for NSE)
+    $stooqUrl = 'https://stooq.com/q/l/?s=reliance.in&f=sd2t2ohlcv&h&e=csv'; // .in is correct Stooq suffix for NSE India
     $ch = curl_init($stooqUrl);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10,
@@ -247,9 +247,40 @@ if ($uri === '/api/debug/quicktest') {
         'count'        => count($bulkResult),
         'sample_price' => $bulkResult['RELIANCE.NS']['regularMarketPrice'] ?? null,
         'ms'           => round((microtime(true) - $t0) * 1000),
-        'diagnosis'    => count($bulkResult) === 3 ? 'PASS: All 3 symbols fetched'
+        'diagnosis'    => count($bulkResult) === 3 ? 'PASS: All 3 symbols fetched (using .in suffix)'
             : (count($bulkResult) > 0 ? 'PARTIAL: Only ' . count($bulkResult) . '/3 fetched — some symbols may be wrong format'
             : 'FAIL: 0 symbols returned — stooqBulkFetch returning empty (CP1 likely also failed)'),
+    ];
+
+    // ══════════════════════════════════════════════════════
+    // CHECKPOINT 2a: Stooq .in format direct test
+    // ══════════════════════════════════════════════════════
+    $t0 = microtime(true);
+    $stooqInUrl = 'https://stooq.com/q/l/?s=reliance.in&f=sd2t2ohlcv&h&e=csv';
+    $ch2a = curl_init($stooqInUrl);
+    curl_setopt_array($ch2a, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10,
+        CURLOPT_SSL_VERIFYPEER => false, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_HTTPHEADER => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+            'Accept: text/csv,text/plain,*/*', 'Referer: https://stooq.com/',
+        ],
+    ]);
+    $raw2a  = curl_exec($ch2a);
+    $code2a = curl_getinfo($ch2a, CURLINFO_HTTP_CODE);
+    curl_close($ch2a);
+    $lines2a = $raw2a ? array_values(array_filter(explode("\n", trim($raw2a)))) : [];
+    $price2a = null;
+    if (count($lines2a) >= 2) { $r = str_getcsv($lines2a[1]); $price2a = isset($r[6]) ? (float)$r[6] : null; }
+    $out['checkpoints']['CP2a_stooq_in_format'] = [
+        'label'        => 'Stooq .in format (reliance.in — correct NSE suffix)',
+        'ok'           => $code2a === 200 && $price2a > 0,
+        'http_code'    => $code2a,
+        'parsed_price' => $price2a,
+        'ms'           => round((microtime(true) - $t0) * 1000),
+        'diagnosis'    => $code2a === 200 && $price2a > 0 ? 'PASS: Stooq .in works!' :
+            ($code2a === 200 ? 'FAIL: Connected but no price — N/D response' :
+            "FAIL: HTTP {$code2a}"),
     ];
 
     // ══════════════════════════════════════════════════════
@@ -937,14 +968,18 @@ function stooqQuoteFallback(string $symbol): ?array
 {
     // Stooq uses format: TCS.NS (lowercase .ns) for NSE stocks
     $base   = strtolower(str_replace('.NS', '', $symbol));
-    $stooqSym = $base . '.ns';
+    $stooqSym = $base . '.in';
 
     $url = 'https://stooq.com/q/l/?s=' . urlencode($stooqSym) . '&f=sd2t2ohlcv&h&e=csv';
     $ch  = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_TIMEOUT => 8, CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_HTTPHEADER => ['User-Agent: Mozilla/5.0', 'Accept: text/csv,*/*'],
+        CURLOPT_HTTPHEADER => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept: text/csv,text/plain,*/*',
+            'Referer: https://stooq.com/',
+        ],
     ]);
     $raw  = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -995,14 +1030,18 @@ function stooqBulkFetch(array $symbols): array
 
     foreach ($symbols as $sym) {
         $base     = strtolower(str_replace('.NS', '', $sym));
-        $stooqSym = $base . '.ns';
+        $stooqSym = $base . '.in';
         $url = 'https://stooq.com/q/l/?s=' . urlencode($stooqSym) . '&f=sd2t2ohlcv&h&e=csv';
         $ch  = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_TIMEOUT => 12, CURLOPT_CONNECTTIMEOUT => 6,
             CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_HTTPHEADER => ['User-Agent: Mozilla/5.0', 'Accept: text/csv,*/*'],
+            CURLOPT_HTTPHEADER => [
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept: text/csv,text/plain,*/*',
+                'Referer: https://stooq.com/',
+            ],
         ]);
         curl_multi_add_handle($mh, $ch);
         $handles[$sym] = $ch;
@@ -1185,6 +1224,139 @@ function growwQuoteFetch(string $nseSymbol): ?array
 }
 
 /**
+ * Fetch quote from NSE India's unofficial JSON API (v2 endpoint, more stable).
+ * Different from the main API — uses market data endpoint.
+ */
+function nseMarketFetch(string $symbol): ?array
+{
+    $sym = strtoupper(str_replace('.NS', '', $symbol));
+    $cookieJar = STORAGE . '/nse_mkt_cookie.txt';
+
+    // Warm up session with homepage visit
+    if (!file_exists($cookieJar) || (time() - filemtime($cookieJar)) > 1800) {
+        $ch = curl_init('https://www.nseindia.com/market-data/live-equity-market');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_COOKIEJAR => $cookieJar, CURLOPT_COOKIEFILE => $cookieJar,
+            CURLOPT_HTTPHEADER => [
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+                'Accept: text/html,application/xhtml+xml,*/*;q=0.9',
+                'Accept-Language: en-IN,en;q=0.9',
+                'Accept-Encoding: gzip, deflate, br',
+                'Connection: keep-alive',
+                'Upgrade-Insecure-Requests: 1',
+            ],
+        ]);
+        curl_exec($ch); curl_close($ch);
+        usleep(500000); // 500ms pause — NSE needs time between calls
+    }
+
+    // API call with full session headers
+    $ch = curl_init('https://www.nseindia.com/api/quote-equity?symbol=' . urlencode($sym));
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 12, CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_ENCODING => 'gzip',
+        CURLOPT_COOKIEJAR => $cookieJar, CURLOPT_COOKIEFILE => $cookieJar,
+        CURLOPT_HTTPHEADER => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+            'Accept: application/json, text/plain, */*',
+            'Accept-Language: en-IN,en;q=0.9',
+            'Accept-Encoding: gzip, deflate, br',
+            'Referer: https://www.nseindia.com/market-data/live-equity-market',
+            'X-Requested-With: XMLHttpRequest',
+            'sec-ch-ua: "Google Chrome";v="125", "Not:A-Brand";v="8"',
+            'sec-ch-ua-mobile: ?0',
+            'sec-fetch-dest: empty',
+            'sec-fetch-mode: cors',
+            'sec-fetch-site: same-origin',
+        ],
+    ]);
+    $raw  = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if (!$raw || $code !== 200) return null;
+    $d = json_decode($raw, true);
+    if (empty($d['priceInfo'])) return null;
+
+    $p  = $d['priceInfo'];
+    $md = $d['metadata'] ?? [];
+    return [
+        'symbol'                     => $sym . '.NS',
+        'shortName'                  => $md['companyName'] ?? $sym,
+        'longName'                   => $md['companyName'] ?? $sym,
+        'regularMarketPrice'         => (float)($p['lastPrice'] ?? 0),
+        'regularMarketChange'        => (float)($p['change'] ?? 0),
+        'regularMarketChangePercent' => (float)($p['pChange'] ?? 0),
+        'regularMarketPreviousClose' => (float)($p['previousClose'] ?? 0),
+        'regularMarketOpen'          => (float)($p['open'] ?? 0),
+        'regularMarketDayHigh'       => (float)($p['intraDayHighLow']['max'] ?? 0),
+        'regularMarketDayLow'        => (float)($p['intraDayHighLow']['min'] ?? 0),
+        'regularMarketVolume'        => (int)($d['securityInfo']['tradedVolume'] ?? 0),
+        'averageDailyVolume3Month'   => (int)($d['securityInfo']['tradedVolume'] ?? 0),
+        'fiftyTwoWeekHigh'           => (float)($p['weekHighLow']['max'] ?? 0),
+        'fiftyTwoWeekLow'            => (float)($p['weekHighLow']['min'] ?? 0),
+        'trailingPE' => null, 'priceToBook' => null, 'marketCap' => null,
+        'sector' => null, 'industry' => null, 'returnOnEquity' => null, 'debtToEquity' => null,
+        '_source' => 'nse_market',
+    ];
+}
+
+/**
+ * Fetch quote from BSE India public API (no auth, Indian datacenter-friendly).
+ */
+function bseQuoteFetch(string $nseSymbol): ?array
+{
+    // BSE uses scrip codes, but their search API accepts symbol names
+    $sym = strtoupper(str_replace('.NS', '', $nseSymbol));
+    // BSE search to find scrip code
+    $searchUrl = 'https://api.bseindia.com/BseIndiaAPI/api/ComHeader/w?quotetype=EQ&scripcode=&companyname=' . urlencode($sym);
+    $ch = curl_init($searchUrl);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 8, CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_ENCODING => 'gzip',
+        CURLOPT_HTTPHEADER => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+            'Accept: application/json, text/plain, */*',
+            'Referer: https://www.bseindia.com/',
+            'Origin: https://www.bseindia.com',
+        ],
+    ]);
+    $raw  = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if (!$raw || $code !== 200) return null;
+    $d = json_decode($raw, true);
+    $price = (float)($d['CurrRate'] ?? $d['Curr_Rate'] ?? 0);
+    if ($price <= 0) return null;
+
+    return [
+        'symbol'                     => $sym . '.NS',
+        'shortName'                  => $d['CompanyName'] ?? $sym,
+        'longName'                   => $d['CompanyName'] ?? $sym,
+        'regularMarketPrice'         => $price,
+        'regularMarketChange'        => (float)($d['Chg'] ?? 0),
+        'regularMarketChangePercent' => (float)($d['PcChg'] ?? 0),
+        'regularMarketPreviousClose' => (float)($d['PrevClose'] ?? $price),
+        'regularMarketOpen'          => (float)($d['Open'] ?? $price),
+        'regularMarketDayHigh'       => (float)($d['High'] ?? $price),
+        'regularMarketDayLow'        => (float)($d['Low'] ?? $price),
+        'regularMarketVolume'        => (int)($d['TotalTradedQty'] ?? 0),
+        'averageDailyVolume3Month'   => (int)($d['TotalTradedQty'] ?? 0),
+        'fiftyTwoWeekHigh'           => (float)($d['WeekHigh52'] ?? $price),
+        'fiftyTwoWeekLow'            => (float)($d['WeekLow52'] ?? $price),
+        'trailingPE' => null, 'priceToBook' => null, 'marketCap' => null,
+        'sector' => null, 'industry' => null, 'returnOnEquity' => null, 'debtToEquity' => null,
+        '_source' => 'bse',
+    ];
+}
+
+
+/**
  * Bulk-fetch quotes: tries NSE+Stooq first (reliable), then Yahoo Finance.
  * Caches to bulk_quotes.json for 5 minutes.
  */
@@ -1251,7 +1423,16 @@ function yahooQuoteBulk(array $symbols): array
         }
     }
 
-    // ── Priority 4: NSE India one-by-one (rate-limited, last resort) ─
+    // ── Priority 4: NSE India with improved session (market-data referer) ─
+    if (empty($all)) {
+        foreach (array_slice($symbols, 0, 20) as $sym) {
+            $nse = nseMarketFetch($sym);
+            if ($nse && ($nse['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $nse;
+            usleep(300000); // NSE needs ~300ms between calls
+        }
+    }
+
+    // ── Priority 5: NSE India original endpoint ───────────────────────
     if (empty($all)) {
         foreach (array_slice($symbols, 0, 20) as $sym) {
             $nse = nseQuoteFallback($sym);
@@ -1260,12 +1441,21 @@ function yahooQuoteBulk(array $symbols): array
         }
     }
 
-    // ── Priority 5: Groww API (India-based, works on IN hosting) ─────
+    // ── Priority 6: Groww API (India-based CDN, no IP block) ─────────
     if (empty($all)) {
         foreach (array_slice($symbols, 0, 30) as $sym) {
             $gw = growwQuoteFetch($sym);
             if ($gw && ($gw['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $gw;
             usleep(100000);
+        }
+    }
+
+    // ── Priority 7: BSE India public API ─────────────────────────────
+    if (empty($all)) {
+        foreach (array_slice($symbols, 0, 20) as $sym) {
+            $bse = bseQuoteFetch($sym);
+            if ($bse && ($bse['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $bse;
+            usleep(150000);
         }
     }
 
@@ -1280,7 +1470,7 @@ function yahooQuoteBulk(array $symbols): array
 function stooqHistoryFallback(string $symbol, int $days = 90): array
 {
     $base     = strtolower(str_replace('.NS', '', $symbol));
-    $stooqSym = $base . '.ns';
+    $stooqSym = $base . '.in';
     $from = date('Ymd', strtotime("-{$days} days -30 days"));
     $to   = date('Ymd');
     $url  = "https://stooq.com/q/d/l/?s={$stooqSym}&d1={$from}&d2={$to}&i=d";
