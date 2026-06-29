@@ -2188,12 +2188,54 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
 
     // ── Step 5: analyse page stocks ─────────────────────────────
     $stocks = [];
+    $skippedNoQuote = 0;
     foreach ($pageSyms as $sym) {
         $quote = $allQuotes[$sym] ?? null;
-        if (!$quote) continue;
+        if (!$quote) { $skippedNoQuote++; continue; }
         try {
             $history = yahooHistory($sym, 90);
-            if (count($history) < 20) continue;
+            // Use whatever history we have; skip only if truly empty
+            if (count($history) < 5) {
+                // Still show the stock with price data, minimal indicators
+                $price = (float)($quote['regularMarketPrice'] ?? 0);
+                $chg   = (float)($quote['regularMarketChangePercent'] ?? 0);
+                $stocks[] = [
+                    'symbol'        => $sym,
+                    'name'          => $quote['shortName'] ?? $sym,
+                    'price'         => $price,
+                    'change_pct'    => round($chg, 2),
+                    'change_5d'     => 0,
+                    'momentum_score'=> 0,
+                    'signal'        => 'Hold',
+                    'confidence'    => 0,
+                    'trend'         => 'N/A',
+                    'direction'     => 'flat',
+                    'rsi'           => 50,
+                    'supertrend'    => 'N/A',
+                    'ema_signal'    => null,
+                    'macd_signal'   => 'N/A',
+                    'adx'           => null,
+                    'adx_strength'  => null,
+                    'adx_direction' => null,
+                    'stoch_k'       => 50,
+                    'stoch_d'       => 50,
+                    'stoch_signal'  => 'N/A',
+                    'obv_trend'     => null,
+                    'vol_ratio'     => 1,
+                    'vol_label'     => 'N/A',
+                    'vol_surge'     => false,
+                    'pattern'       => '',
+                    'target'        => round($price * 1.03, 2),
+                    'stoploss'      => round($price * 0.97, 2),
+                    'position_52w'  => null,
+                    'sector'        => $quote['sector'] ?? null,
+                    '52w_high'      => round($quote['fiftyTwoWeekHigh'] ?? 0, 2),
+                    '52w_low'       => round($quote['fiftyTwoWeekLow'] ?? 0, 2),
+                    'bull_factors'  => [],
+                    'bear_factors'  => [],
+                ];
+                continue;
+            }
 
             $closePrices = array_column($history, 'close');
             $ema20       = ema($closePrices, 20);
@@ -2277,17 +2319,20 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
            : (count($buys) / max(1, count($stocks)) <= 0.4 ? 'Bearish' : 'Mixed');
 
     return [
-        'stocks'       => $stocks,
-        'buy_list'     => $buys,
-        'sell_list'    => $sells,
-        'market_mood'  => $mood,
-        'page'         => $page,
-        'total_pages'  => $totalPages,
-        'total_stocks' => $totalSyms,
-        'per_page'     => $perPage,
-        'sector'       => $sector,
-        'search'       => $search,
-        'ts'           => time(),
+        'stocks'          => $stocks,
+        'buy_list'        => $buys,
+        'sell_list'       => $sells,
+        'market_mood'     => $mood,
+        'page'            => $page,
+        'total_pages'     => $totalPages,
+        'total_stocks'    => $totalSyms,
+        'per_page'        => $perPage,
+        'sector'          => $sector,
+        'search'          => $search,
+        'ts'              => time(),
+        'quotes_fetched'  => count($allQuotes),
+        'skipped_no_quote'=> $skippedNoQuote ?? 0,
+        'warning'         => empty($allQuotes) ? 'Yahoo Finance returned no quotes — possible rate limit or network issue. Try refreshing in a minute.' : null,
     ];
 }
 
@@ -2932,6 +2977,11 @@ async function loadWatchlist(force=false){
       document.getElementById('watchLoading').innerHTML=`<div class="err-box">${escHtml(d.error)}</div>`;
       return;
     }
+    if(d.warning){
+      document.getElementById('watchLoading').style.display='flex';
+      document.getElementById('watchLoading').innerHTML=`<div class="err-box" style="width:100%">⚠️ ${escHtml(d.warning)}<br><small>Quotes fetched: ${d.quotes_fetched||0} · Skipped (no quote): ${d.skipped_no_quote||0}</small></div>`;
+      if(!d.stocks?.length) return;
+    }
     wlTotalPages=d.total_pages||1;
     renderWatchlist(d);
     renderPagination(d);
@@ -3076,7 +3126,7 @@ function renderWatchlist(d){
   }
 
   function stockTable(list,title,color,icon){
-    if(!list.length) return `<div style="padding:20px;color:var(--muted);font-size:13px">No stocks here right now.</div>`;
+    if(!list.length) return `<div style="padding:20px;color:var(--muted);font-size:13px">No ${title.includes('BUY')?'buy':'sell'} signals right now — stocks may be in a neutral/hold zone, or Yahoo Finance data is still loading. Try refreshing.</div>`;
     return `<div style="padding:12px 18px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:16px">${icon}</span>
       <span style="font-weight:700;color:${color};font-size:14px">${title}</span>
