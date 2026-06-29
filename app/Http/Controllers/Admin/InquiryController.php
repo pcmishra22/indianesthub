@@ -29,7 +29,9 @@ class InquiryController extends Controller
                         'message'    => $inq->message,
                         'status'     => $inq->status ? 'active' : 'inactive',
                         'subject'    => $inq->property ? $inq->property->title : '—',
-                        'subject_url'=> $inq->property ? route('properties.show', $inq->property) : null,
+                        'subject_url'=> $inq->property
+                                            ? route('property-details', $inq->property->slug)
+                                            : null,
                         'source'     => $inq->source ?? 'website',
                         'created_at' => $inq->created_at,
                         'detail_url' => route('admin.inquiries.show', $inq->id),
