@@ -4184,92 +4184,109 @@ async function loadWatchlist(force=false){
   }
 }
 
-// ── Fetch quotes directly from browser (bypasses server IP blocks) ──
-// Tries: Yahoo Finance direct → Yahoo via allorigins CORS proxy
+// ── Fetch quotes directly from browser ───────────────────────────
+// Strategy: try multiple sources that work from browser (not server)
 async function fetchQuotesDirect(symbols){
-  const FIELDS='regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,averageDailyVolume3Month,regularMarketDayHigh,regularMarketDayLow,regularMarketPreviousClose,regularMarketOpen,fiftyTwoWeekHigh,fiftyTwoWeekLow,shortName,longName';
   const allQuotes=[];
-  const CHUNK=20;
-  for(let i=0;i<symbols.length;i+=CHUNK){
-    const chunk=symbols.slice(i,i+CHUNK);
+  const FIELDS='regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,averageDailyVolume3Month,regularMarketDayHigh,regularMarketDayLow,regularMarketPreviousClose,regularMarketOpen,fiftyTwoWeekHigh,fiftyTwoWeekLow,shortName,longName';
+
+  // ── Source 1: Yahoo Finance v7 no-auth endpoint (often works from browsers) ──
+  for(let i=0;i<symbols.length;i+=10){
+    const chunk=symbols.slice(i,i+10);
     const syms=chunk.join(',');
-    let fetched=false;
-    // Try Yahoo Finance directly from browser (browser not IP-blocked like server)
-    for(const host of ['query1','query2']){
-      if(fetched) break;
+    let got=false;
+    // v7 endpoint sometimes bypasses auth requirements
+    for(const url of [
+      `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(syms)}&fields=${FIELDS}`,
+      `https://query2.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(syms)}&fields=${FIELDS}`,
+      `https://query1.finance.yahoo.com/v8/finance/quote?symbols=${encodeURIComponent(syms)}&fields=${FIELDS}&lang=en-US&region=IN`,
+    ]){
       try{
-        const r=await fetch(`https://${host}.finance.yahoo.com/v8/finance/quote?symbols=${encodeURIComponent(syms)}&fields=${FIELDS}&lang=en-US&region=IN`,{headers:{'Accept':'application/json'}});
+        const r=await fetch(url,{headers:{'Accept':'application/json','User-Agent':'Mozilla/5.0'}});
         if(r.ok){
           const j=await r.json();
-          const results=j?.quoteResponse?.result||[];
-          results.forEach(q=>{if(q.regularMarketPrice>0){q._source='yahoo_browser';allQuotes.push(q);}});
-          if(results.length>0){fetched=true;break;}
+          const results=(j?.quoteResponse?.result||j?.finance?.result||[]);
+          const valid=results.filter(q=>q.regularMarketPrice>0);
+          if(valid.length){valid.forEach(q=>allQuotes.push(q));got=true;break;}
         }
       }catch(e){}
     }
-    // CORS proxy fallback
-    if(!fetched){
+    if(got) continue;
+
+    // ── Source 2: Groww public API (Indian broker, no CORS issues) ──
+    for(const sym of chunk){
+      const base=sym.replace('.NS','').replace('.BO','');
       try{
-        const target=`https://query1.finance.yahoo.com/v8/finance/quote?symbols=${encodeURIComponent(syms)}&fields=${FIELDS}&lang=en-US&region=IN`;
-        const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(target)}`);
+        const r=await fetch(`https://groww.in/v1/api/stocks_data/v1/company/search?q=${encodeURIComponent(base)}&page=0&size=1`,
+          {headers:{'Accept':'application/json'}});
         if(r.ok){
           const j=await r.json();
-          const data=JSON.parse(j.contents||'{}');
-          const results=data?.quoteResponse?.result||[];
-          results.forEach(q=>{if(q.regularMarketPrice>0){q._source='yahoo_allorigins';allQuotes.push(q);}});
-          if(results.length>0) fetched=true;
+          const s=j?.stocks?.[0];
+          if(s&&s.ltp>0){
+            allQuotes.push({
+              symbol:sym,
+              shortName:s.companyName||base,longName:s.companyName||base,
+              regularMarketPrice:+s.ltp,
+              regularMarketChange:+(s.dayChange||0),
+              regularMarketChangePercent:+(s.dayChangePerc||0),
+              regularMarketPreviousClose:+(s.previousClose||s.ltp),
+              regularMarketOpen:+(s.open||s.ltp),
+              regularMarketDayHigh:+(s.high||s.ltp),
+              regularMarketDayLow:+(s.low||s.ltp),
+              regularMarketVolume:+(s.totalTradedVolume||0),
+              averageDailyVolume3Month:+(s.totalTradedVolume||0),
+              fiftyTwoWeekHigh:+(s['52WeekHigh']||s.ltp),
+              fiftyTwoWeekLow:+(s['52WeekLow']||s.ltp),
+              _source:'groww'
+            });
+          }
         }
       }catch(e){}
+      await new Promise(r=>setTimeout(r,80));
     }
-    if(i+CHUNK<symbols.length) await new Promise(res=>setTimeout(res,150));
   }
   return allQuotes;
 }
+
 
 // Legacy alias kept for other callers (EOD report, etc.)
 async function browserFetchQuotes(symbols){
   return fetchQuotesDirect(symbols);
 }
-
-
-// ── Browser-side history fetcher ──────────────────────────────────
-async function browserFetchHistory(yahooSym){
   const p2=Math.floor(Date.now()/1000);
   const p1=p2-(90*86400);
-  const url=`https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?period1=${p1}&period2=${p2}&interval=1d`;
+  const base=yahooSym.replace('.NS','').replace('.BO','');
 
-  // Try direct
+  // Try Yahoo Finance direct
   for(const host of ['query1','query2']){
     try{
       const r=await fetch(`https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?period1=${p1}&period2=${p2}&interval=1d`);
-      if(r.ok){
-        const j=await r.json();
-        const rows=parseYahooChart(j);
-        if(rows.length) return rows;
-      }
+      if(r.ok){const j=await r.json();const rows=parseYahooChart(j);if(rows.length) return rows;}
     }catch(e){}
   }
 
-  // Try via allorigins proxy
+  // Try Groww candle API
   try{
-    const targetUrl=encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?period1=${p1}&period2=${p2}&interval=1d`);
-    const r=await fetch(`https://api.allorigins.win/get?url=${targetUrl}`);
-    if(r.ok){
-      const j=await r.json();
-      const data=JSON.parse(j.contents||'{}');
-      const rows=parseYahooChart(data);
-      if(rows.length) return rows;
-    }
-  }catch(e){}
-
-  // Try via corsproxy.io
-  try{
-    const targetUrl=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?period1=${p1}&period2=${p2}&interval=1d`;
-    const r=await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
-    if(r.ok){
-      const j=await r.json();
-      const rows=parseYahooChart(j);
-      if(rows.length) return rows;
+    // First get the groww slug for this symbol
+    const sr=await fetch(`https://groww.in/v1/api/stocks_data/v1/company/search?q=${encodeURIComponent(base)}&page=0&size=1`);
+    if(sr.ok){
+      const sj=await sr.json();
+      const slug=sj?.stocks?.[0]?.searchId||sj?.stocks?.[0]?.slug;
+      if(slug){
+        const cr=await fetch(`https://groww.in/v1/api/charting_service/v2/chart/exchange/NSE/segment/CASH/${encodeURIComponent(slug)}?startTimeInMillis=${p1*1000}&endTimeInMillis=${p2*1000}&intervalInMinutes=1440`);
+        if(cr.ok){
+          const cj=await cr.json();
+          const candles=cj?.candles||cj?.data?.candles||[];
+          if(candles.length){
+            return candles.map(c=>({
+              date:new Date(c[0]).toISOString().slice(0,10),
+              open:+c[1].toFixed(2),high:+c[2].toFixed(2),
+              low:+c[3].toFixed(2),close:+c[4].toFixed(2),
+              volume:c[5]||0
+            })).filter(r=>r.close>0);
+          }
+        }
+      }
     }
   }catch(e){}
 
@@ -5006,17 +5023,24 @@ async function loadChart(sym, interval='5m'){
       }catch(e){}
     }
 
-    // Proxy fallback
+    // Groww intraday fallback
     if(!candles.length){
       try{
-        const r=await fetch(`https://corsproxy.io/?${encodeURIComponent(chartUrl)}`);
-        if(r.ok){
-          const j=await r.json();
-          const chart=j?.chart?.result?.[0];
-          if(chart){
-            const ts=chart.timestamp||[];
-            const ohlcv=chart.indicators?.quote?.[0]||{};
-            candles=ts.map((t,i)=>({t,o:+(ohlcv.open?.[i]||0).toFixed(2),h:+(ohlcv.high?.[i]||0).toFixed(2),l:+(ohlcv.low?.[i]||0).toFixed(2),c:+(ohlcv.close?.[i]||0).toFixed(2),v:ohlcv.volume?.[i]||0})).filter(c=>c.c>0);
+        const base=sym.replace('.NS','').replace('.BO','');
+        const sr=await fetch(`https://groww.in/v1/api/stocks_data/v1/company/search?q=${encodeURIComponent(base)}&page=0&size=1`);
+        if(sr.ok){
+          const sj=await sr.json();
+          const slug=sj?.stocks?.[0]?.searchId||sj?.stocks?.[0]?.slug;
+          if(slug){
+            const mins={'5m':5,'15m':15,'1h':60}[interval]||5;
+            const now=Date.now();
+            const from=interval==='1h'?now-5*86400000:now-86400000;
+            const cr=await fetch(`https://groww.in/v1/api/charting_service/v2/chart/exchange/NSE/segment/CASH/${encodeURIComponent(slug)}?startTimeInMillis=${from}&endTimeInMillis=${now}&intervalInMinutes=${mins}`);
+            if(cr.ok){
+              const cj=await cr.json();
+              const gc=cj?.candles||cj?.data?.candles||[];
+              candles=gc.map(c=>({t:Math.floor(c[0]/1000),o:+c[1].toFixed(2),h:+c[2].toFixed(2),l:+c[3].toFixed(2),c:+c[4].toFixed(2),v:c[5]||0})).filter(c=>c.c>0);
+            }
           }
         }
       }catch(e){}
