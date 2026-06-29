@@ -187,6 +187,76 @@ if (empty($_SESSION['auth'])) { redirect('login'); }
 header_remove('X-Powered-By');
 
 // ── Data source diagnostic endpoint ──────────────────────────
+// ── Quick connectivity test ──────────────────────────────────
+if ($uri === '/api/debug/quicktest') {
+    header('Content-Type: application/json');
+    $out = ['ts' => date('Y-m-d H:i:s'), 'tests' => []];
+
+    // Test 1: Stooq single symbol
+    $t0 = microtime(true);
+    $stooqUrl = 'https://stooq.com/q/l/?s=reliance.in&f=sd2t2ohlcv&h&e=csv';
+    $ch = curl_init($stooqUrl);
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>10,
+        CURLOPT_SSL_VERIFYPEER=>false, CURLOPT_FOLLOWLOCATION=>true,
+        CURLOPT_HTTPHEADER=>['User-Agent: Mozilla/5.0']]);
+    $raw = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
+    $lines = $raw ? array_values(array_filter(explode("
+", trim($raw)))) : [];
+    $out['tests']['stooq'] = [
+        'ok' => $code === 200 && count($lines) >= 2 && str_contains($raw ?? '', 'Reliance'),
+        'http' => $code, 'curl_err' => $err ?: null,
+        'lines' => count($lines), 'sample' => $lines[1] ?? null,
+        'ms' => round((microtime(true)-$t0)*1000),
+    ];
+
+    // Test 2: NSE India
+    $t0 = microtime(true);
+    $ch2 = curl_init('https://www.nseindia.com/api/quote-equity?symbol=RELIANCE');
+    curl_setopt_array($ch2, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>10,
+        CURLOPT_SSL_VERIFYPEER=>false, CURLOPT_FOLLOWLOCATION=>true,
+        CURLOPT_HTTPHEADER=>['User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept: application/json', 'Referer: https://www.nseindia.com/']]);
+    $raw2 = curl_exec($ch2);
+    $code2 = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+    $err2 = curl_error($ch2);
+    curl_close($ch2);
+    $d2 = $raw2 ? json_decode($raw2, true) : null;
+    $out['tests']['nse'] = [
+        'ok' => !empty($d2['priceInfo']['lastPrice']),
+        'http' => $code2, 'curl_err' => $err2 ?: null,
+        'price' => $d2['priceInfo']['lastPrice'] ?? null,
+        'ms' => round((microtime(true)-$t0)*1000),
+    ];
+
+    // Test 3: stooqBulkFetch with 3 symbols
+    $t0 = microtime(true);
+    $bulkResult = stooqBulkFetch(['RELIANCE.NS','TCS.NS','INFY.NS']);
+    $out['tests']['stooq_bulk'] = [
+        'ok' => count($bulkResult) > 0,
+        'count' => count($bulkResult),
+        'symbols_got' => array_keys($bulkResult),
+        'ms' => round((microtime(true)-$t0)*1000),
+    ];
+
+    // Test 4: bulk_quotes.json cache status
+    $cacheFile = STORAGE . '/bulk_quotes.json';
+    $out['cache'] = [
+        'exists' => file_exists($cacheFile),
+        'age_sec' => file_exists($cacheFile) ? (time() - filemtime($cacheFile)) : null,
+        'size_bytes' => file_exists($cacheFile) ? filesize($cacheFile) : 0,
+        'count' => file_exists($cacheFile) ? count(json_decode(file_get_contents($cacheFile),true)??[]) : 0,
+    ];
+
+    $out['recommended'] = $out['tests']['stooq_bulk']['ok'] ? 'Stooq bulk OK'
+        : ($out['tests']['nse']['ok'] ? 'NSE OK but Stooq blocked' : 'ALL SOURCES BLOCKED');
+
+    echo json_encode($out, JSON_PRETTY_PRINT);
+    exit;
+}
+
 if ($uri === '/api/debug/datasource') {
     header('Content-Type: application/json');
     $testSym = 'TCS.NS';
@@ -567,19 +637,52 @@ if ($uri === '/api/quotes/bulk' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // Sanitize
     $symbols = array_map(fn($s) => strtoupper(trim($s)), $symbols);
     $symbols = array_filter($symbols, fn($s) => preg_match('/^[A-Z0-9\.\-&]+$/', $s));
+    $symbols = array_values($symbols);
 
-    $quotes = stooqBulkFetch(array_values($symbols));
+    $sources_tried = [];
+    $quotes = [];
 
-    // Also save to bulk_quotes.json so server-side TA can read it
+    // ── Priority 1: Stooq parallel (fast, no auth) ───────────────
+    $sources_tried[] = 'stooq';
+    $quotes = stooqBulkFetch($symbols);
+
+    // ── Priority 2: NSE India (one by one, reliable from IN servers) ─
+    if (empty($quotes)) {
+        $sources_tried[] = 'nse';
+        foreach (array_slice($symbols, 0, 10) as $sym) { // limit to 10 for speed
+            $nse = nseQuoteFallback($sym);
+            if ($nse && ($nse['regularMarketPrice'] ?? 0) > 0) {
+                $quotes[$sym] = $nse;
+            }
+            usleep(150000);
+        }
+    }
+
+    // ── Priority 3: yahooQuoteBulk full fallback chain ────────────
+    if (empty($quotes)) {
+        $sources_tried[] = 'yahoo_bulk';
+        $all = yahooQuoteBulk($symbols);
+        foreach ($all as $sym => $q) {
+            if (($q['regularMarketPrice'] ?? 0) > 0) $quotes[$sym] = $q;
+        }
+    }
+
+    // Save to bulk_quotes.json so server-side TA can read it
     if (!empty($quotes)) {
         if (!is_dir(STORAGE)) mkdir(STORAGE, 0755, true);
         $existing = file_exists(STORAGE . '/bulk_quotes.json')
-            ? json_decode(file_get_contents(STORAGE . '/bulk_quotes.json'), true) : [];
+            ? (json_decode(file_get_contents(STORAGE . '/bulk_quotes.json'), true) ?? []) : [];
         foreach ($quotes as $sym => $q) $existing[$sym] = $q;
         file_put_contents(STORAGE . '/bulk_quotes.json', json_encode($existing));
     }
 
-    echo json_encode(['ok' => true, 'quotes' => array_values($quotes), 'count' => count($quotes)]);
+    echo json_encode([
+        'ok'           => !empty($quotes),
+        'quotes'       => array_values($quotes),
+        'count'        => count($quotes),
+        'sources_tried'=> $sources_tried,
+        'error'        => empty($quotes) ? 'All sources failed (Stooq, NSE, Yahoo). Check server outbound connectivity.' : null,
+    ]);
     exit;
 }
 
@@ -3523,8 +3626,8 @@ async function loadWatchlist(force=false){
   document.getElementById('watchLoading').style.display='flex';
   document.getElementById('watchLoading').innerHTML=`
     <div class="spin"></div>
-    <div>Fetching stock quotes from Yahoo Finance…</div>
-    <div style="font-size:11px;color:var(--muted)">Browser fetching data directly (bypasses server IP blocks)</div>`;
+    <div>Fetching stock quotes from Stooq…</div>
+    <div style="font-size:11px;color:var(--muted)">Server is fetching data directly (reliable, no CORS issues)</div>`;
   document.getElementById('watchTable').style.display='none';
   const rb=document.getElementById('refreshBtn');
   if(rb){rb.disabled=true;rb.textContent='⏳ Loading…';}
@@ -3545,25 +3648,27 @@ async function loadWatchlist(force=false){
 
     document.getElementById('watchLoading').innerHTML=`
       <div class="spin"></div>
-      <div>Fetching ${filteredSyms.length} quotes from Yahoo Finance…</div>
-      <div style="font-size:11px;color:var(--muted)">Your browser is fetching directly — no server IP restrictions</div>`;
+      <div>Fetching ${filteredSyms.length} quotes via Stooq…</div>
+      <div style="font-size:11px;color:var(--muted)">Server-side fetch — no browser CORS restrictions</div>`;
 
-    // ── Step 2: browser fetches quotes from Yahoo Finance ─────────
-    const quotes=await browserFetchQuotes(filteredSyms);
-    if(!quotes.length){
-      document.getElementById('watchLoading').innerHTML=`<div class="err-box">⚠️ Could not fetch quotes from Yahoo Finance. Please check your internet connection or try again.<br><small>Note: This fetch runs in your browser, not the server.</small></div>`;
-      wlLoading=false; if(rb){rb.disabled=false;rb.textContent='🔄 Refresh';} return;
+    // ── Step 2: server fetches quotes (Stooq → NSE → Yahoo fallback) ──
+    const bulkRes=await browserFetchQuotes(filteredSyms);
+    if(!bulkRes.length){
+      // Quotes fetch failed — but still try to load from server cache/watchlist endpoint
+      document.getElementById('watchLoading').innerHTML=`
+        <div class="spin"></div>
+        <div>Quote fetch failed — trying server cache…</div>`;
+    } else {
+      document.getElementById('watchLoading').innerHTML=`
+        <div class="spin"></div>
+        <div>Got ${bulkRes.length} quotes — running technical analysis…</div>`;
+      // Push quotes to PHP proxy cache (for TA)
+      await fetch(apiUrl('api/proxy/quotes'),{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(bulkRes)
+      });
     }
-
-    document.getElementById('watchLoading').innerHTML=`
-      <div class="spin"></div>
-      <div>Got ${quotes.length} quotes — sending to server for analysis…</div>`;
-
-    // ── Step 3: push quotes to PHP so it can run TA ───────────────
-    await fetch(apiUrl('api/proxy/quotes'),{
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(quotes)
-    });
+    const quotes=bulkRes;
 
     // ── Step 4: request paginated analysis from PHP ───────────────
     document.getElementById('watchLoading').innerHTML=`
