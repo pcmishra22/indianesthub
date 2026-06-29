@@ -789,9 +789,10 @@ if ($uri === '/api/quotes/bulk' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Use yahooQuoteBulk which tries: Stooq → Yahoo v7 → Yahoo v8 → NSE
     // Results are cached in bulk_quotes.json for 5 min
-    // Force fresh fetch by deleting cache first
+    // Only delete cache if it was not written by the browser (via /api/proxy/quotes).
+    // Browser-pushed data is the fallback when server sources are IP-blocked.
     $bulkCacheFile = STORAGE . '/bulk_quotes.json';
-    if (file_exists($bulkCacheFile)) unlink($bulkCacheFile); // always fresh on explicit bulk call
+    // Do NOT unlink here — preserve browser-pushed quotes in the cache.
 
     $quotes = yahooQuoteBulk($symbols);
     $sources_tried = ['stooq_ns', 'yahoo_v7', 'yahoo_v8', 'nse'];
@@ -3063,8 +3064,19 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
     $perPage  = 20;
     $allSyms  = getActiveWatchlist();
 
-    // ── Step 1: bulk-fetch all quotes (parallel, cached 5min) ──
-    $allQuotes = yahooQuoteBulk($allSyms);
+    // ── Step 1: check if browser already pushed quotes via /api/proxy/quotes ──
+    // This is the primary path when server-side sources (Stooq/Yahoo/NSE) are IP-blocked.
+    $bulkCache = STORAGE . '/bulk_quotes.json';
+    $browserQuotes = [];
+    if (file_exists($bulkCache) && (time() - filemtime($bulkCache)) < 300) {
+        $cached = json_decode(file_get_contents($bulkCache), true) ?? [];
+        if (count($cached) >= 3) {
+            $browserQuotes = $cached;
+        }
+    }
+
+    // ── Step 2: if no valid browser cache, try server-side fetch ──
+    $allQuotes = !empty($browserQuotes) ? $browserQuotes : yahooQuoteBulk($allSyms);
 
     // ── Step 2: filter by sector ────────────────────────────────
     if ($sector && isset(SECTOR_MAP[$sector])) {
@@ -3905,55 +3917,49 @@ async function loadWatchlist(force=false){
   if(wlLoading) return;
   wlLoading=true;
   document.getElementById('watchLoading').style.display='flex';
-  document.getElementById('watchLoading').innerHTML=`
-    <div class="spin"></div>
-    <div>Fetching stock quotes from Stooq…</div>
-    <div style="font-size:11px;color:var(--muted)">Server is fetching data directly (reliable, no CORS issues)</div>`;
+  document.getElementById('watchLoading').innerHTML=`<div class="spin"></div><div>Connecting to data sources…</div>`;
   document.getElementById('watchTable').style.display='none';
   const rb=document.getElementById('refreshBtn');
   if(rb){rb.disabled=true;rb.textContent='⏳ Loading…';}
   try{
-    // ── Step 1: get active watchlist symbols from server ──────────
+    // Step 1: get symbols
     const wlRes=await fetch(apiUrl('api/watchlist/list'));
     const wlData=await wlRes.json();
     let symbols=wlData.watchlist||[];
     if(!symbols.length) symbols=['RELIANCE.NS','TCS.NS','HDFCBANK.NS','INFY.NS','ICICIBANK.NS'];
 
-    // Apply sector/search filter client-side before fetching
-    let filteredSyms=symbols;
-    if(wlSector){
-      const sr=await fetch(apiUrl('api/sectors'));
-      const sd=await sr.json();
-      // sector filter via server still works
-    }
+    // Step 2: identify current-page symbols for priority fetch
+    const PAGE=20;
+    const pageStart=(wlPage-1)*PAGE;
+    const pageSyms=symbols.slice(pageStart,pageStart+PAGE);
+    const restSyms=symbols.filter(s=>!pageSyms.includes(s));
 
-    document.getElementById('watchLoading').innerHTML=`
-      <div class="spin"></div>
-      <div>Fetching ${filteredSyms.length} quotes via Stooq…</div>
-      <div style="font-size:11px;color:var(--muted)">Server-side fetch — no browser CORS restrictions</div>`;
+    document.getElementById('watchLoading').innerHTML=`<div class="spin"></div><div>Fetching quotes for ${pageSyms.length} stocks on this page…</div><div style="font-size:11px;color:var(--muted)">Fetching directly from browser (bypasses server IP restrictions)</div>`;
 
-    // ── Step 2: server fetches quotes (Stooq → NSE → Yahoo fallback) ──
-    const bulkRes=await browserFetchQuotes(filteredSyms);
-    if(!bulkRes.length){
-      // Quotes fetch failed — but still try to load from server cache/watchlist endpoint
-      document.getElementById('watchLoading').innerHTML=`
-        <div class="spin"></div>
-        <div>Quote fetch failed — trying server cache…</div>`;
+    // Step 3: fetch page quotes first (priority), then rest in background
+    const pageQuotes=await fetchQuotesDirect(pageSyms);
+
+    if(pageQuotes.length>0){
+      document.getElementById('watchLoading').innerHTML=`<div class="spin"></div><div>Got ${pageQuotes.length} quotes — pushing to server for analysis…</div>`;
+      // MUST await this — PHP reads bulk_quotes.json immediately after
+      await fetch(apiUrl('api/proxy/quotes'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pageQuotes)});
+      // Background fetch for remaining symbols (fire-and-forget, no await)
+      if(restSyms.length>0){
+        fetchQuotesDirect(restSyms).then(rest=>{
+          if(rest.length>0) fetch(apiUrl('api/proxy/quotes'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(rest)});
+        });
+      }
     } else {
-      document.getElementById('watchLoading').innerHTML=`
-        <div class="spin"></div>
-        <div>Got ${bulkRes.length} quotes — running technical analysis…</div>`;
-      // Push quotes to PHP proxy cache (for TA)
-      await fetch(apiUrl('api/proxy/quotes'),{
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify(bulkRes)
-      });
+      // All browser sources failed too — try server-side as last resort
+      document.getElementById('watchLoading').innerHTML=`<div class="spin"></div><div>Browser fetch failed — trying server-side sources…</div>`;
+      try{
+        const r=await fetch(apiUrl('api/quotes/bulk'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbols:pageSyms})});
+        if(r.ok){const d=await r.json();if(d.count>0) console.log('Server fallback succeeded:',d.count,'quotes');}
+      }catch(e){console.warn('Server fallback also failed:',e);}
     }
-    const quotes=bulkRes;
 
-    // ── Step 4: request paginated analysis from PHP ───────────────
-    document.getElementById('watchLoading').innerHTML=`
-      <div class="spin"></div><div>Running technical analysis (RSI, MACD, EMA, Supertrend…)</div>`;
+    // Step 4: run TA on server (reads from bulk_quotes.json populated above)
+    document.getElementById('watchLoading').innerHTML=`<div class="spin"></div><div>Running technical analysis (RSI, MACD, EMA, Supertrend…)</div>`;
 
     const url=apiUrl('api/watchlist/page')
       +'?page='+wlPage
@@ -3964,12 +3970,7 @@ async function loadWatchlist(force=false){
     let d;
     try{ d=JSON.parse(text); }
     catch(je){
-      document.getElementById('watchLoading').innerHTML=`<div class="err-box">
-        <strong>API Error (not JSON)</strong><br>
-        URL: <code>${escHtml(url)}</code><br>
-        Status: ${r.status}<br>
-        Response: <code>${escHtml(text.slice(0,200))}</code>
-      </div>`;
+      document.getElementById('watchLoading').innerHTML=`<div class="err-box"><strong>API Error (not JSON)</strong><br>URL: <code>${escHtml(url)}</code><br>Status: ${r.status}<br>Response: <code>${escHtml(text.slice(0,200))}</code></div>`;
       return;
     }
     if(d.error&&!d.stocks?.length){
@@ -3993,76 +3994,51 @@ async function loadWatchlist(force=false){
   }
 }
 
-// ── Quote fetcher: server-side first, then browser-side fallback ──
-async function browserFetchQuotes(symbols){
-  // Step 1: try server-side (Stooq / Yahoo / NSE via PHP)
-  try{
-    const r=await fetch(apiUrl('api/quotes/bulk'),{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({symbols})
-    });
-    if(r.ok){
-      const d=await r.json();
-      if(d.quotes&&d.quotes.length>0) return d.quotes;
-    }
-  }catch(e){
-    console.warn('Server-side quote fetch failed, trying browser fallback:',e);
-  }
-
-  // Step 2: server sources all blocked — fetch directly from browser
-  // Browser is NOT subject to server IP blocks
-  console.warn('Server could not fetch quotes. Using browser-direct Yahoo Finance fallback.');
-  document.getElementById('watchLoading').innerHTML=`
-    <div class="spin"></div>
-    <div>Server sources blocked — fetching quotes directly from browser…</div>
-    <div style="font-size:11px;color:var(--muted)">Using Yahoo Finance via browser (bypasses server IP restrictions)</div>`;
-
-  const allQuotes=[];
+// ── Fetch quotes directly from browser (bypasses server IP blocks) ──
+// Tries: Yahoo Finance direct → Yahoo via allorigins CORS proxy
+async function fetchQuotesDirect(symbols){
   const FIELDS='regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,averageDailyVolume3Month,regularMarketDayHigh,regularMarketDayLow,regularMarketPreviousClose,regularMarketOpen,fiftyTwoWeekHigh,fiftyTwoWeekLow,shortName,longName';
+  const allQuotes=[];
   const CHUNK=20;
-  const chunks=[];
-  for(let i=0;i<symbols.length;i+=CHUNK) chunks.push(symbols.slice(i,i+CHUNK));
-
-  for(const chunk of chunks){
+  for(let i=0;i<symbols.length;i+=CHUNK){
+    const chunk=symbols.slice(i,i+CHUNK);
     const syms=chunk.join(',');
     let fetched=false;
-
-    // Try Yahoo Finance directly (works from browser, blocked on server)
+    // Try Yahoo Finance directly from browser (browser not IP-blocked like server)
     for(const host of ['query1','query2']){
       if(fetched) break;
       try{
-        const url=`https://${host}.finance.yahoo.com/v8/finance/quote?symbols=${encodeURIComponent(syms)}&fields=${FIELDS}&lang=en-US&region=IN`;
-        const r=await fetch(url);
+        const r=await fetch(`https://${host}.finance.yahoo.com/v8/finance/quote?symbols=${encodeURIComponent(syms)}&fields=${FIELDS}&lang=en-US&region=IN`,{headers:{'Accept':'application/json'}});
         if(r.ok){
           const j=await r.json();
           const results=j?.quoteResponse?.result||[];
-          results.forEach(q=>{ if(q.regularMarketPrice>0){ q._source='yahoo_browser'; allQuotes.push(q); } });
-          if(results.length>0){ fetched=true; break; }
+          results.forEach(q=>{if(q.regularMarketPrice>0){q._source='yahoo_browser';allQuotes.push(q);}});
+          if(results.length>0){fetched=true;break;}
         }
       }catch(e){}
     }
-
-    // Try via allorigins CORS proxy if direct Yahoo is also blocked in browser
+    // CORS proxy fallback
     if(!fetched){
       try{
-        const targetUrl=`https://query1.finance.yahoo.com/v8/finance/quote?symbols=${encodeURIComponent(syms)}&fields=${FIELDS}&lang=en-US&region=IN`;
-        const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
+        const target=`https://query1.finance.yahoo.com/v8/finance/quote?symbols=${encodeURIComponent(syms)}&fields=${FIELDS}&lang=en-US&region=IN`;
+        const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(target)}`);
         if(r.ok){
           const j=await r.json();
           const data=JSON.parse(j.contents||'{}');
           const results=data?.quoteResponse?.result||[];
-          results.forEach(q=>{ if(q.regularMarketPrice>0){ q._source='yahoo_allorigins'; allQuotes.push(q); } });
+          results.forEach(q=>{if(q.regularMarketPrice>0){q._source='yahoo_allorigins';allQuotes.push(q);}});
           if(results.length>0) fetched=true;
         }
       }catch(e){}
     }
-
-    // Small delay between chunks to avoid rate-limiting
-    if(chunks.indexOf(chunk)<chunks.length-1) await new Promise(res=>setTimeout(res,200));
+    if(i+CHUNK<symbols.length) await new Promise(res=>setTimeout(res,150));
   }
-
   return allQuotes;
+}
+
+// Legacy alias kept for other callers (EOD report, etc.)
+async function browserFetchQuotes(symbols){
+  return fetchQuotesDirect(symbols);
 }
 
 
