@@ -2873,6 +2873,13 @@ function showTab(name,btn){
   document.getElementById('tab-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
   if(name==='news'&&!newsLoaded) loadNews();
+  if(name==='leaders'){
+    if(!leaderLoaded) loadLeaders();
+    if(!tickTimer){
+      forceTick();
+      tickTimer=setInterval(forceTick, TICK_INTERVAL);
+    }
+  }
 }
 
 // ══ WATCHLIST ════════════════════════════════════════════════
@@ -3818,18 +3825,7 @@ function renderLeaders(d){
   el.innerHTML=html;
 }
 
-// Start auto-tick when leaders tab is active
-const _origShowTab=showTab;
-function showTab(name,btn){
-  _origShowTab(name,btn);
-  if(name==='leaders'){
-    if(!leaderLoaded) loadLeaders();
-    if(!tickTimer){
-      forceTick(); // immediate first tick
-      tickTimer=setInterval(forceTick, TICK_INTERVAL);
-    }
-  }
-}
+// Start auto-tick when leaders tab is active — handled inside showTab above
 
 // ── Intraday Chart ────────────────────────────────────────────
 let priceChartInst = null, volChartInst = null;
