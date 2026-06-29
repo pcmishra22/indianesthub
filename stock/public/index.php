@@ -251,6 +251,77 @@ if ($uri === '/api/analyze' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+// ── Browser-proxy: accept quote data fetched by the client browser ──
+// Browser fetches from Yahoo/NSE (no server-IP block), POSTs JSON here.
+// PHP stores it in the bulk cache so all analysis functions can use it.
+if ($uri === '/api/proxy/quotes' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    $body   = file_get_contents('php://input');
+    $quotes = json_decode($body, true);
+    if (!is_array($quotes) || empty($quotes)) {
+        echo json_encode(['ok' => false, 'error' => 'No quote data received']);
+        exit;
+    }
+    // Normalise: key by symbol
+    $map = [];
+    foreach ($quotes as $q) {
+        $sym = $q['symbol'] ?? null;
+        if ($sym) $map[$sym] = $q;
+    }
+    if (!is_dir(STORAGE)) mkdir(STORAGE, 0755, true);
+    file_put_contents(STORAGE . '/bulk_quotes.json', json_encode($map));
+    echo json_encode(['ok' => true, 'stored' => count($map)]);
+    exit;
+}
+
+// ── Browser-proxy: accept historical OHLCV data for one symbol ──
+if ($uri === '/api/proxy/history' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    $body = file_get_contents('php://input');
+    $data = json_decode($body, true);
+    $sym  = strtoupper(trim($data['symbol'] ?? ''));
+    $rows = $data['rows'] ?? [];
+    if (!$sym || empty($rows)) {
+        echo json_encode(['ok' => false, 'error' => 'Missing symbol or rows']);
+        exit;
+    }
+    if (!is_dir(STORAGE)) mkdir(STORAGE, 0755, true);
+    $cacheFile = STORAGE . '/hist_' . preg_replace('/[^A-Z0-9]/', '_', $sym) . '.json';
+    file_put_contents($cacheFile, json_encode($rows));
+    echo json_encode(['ok' => true, 'symbol' => $sym, 'bars' => count($rows)]);
+    exit;
+}
+
+// ── Browser-proxy: analyze after browser pushes history ─────────
+if ($uri === '/api/proxy/analyze' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    $body = file_get_contents('php://input');
+    $data = json_decode($body, true);
+    $sym  = strtoupper(trim($data['symbol'] ?? ''));
+    $rows = $data['rows'] ?? [];   // OHLCV array from browser
+    $quote= $data['quote'] ?? [];  // quote snapshot from browser
+
+    if (!$sym) { echo json_encode(['error' => 'No symbol']); exit; }
+
+    // Store history so apiAnalyze can read it
+    if (!empty($rows)) {
+        if (!is_dir(STORAGE)) mkdir(STORAGE, 0755, true);
+        $cacheFile = STORAGE . '/hist_' . preg_replace('/[^A-Z0-9]/', '_', $sym . '.NS') . '.json';
+        file_put_contents($cacheFile, json_encode($rows));
+    }
+    // Store quote so yahooQuote() can read it from bulk cache
+    if (!empty($quote)) {
+        $bulkCache = STORAGE . '/bulk_quotes.json';
+        $all = file_exists($bulkCache) ? json_decode(file_get_contents($bulkCache), true) : [];
+        $all[$sym . '.NS'] = $quote;
+        file_put_contents($bulkCache, json_encode($all));
+    }
+
+    try { echo json_encode(apiAnalyze($sym)); }
+    catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
+    exit;
+}
+
 if ($uri === '/api/news') {
     header('Content-Type: application/json');
     try { echo json_encode(apiNews()); } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
@@ -3424,12 +3495,52 @@ async function loadWatchlist(force=false){
   document.getElementById('watchLoading').style.display='flex';
   document.getElementById('watchLoading').innerHTML=`
     <div class="spin"></div>
-    <div>Fetching 200+ NSE stocks from Yahoo Finance…</div>
-    <div style="font-size:11px;color:var(--muted)">Parallel bulk fetch → page ${wlPage} analysis (first load ~20s, then cached)</div>`;
+    <div>Fetching stock quotes from Yahoo Finance…</div>
+    <div style="font-size:11px;color:var(--muted)">Browser fetching data directly (bypasses server IP blocks)</div>`;
   document.getElementById('watchTable').style.display='none';
   const rb=document.getElementById('refreshBtn');
   if(rb){rb.disabled=true;rb.textContent='⏳ Loading…';}
   try{
+    // ── Step 1: get active watchlist symbols from server ──────────
+    const wlRes=await fetch(apiUrl('api/watchlist/list'));
+    const wlData=await wlRes.json();
+    let symbols=wlData.watchlist||[];
+    if(!symbols.length) symbols=['RELIANCE.NS','TCS.NS','HDFCBANK.NS','INFY.NS','ICICIBANK.NS'];
+
+    // Apply sector/search filter client-side before fetching
+    let filteredSyms=symbols;
+    if(wlSector){
+      const sr=await fetch(apiUrl('api/sectors'));
+      const sd=await sr.json();
+      // sector filter via server still works
+    }
+
+    document.getElementById('watchLoading').innerHTML=`
+      <div class="spin"></div>
+      <div>Fetching ${filteredSyms.length} quotes from Yahoo Finance…</div>
+      <div style="font-size:11px;color:var(--muted)">Your browser is fetching directly — no server IP restrictions</div>`;
+
+    // ── Step 2: browser fetches quotes from Yahoo Finance ─────────
+    const quotes=await browserFetchQuotes(filteredSyms);
+    if(!quotes.length){
+      document.getElementById('watchLoading').innerHTML=`<div class="err-box">⚠️ Could not fetch quotes from Yahoo Finance. Please check your internet connection or try again.<br><small>Note: This fetch runs in your browser, not the server.</small></div>`;
+      wlLoading=false; if(rb){rb.disabled=false;rb.textContent='🔄 Refresh';} return;
+    }
+
+    document.getElementById('watchLoading').innerHTML=`
+      <div class="spin"></div>
+      <div>Got ${quotes.length} quotes — sending to server for analysis…</div>`;
+
+    // ── Step 3: push quotes to PHP so it can run TA ───────────────
+    await fetch(apiUrl('api/proxy/quotes'),{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(quotes)
+    });
+
+    // ── Step 4: request paginated analysis from PHP ───────────────
+    document.getElementById('watchLoading').innerHTML=`
+      <div class="spin"></div><div>Running technical analysis (RSI, MACD, EMA, Supertrend…)</div>`;
+
     const url=apiUrl('api/watchlist/page')
       +'?page='+wlPage
       +(wlSector?'&sector='+encodeURIComponent(wlSector):'')
@@ -3443,7 +3554,7 @@ async function loadWatchlist(force=false){
         <strong>API Error (not JSON)</strong><br>
         URL: <code>${escHtml(url)}</code><br>
         Status: ${r.status}<br>
-        Response starts with: <code>${escHtml(text.slice(0,200))}</code>
+        Response: <code>${escHtml(text.slice(0,200))}</code>
       </div>`;
       return;
     }
@@ -3461,11 +3572,129 @@ async function loadWatchlist(force=false){
     renderPagination(d);
     startCountdown();
   }catch(e){
-    document.getElementById('watchLoading').innerHTML=`<div class="err-box">Network error: ${escHtml(e.message)}<br><br>Make sure your server can reach query2.finance.yahoo.com</div>`;
+    document.getElementById('watchLoading').innerHTML=`<div class="err-box">Error: ${escHtml(e.message)}</div>`;
   }finally{
     wlLoading=false;
     if(rb){rb.disabled=false;rb.textContent='🔄 Refresh';}
   }
+}
+
+// ── Browser-side quote fetcher with CORS-friendly sources ────────
+async function browserFetchQuotes(symbols){
+  const all=[];
+  // Fetch one by one using a public CORS proxy approach
+  // Use allorigins.win as CORS proxy to reach Yahoo Finance
+  for(let i=0;i<symbols.length;i+=10){
+    const chunk=symbols.slice(i,i+10);
+    const syms=chunk.map(encodeURIComponent).join(',');
+    const fields='regularMarketPrice,regularMarketChange,regularMarketChangePercent,'
+      +'regularMarketVolume,averageDailyVolume3Month,fiftyTwoWeekHigh,fiftyTwoWeekLow,'
+      +'shortName,longName,regularMarketDayHigh,regularMarketDayLow,'
+      +'regularMarketPreviousClose,regularMarketOpen';
+
+    // Try direct Yahoo first (works if browser allows CORS)
+    let fetched=false;
+    for(const host of ['query1','query2']){
+      try{
+        const r=await fetch(`https://${host}.finance.yahoo.com/v8/finance/quote?symbols=${syms}&fields=${fields}&lang=en-US&region=IN`,
+          {headers:{'Accept':'application/json'},mode:'cors'});
+        if(r.ok){
+          const j=await r.json();
+          const results=j?.quoteResponse?.result||[];
+          if(results.length){all.push(...results);fetched=true;break;}
+        }
+      }catch(e){}
+    }
+
+    // Fallback: use allorigins CORS proxy
+    if(!fetched){
+      try{
+        const targetUrl=encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/quote?symbols=${syms}&fields=${fields}&lang=en-US&region=IN`);
+        const r=await fetch(`https://api.allorigins.win/get?url=${targetUrl}`);
+        if(r.ok){
+          const j=await r.json();
+          const data=JSON.parse(j.contents||'{}');
+          const results=data?.quoteResponse?.result||[];
+          if(results.length){all.push(...results);fetched=true;}
+        }
+      }catch(e){}
+    }
+
+    // Fallback 2: corsproxy.io
+    if(!fetched){
+      try{
+        const targetUrl=`https://query1.finance.yahoo.com/v8/finance/quote?symbols=${syms}&fields=${fields}&lang=en-US&region=IN`;
+        const r=await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
+        if(r.ok){
+          const j=await r.json();
+          const results=j?.quoteResponse?.result||[];
+          if(results.length){all.push(...results);fetched=true;}
+        }
+      }catch(e){}
+    }
+
+    if(i+10<symbols.length) await new Promise(r=>setTimeout(r,200));
+  }
+  return all;
+}
+
+// ── Browser-side history fetcher ──────────────────────────────────
+async function browserFetchHistory(yahooSym){
+  const p2=Math.floor(Date.now()/1000);
+  const p1=p2-(90*86400);
+  const url=`https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?period1=${p1}&period2=${p2}&interval=1d`;
+
+  // Try direct
+  for(const host of ['query1','query2']){
+    try{
+      const r=await fetch(`https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?period1=${p1}&period2=${p2}&interval=1d`);
+      if(r.ok){
+        const j=await r.json();
+        const rows=parseYahooChart(j);
+        if(rows.length) return rows;
+      }
+    }catch(e){}
+  }
+
+  // Try via allorigins proxy
+  try{
+    const targetUrl=encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?period1=${p1}&period2=${p2}&interval=1d`);
+    const r=await fetch(`https://api.allorigins.win/get?url=${targetUrl}`);
+    if(r.ok){
+      const j=await r.json();
+      const data=JSON.parse(j.contents||'{}');
+      const rows=parseYahooChart(data);
+      if(rows.length) return rows;
+    }
+  }catch(e){}
+
+  // Try via corsproxy.io
+  try{
+    const targetUrl=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?period1=${p1}&period2=${p2}&interval=1d`;
+    const r=await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
+    if(r.ok){
+      const j=await r.json();
+      const rows=parseYahooChart(j);
+      if(rows.length) return rows;
+    }
+  }catch(e){}
+
+  return [];
+}
+
+function parseYahooChart(j){
+  const chart=j?.chart?.result?.[0];
+  if(!chart) return [];
+  const ts=chart.timestamp||[];
+  const ohlcv=chart.indicators?.quote?.[0]||{};
+  return ts.map((t,i)=>({
+    date:new Date(t*1000).toISOString().slice(0,10),
+    open:+(ohlcv.open?.[i]||0).toFixed(2),
+    high:+(ohlcv.high?.[i]||0).toFixed(2),
+    low:+(ohlcv.low?.[i]||0).toFixed(2),
+    close:+(ohlcv.close?.[i]||0).toFixed(2),
+    volume:ohlcv.volume?.[i]||0
+  })).filter(r=>r.close>0);
 }
 
 function goPage(p){wlPage=p;loadWatchlist();}
@@ -3695,14 +3924,46 @@ async function runAnalyze(){
 
   const el=document.getElementById('analyzeResult');
   el.innerHTML=`<div class="loading-card"><div class="spin"></div>
-    <div>Analyzing <strong>${escHtml(sym)}</strong> via Yahoo Finance…</div>
-    <div style="font-size:11px;color:var(--muted)">Fetching 90 days of data + calculating all indicators (5–10s)</div>
+    <div>Fetching <strong>${escHtml(sym)}</strong> data from Yahoo Finance…</div>
+    <div style="font-size:11px;color:var(--muted)">Browser fetching directly (bypasses server IP blocks)</div>
   </div>`;
 
   try{
-    const fd=new FormData();
-    fd.append('symbol',sym);
-    const r=await fetch(apiUrl('api/analyze'),{method:'POST',body:fd});
+    const yahooSym=sym.endsWith('.NS')?sym:sym+'.NS';
+
+    // ── Step 1: browser fetches quote ──────────────────────────
+    let quote=null;
+    const fields='regularMarketPrice,regularMarketChange,regularMarketChangePercent,'
+      +'regularMarketVolume,averageDailyVolume3Month,fiftyTwoWeekHigh,fiftyTwoWeekLow,'
+      +'trailingPE,priceToBook,marketCap,shortName,longName,sector,industry,'
+      +'returnOnEquity,debtToEquity,regularMarketDayHigh,regularMarketDayLow,'
+      +'regularMarketPreviousClose,regularMarketOpen';
+    for(const host of ['query1','query2']){
+      try{
+        const r=await fetch(`https://${host}.finance.yahoo.com/v8/finance/quote?symbols=${encodeURIComponent(yahooSym)}&fields=${fields}&lang=en-US&region=IN`);
+        if(r.ok){const j=await r.json();quote=j?.quoteResponse?.result?.[0]||null;if(quote)break;}
+      }catch(e){}
+    }
+    if(!quote){
+      el.innerHTML=`<div class="err-box"><strong>Analysis failed</strong><br>Could not fetch quote for <strong>${escHtml(sym)}</strong> from Yahoo Finance.<br><small>Check that the symbol is correct (e.g. TCS, RELIANCE, INFY) and your internet connection.</small></div>`;
+      return;
+    }
+
+    el.innerHTML=`<div class="loading-card"><div class="spin"></div>
+      <div>Fetching 90-day price history for <strong>${escHtml(sym)}</strong>…</div></div>`;
+
+    // ── Step 2: browser fetches historical OHLCV ───────────────
+    const rows=await browserFetchHistory(yahooSym);
+
+    el.innerHTML=`<div class="loading-card"><div class="spin"></div>
+      <div>Running technical analysis (RSI, MACD, EMA, Supertrend…)</div></div>`;
+
+    // ── Step 3: push to PHP for TA, get full analysis back ─────
+    const r=await fetch(apiUrl('api/proxy/analyze'),{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({symbol:sym,quote:quote,rows:rows})
+    });
     const d=await r.json();
     if(d.error){
       el.innerHTML=`<div class="err-box"><strong>Analysis failed:</strong><br>${escHtml(d.error)}</div>`;
@@ -3710,7 +3971,6 @@ async function runAnalyze(){
     }
     renderAnalysis(el,d);
     addHistory(sym);
-    // Auto-load 5-min intraday chart
     setTimeout(()=>loadChart(d.symbol||sym,'5m'), 100);
   }catch(e){
     el.innerHTML=`<div class="err-box">Error: ${escHtml(e.message)}</div>`;
@@ -4125,21 +4385,59 @@ async function loadChart(sym, interval='5m'){
   if(cl) cl.style.display='flex';
   cv.style.display='none';
   try{
-    const r=await fetch(apiUrl(`api/intraday?symbol=${encodeURIComponent(sym)}&interval=${interval}`));
-    const d=await r.json();
-    if(d.error||!d.candles||!d.candles.length){
-      if(cl){cl.innerHTML='<span style="color:var(--muted)">No intraday data available</span>';cl.style.display='flex';}
+    const yahooSym=sym.endsWith('.NS')?sym:sym+'.NS';
+    // Map interval to Yahoo Finance params
+    const intervalMap={'5m':'5m','15m':'15m','1h':'60m'};
+    const yInterval=intervalMap[interval]||'5m';
+    const range=interval==='1h'?'5d':'1d';
+
+    // Browser fetches intraday from Yahoo Finance directly (with proxy fallbacks)
+    let candles=[];
+    const chartUrl=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?interval=${yInterval}&range=${range}`;
+
+    // Try direct
+    for(const host of ['query1','query2']){
+      try{
+        const r=await fetch(`https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSym)}?interval=${yInterval}&range=${range}`);
+        if(r.ok){
+          const j=await r.json();
+          const chart=j?.chart?.result?.[0];
+          if(chart){
+            const ts=chart.timestamp||[];
+            const ohlcv=chart.indicators?.quote?.[0]||{};
+            candles=ts.map((t,i)=>({t,o:+(ohlcv.open?.[i]||0).toFixed(2),h:+(ohlcv.high?.[i]||0).toFixed(2),l:+(ohlcv.low?.[i]||0).toFixed(2),c:+(ohlcv.close?.[i]||0).toFixed(2),v:ohlcv.volume?.[i]||0})).filter(c=>c.c>0);
+            if(candles.length)break;
+          }
+        }
+      }catch(e){}
+    }
+
+    // Proxy fallback
+    if(!candles.length){
+      try{
+        const r=await fetch(`https://corsproxy.io/?${encodeURIComponent(chartUrl)}`);
+        if(r.ok){
+          const j=await r.json();
+          const chart=j?.chart?.result?.[0];
+          if(chart){
+            const ts=chart.timestamp||[];
+            const ohlcv=chart.indicators?.quote?.[0]||{};
+            candles=ts.map((t,i)=>({t,o:+(ohlcv.open?.[i]||0).toFixed(2),h:+(ohlcv.high?.[i]||0).toFixed(2),l:+(ohlcv.low?.[i]||0).toFixed(2),c:+(ohlcv.close?.[i]||0).toFixed(2),v:ohlcv.volume?.[i]||0})).filter(c=>c.c>0);
+          }
+        }
+      }catch(e){}
+    }
+
+    if(!candles.length){
+      if(cl){cl.innerHTML='<span style="color:var(--muted)">No intraday data available from Yahoo Finance</span>';cl.style.display='flex';}
       return;
     }
     cv.style.display='block';
     if(cl) cl.style.display='none';
-    // Destroy previous chart
     if(chartInstance){ chartInstance.destroy(); chartInstance=null; }
-    const labels=d.candles.map(c=>{const dt=new Date(c.t*1000);return dt.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kolkata'});});
-    const closes=d.candles.map(c=>c.c);
-    const opens=d.candles.map(c=>c.o);
+    const labels=candles.map(c=>{const dt=new Date(c.t*1000);return dt.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',timeZone:'Asia/Kolkata'});});
+    const closes=candles.map(c=>c.c);
     const first=closes[0]||0;
-    const colors=closes.map(c=>c>=first?'rgba(16,185,129,0.7)':'rgba(239,68,68,0.7)');
     const ctx=cv.getContext('2d');
     chartInstance=new Chart(ctx,{
       type:'line',
@@ -4161,11 +4459,7 @@ async function loadChart(sym, interval='5m'){
         maintainAspectRatio:false,
         plugins:{
           legend:{display:false},
-          tooltip:{
-            callbacks:{
-              label:ctx=>`₹${ctx.parsed.y.toFixed(2)}`
-            }
-          }
+          tooltip:{callbacks:{label:ctx=>`₹${ctx.parsed.y.toFixed(2)}`}}
         },
         scales:{
           x:{ticks:{color:'#6b7280',maxRotation:0,font:{size:9},maxTicksLimit:8},grid:{color:'rgba(255,255,255,0.04)'}},
@@ -4590,6 +4884,7 @@ async function loadEodReport(date){
   document.getElementById('eodSummary').style.display='none';
 
   try{
+    // Step 1: get saved signals from PHP (no external fetch needed)
     const url=apiUrl('api/eod/report')+(date?'?date='+encodeURIComponent(date):'');
     const r=await fetch(url);
     const d=await r.json();
@@ -4599,6 +4894,48 @@ async function loadEodReport(date){
       document.getElementById('eodEmpty').style.display='block';
       return;
     }
+
+    // Step 2: browser fetches current prices for all signal symbols
+    const syms=d.signals.map(s=>(s.symbol.endsWith('.NS')?s.symbol:s.symbol+'.NS'));
+    if(syms.length){
+      try{
+        const quotes=await browserFetchQuotes(syms);
+        // Inject current prices into signals
+        const priceMap={};
+        quotes.forEach(q=>{ priceMap[q.symbol.replace('.NS','')]={price:q.regularMarketPrice||0,prev:q.regularMarketPreviousClose||0}; });
+        d.signals.forEach(sig=>{
+          const key=sig.symbol.replace('.NS','');
+          if(priceMap[key]){
+            sig.current_price=priceMap[key].price;
+            sig.price_change_pct=sig.entry_price>0?+((( priceMap[key].price-sig.entry_price)/sig.entry_price)*100).toFixed(2):0;
+            // Update status based on live price
+            const live=priceMap[key].price;
+            const isBuy=(sig.signal||'').toLowerCase()==='buy';
+            if(live>0){
+              if(isBuy){
+                if(live>=sig.target_price) sig.status='target_hit';
+                else if(sig.stoploss>0&&live<=sig.stoploss) sig.status='sl_hit';
+                else sig.status='open';
+              }else{
+                if(live<=sig.target_price) sig.status='target_hit';
+                else if(sig.stoploss>0&&live>=sig.stoploss) sig.status='sl_hit';
+                else sig.status='open';
+              }
+            }
+          }
+        });
+        // Recalculate summary
+        let hits=0,misses=0,pending=0;
+        d.signals.forEach(s=>{
+          if(s.status==='target_hit')hits++;
+          else if(s.status==='sl_hit')misses++;
+          else pending++;
+        });
+        const resolved=hits+misses;
+        d.summary={...d.summary,hits,misses,pending,hit_pct:resolved>0?Math.round(hits/resolved*100):null};
+      }catch(e){}
+    }
+
     renderEodReport(d);
   }catch(e){
     document.getElementById('eodLoading').innerHTML='<div class="err-box" style="margin:16px">'+escHtml(e.message)+'</div>';
