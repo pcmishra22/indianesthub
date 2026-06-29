@@ -662,6 +662,10 @@ use App\Http\Controllers\Frontend\BuilderController;
 
 Route::get('/builders',              [BuilderController::class, 'index'])->name('builders.index');
 Route::get('/builders/{builder}',    [BuilderController::class, 'show'])->name('builders.show');
+Route::get('/projects/id/{id}', function ($id) {
+    $project = \App\Models\BuilderProject::findOrFail($id);
+    return redirect()->route('projects.show', $project->slug, 301);
+})->name('projects.show.by-id');
 Route::get('/projects/{project}',    [BuilderController::class, 'projectDetail'])->name('projects.show');
 Route::post('/projects/{project}/lead', [BuilderController::class, 'submitLead'])->name('projects.lead');
 Route::post('/builders/{builder}/inquiry', [BuilderController::class, 'submitBuilderInquiry'])->name('builders.inquiry');

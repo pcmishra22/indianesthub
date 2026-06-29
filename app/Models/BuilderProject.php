@@ -3,19 +3,19 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class BuilderProject extends Model
 {
     protected $table = 'builder_projects';
 
     protected $fillable = [
-        'builder_id', 'title', 'description', 'project_type', 'status',
+        'builder_id', 'title', 'slug', 'description', 'project_type', 'status',
         'address', 'city', 'state',
         'total_units', 'available_units', 'total_towers', 'floors_per_tower',
         'price_from', 'price_to', 'possession_date',
         'cover_image', 'gallery_images', 'master_plan', 'brochure', 'video_url', 'virtual_tour_url',
         'amenities', 'rera_id', 'is_featured',
-        // Phase 2 - location intelligence
         'latitude', 'longitude',
         'nearby_schools', 'nearby_hospitals', 'metro_distance', 'connectivity_score', 'future_infra',
         'views_count', 'leads_count',
@@ -33,6 +33,55 @@ class BuilderProject extends Model
         'leads_count'     => 'integer',
     ];
 
+    // -------------------------------------------------------
+    // Use slug as route key → /projects/emerald-bay-phase-2
+    // -------------------------------------------------------
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
+
+    // -------------------------------------------------------
+    // Auto-generate slug on create / update
+    // -------------------------------------------------------
+    protected static function booted(): void
+    {
+        static::creating(function (BuilderProject $project) {
+            if (empty($project->slug)) {
+                $project->slug = static::generateUniqueSlug($project);
+            }
+        });
+
+        static::updating(function (BuilderProject $project) {
+            if (empty($project->slug)) {
+                $project->slug = static::generateUniqueSlug($project);
+            }
+        });
+    }
+
+    public static function generateUniqueSlug(BuilderProject $project): string
+    {
+        $base     = $project->city
+            ? $project->title . '-' . $project->city
+            : $project->title;
+        $slug     = Str::slug($base);
+        $original = $slug;
+        $count    = 2;
+
+        while (
+            static::where('slug', $slug)
+                  ->where('id', '!=', $project->id ?? 0)
+                  ->exists()
+        ) {
+            $slug = $original . '-' . $count++;
+        }
+
+        return $slug;
+    }
+
+    // -------------------------------------------------------
+    // Relationships
+    // -------------------------------------------------------
     public function builder()
     {
         return $this->belongsTo(Builder::class);
@@ -53,6 +102,9 @@ class BuilderProject extends Model
         return $this->hasMany(BuilderLead::class);
     }
 
+    // -------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------
     public function getStatusBadgeClassAttribute(): string
     {
         return match ($this->status) {
