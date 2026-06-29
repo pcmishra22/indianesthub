@@ -11,7 +11,7 @@ class InquiryController extends Controller
 {
     public function index(Request $request)
     {
-        $type = $request->get('type', 'all'); // all | property | builder
+        $type = $request->get('type', 'all');
 
         // ── Property Inquiries ─────────────────────────────────────────
         $propertyInquiries = collect();
@@ -21,20 +21,20 @@ class InquiryController extends Controller
                 ->get()
                 ->map(function ($inq) {
                     return [
-                        'id'         => $inq->id,
-                        'type'       => 'property',
-                        'name'       => $inq->name,
-                        'email'      => $inq->email,
-                        'phone'      => $inq->phone,
-                        'message'    => $inq->message,
-                        'status'     => $inq->status ? 'active' : 'inactive',
-                        'subject'    => $inq->property ? $inq->property->title : '—',
-                        'subject_url'=> $inq->property
+                        'id'          => $inq->id,
+                        'type'        => 'property',
+                        'name'        => $inq->name,
+                        'email'       => $inq->email ?? '—',
+                        'phone'       => $inq->phone ?? '—',
+                        'message'     => $inq->message,
+                        'status'      => $inq->status ? 'active' : 'new',
+                        'subject'     => optional($inq->property)->title ?? '—',
+                        'subject_url' => ($inq->property && $inq->property->slug)
                                             ? route('property-details', $inq->property->slug)
                                             : null,
-                        'source'     => $inq->source ?? 'website',
-                        'created_at' => $inq->created_at,
-                        'detail_url' => route('admin.inquiries.show', $inq->id),
+                        'source'      => $inq->source ?? 'website',
+                        'created_at'  => $inq->created_at,
+                        'detail_url'  => null, // no admin show page for property inquiries
                     ];
                 });
         }
@@ -46,35 +46,35 @@ class InquiryController extends Controller
                 ->latest()
                 ->get()
                 ->map(function ($lead) {
-                    $subject = $lead->project
-                        ? $lead->project->title
-                        : ($lead->builder ? $lead->builder->company_name : '—');
+                    $subject = optional($lead->project)->title
+                        ?? optional($lead->builder)->company_name
+                        ?? '—';
 
                     return [
-                        'id'         => $lead->id,
-                        'type'       => 'builder',
-                        'name'       => $lead->name,
-                        'email'      => $lead->email,
-                        'phone'      => $lead->phone,
-                        'message'    => $lead->message,
-                        'status'     => $lead->status,
-                        'subject'    => $subject,
-                        'subject_url'=> $lead->project && $lead->project->slug
+                        'id'          => $lead->id,
+                        'type'        => 'builder',
+                        'name'        => $lead->name,
+                        'email'       => $lead->email ?? '—',
+                        'phone'       => $lead->phone ?? '—',
+                        'message'     => $lead->message,
+                        'status'      => $lead->status,
+                        'subject'     => $subject,
+                        'subject_url' => ($lead->project && $lead->project->slug)
                                             ? route('projects.show', $lead->project->slug)
                                             : null,
-                        'source'     => $lead->source ?? 'website',
-                        'created_at' => $lead->created_at,
-                        'detail_url' => route('admin.builder-leads.show', $lead->id),
+                        'source'      => $lead->source ?? 'website',
+                        'created_at'  => $lead->created_at,
+                        'detail_url'  => route('admin.builder-leads.show', $lead->id),
                     ];
                 });
         }
 
         // ── Merge & sort by latest ─────────────────────────────────────
-        $inquiries = $propertyInquiries->concat($builderLeads)
+        $inquiries = $propertyInquiries
+            ->concat($builderLeads)
             ->sortByDesc('created_at')
             ->values();
 
-        // Counts for tab badges
         $counts = [
             'all'      => Inquiry::count() + BuilderLead::count(),
             'property' => Inquiry::count(),

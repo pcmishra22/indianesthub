@@ -57,15 +57,15 @@
               @endif
             </td>
             <td class="fw-semibold">{{ $inq['name'] }}</td>
-            <td>{{ $inq['phone'] ?? '—' }}</td>
-            <td>{{ $inq['email'] ?? '—' }}</td>
+            <td>{{ $inq['phone'] }}</td>
+            <td>{{ $inq['email'] }}</td>
             <td>
               @if($inq['subject_url'])
                 <a href="{{ $inq['subject_url'] }}" target="_blank" class="text-decoration-none small">
                   {{ Str::limit($inq['subject'], 40) }}
                 </a>
               @else
-                <span class="small text-muted">{{ $inq['subject'] }}</span>
+                <span class="small text-muted">{{ Str::limit($inq['subject'], 40) }}</span>
               @endif
             </td>
             <td>
@@ -83,9 +83,15 @@
             </td>
             <td class="small text-muted">{{ $inq['source'] }}</td>
             <td class="small" style="max-width:160px;">{{ Str::limit($inq['message'], 60) }}</td>
-            <td class="small text-muted text-nowrap">{{ \Carbon\Carbon::parse($inq['created_at'])->format('d M Y, h:i A') }}</td>
+            <td class="small text-muted text-nowrap">
+              {{ $inq['created_at'] ? \Carbon\Carbon::parse($inq['created_at'])->format('d M Y, h:i A') : '—' }}
+            </td>
             <td>
-              <a href="{{ $inq['detail_url'] }}" class="btn btn-sm btn-outline-primary">View</a>
+              @if($inq['detail_url'])
+                <a href="{{ $inq['detail_url'] }}" class="btn btn-sm btn-outline-primary">View</a>
+              @else
+                <span class="text-muted small">—</span>
+              @endif
             </td>
           </tr>
         @empty
