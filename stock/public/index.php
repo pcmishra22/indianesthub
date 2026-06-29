@@ -253,6 +253,22 @@ if ($uri === '/api/debug/quicktest') {
     ];
 
     // ══════════════════════════════════════════════════════
+    // CHECKPOINT 2b: Yahoo Finance v7 (mobile UA fallback)
+    // ══════════════════════════════════════════════════════
+    $t0 = microtime(true);
+    $yv7 = yahooV7BulkFetch(['RELIANCE.NS', 'TCS.NS']);
+    $out['checkpoints']['CP2b_yahoo_v7'] = [
+        'label'      => 'Yahoo Finance v7 bulk (mobile User-Agent)',
+        'ok'         => count($yv7) > 0,
+        'count'      => count($yv7),
+        'symbols'    => array_keys($yv7),
+        'sample_price' => $yv7['RELIANCE.NS']['regularMarketPrice'] ?? null,
+        'ms'         => round((microtime(true) - $t0) * 1000),
+        'diagnosis'  => count($yv7) > 0 ? 'PASS: Yahoo v7 works — will be used as fallback'
+            : 'FAIL: Yahoo v7 also blocked on this server',
+    ];
+
+    // ══════════════════════════════════════════════════════
     // CHECKPOINT 3: NSE India API connectivity
     // ══════════════════════════════════════════════════════
     $t0 = microtime(true);
@@ -307,8 +323,11 @@ if ($uri === '/api/debug/quicktest') {
     // ══════════════════════════════════════════════════════
     $t0 = microtime(true);
     $testSyms = ['RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS'];
-    // Re-run exactly what the endpoint does
+    // Re-run exactly what the endpoint does (Stooq → Yahoo v7 → Yahoo v8 → NSE)
     $ep4_quotes = stooqBulkFetch($testSyms);
+    if (empty($ep4_quotes)) {
+        $ep4_quotes = yahooV7BulkFetch($testSyms);
+    }
     if (empty($ep4_quotes)) {
         foreach (array_slice($testSyms, 0, 3) as $s4) {
             $nq = nseQuoteFallback($s4);
@@ -768,33 +787,14 @@ if ($uri === '/api/quotes/bulk' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $symbols = array_filter($symbols, fn($s) => preg_match('/^[A-Z0-9\.\-&]+$/', $s));
     $symbols = array_values($symbols);
 
-    $sources_tried = [];
-    $quotes = [];
+    // Use yahooQuoteBulk which tries: Stooq → Yahoo v7 → Yahoo v8 → NSE
+    // Results are cached in bulk_quotes.json for 5 min
+    // Force fresh fetch by deleting cache first
+    $bulkCacheFile = STORAGE . '/bulk_quotes.json';
+    if (file_exists($bulkCacheFile)) unlink($bulkCacheFile); // always fresh on explicit bulk call
 
-    // ── Priority 1: Stooq parallel (fast, no auth) ───────────────
-    $sources_tried[] = 'stooq';
-    $quotes = stooqBulkFetch($symbols);
-
-    // ── Priority 2: NSE India (one by one, reliable from IN servers) ─
-    if (empty($quotes)) {
-        $sources_tried[] = 'nse';
-        foreach (array_slice($symbols, 0, 10) as $sym) { // limit to 10 for speed
-            $nse = nseQuoteFallback($sym);
-            if ($nse && ($nse['regularMarketPrice'] ?? 0) > 0) {
-                $quotes[$sym] = $nse;
-            }
-            usleep(150000);
-        }
-    }
-
-    // ── Priority 3: yahooQuoteBulk full fallback chain ────────────
-    if (empty($quotes)) {
-        $sources_tried[] = 'yahoo_bulk';
-        $all = yahooQuoteBulk($symbols);
-        foreach ($all as $sym => $q) {
-            if (($q['regularMarketPrice'] ?? 0) > 0) $quotes[$sym] = $q;
-        }
-    }
+    $quotes = yahooQuoteBulk($symbols);
+    $sources_tried = ['stooq_ns', 'yahoo_v7', 'yahoo_v8', 'nse'];
 
     // Save to bulk_quotes.json so server-side TA can read it
     if (!empty($quotes)) {
@@ -1049,6 +1049,140 @@ function stooqBulkFetch(array $symbols): array
     return $all;
 }
 
+
+/**
+ * Fetch quote from Yahoo Finance v7 (different endpoint, sometimes less blocked).
+ */
+function yahooV7Quote(string $symbol): ?array
+{
+    $url = 'https://query1.finance.yahoo.com/v7/finance/quote?symbols=' . urlencode($symbol)
+         . '&fields=regularMarketPrice,regularMarketChange,regularMarketChangePercent,'
+         . 'regularMarketVolume,regularMarketDayHigh,regularMarketDayLow,'
+         . 'regularMarketPreviousClose,regularMarketOpen,fiftyTwoWeekHigh,fiftyTwoWeekLow,shortName';
+
+    foreach (['query1', 'query2'] as $host) {
+        $tryUrl = str_replace('query1', $host, $url);
+        $ch = curl_init($tryUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => 10, CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_SSL_VERIFYPEER => false, CURLOPT_ENCODING => 'gzip',
+            CURLOPT_HTTPHEADER => [
+                'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
+                'Accept: application/json',
+                'Referer: https://finance.yahoo.com/',
+            ],
+        ]);
+        $raw  = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($raw && $code === 200) {
+            $d = json_decode($raw, true);
+            $r = $d['quoteResponse']['result'][0] ?? null;
+            if ($r && ($r['regularMarketPrice'] ?? 0) > 0) return $r;
+        }
+    }
+    return null;
+}
+
+/**
+ * Bulk fetch via Yahoo Finance v7 for multiple symbols at once.
+ */
+function yahooV7BulkFetch(array $symbols): array
+{
+    $all    = [];
+    $fields = 'regularMarketPrice,regularMarketChange,regularMarketChangePercent,'
+            . 'regularMarketVolume,averageDailyVolume3Month,regularMarketDayHigh,regularMarketDayLow,'
+            . 'regularMarketPreviousClose,regularMarketOpen,fiftyTwoWeekHigh,fiftyTwoWeekLow,'
+            . 'shortName,longName';
+
+    foreach (array_chunk($symbols, 20) as $chunk) {
+        $syms = implode(',', array_map('urlencode', $chunk));
+        foreach (['query1', 'query2'] as $host) {
+            $url = "https://{$host}.finance.yahoo.com/v7/finance/quote?symbols={$syms}&fields={$fields}";
+            $ch  = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_TIMEOUT => 15, CURLOPT_CONNECTTIMEOUT => 6,
+                CURLOPT_SSL_VERIFYPEER => false, CURLOPT_ENCODING => 'gzip',
+                CURLOPT_HTTPHEADER => [
+                    'User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
+                    'Accept: application/json',
+                    'Referer: https://finance.yahoo.com/',
+                    'Origin: https://finance.yahoo.com',
+                ],
+            ]);
+            $raw  = curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            if ($raw && $code === 200) {
+                $d = json_decode($raw, true);
+                foreach ($d['quoteResponse']['result'] ?? [] as $q) {
+                    if (!empty($q['symbol']) && ($q['regularMarketPrice'] ?? 0) > 0) {
+                        $q['_source'] = 'yahoo_v7';
+                        $all[$q['symbol']] = $q;
+                    }
+                }
+                if (!empty($all)) break;
+            }
+        }
+        if (!empty($all)) usleep(300000); // 300ms between chunks
+    }
+    return $all;
+}
+
+/**
+ * Fetch from Groww public API (no auth, India-based, works from IN servers).
+ */
+function growwQuoteFetch(string $nseSymbol): ?array
+{
+    $sym = strtoupper(str_replace('.NS', '', $nseSymbol));
+    $url = 'https://groww.in/v1/api/stocks_data/v1/accord_points/stock/nsecm/' . urlencode($sym) . '/chart_data/v2?endTimeInMs=' . (time()*1000) . '&intervalInMinutes=1&startTimeInMs=' . ((time()-86400)*1000);
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 8, CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_HTTPHEADER => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept: application/json',
+            'Referer: https://groww.in/',
+        ],
+    ]);
+    $raw  = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if (!$raw || $code !== 200) return null;
+    $d = json_decode($raw, true);
+
+    // Groww returns candle data — get last price from latest candle
+    $candles = $d['data']['candles'] ?? $d['candles'] ?? [];
+    if (empty($candles)) return null;
+    $last = end($candles); // [timestamp, open, high, low, close, volume]
+    if (!isset($last[4]) || $last[4] <= 0) return null;
+
+    return [
+        'symbol'                     => $sym . '.NS',
+        'shortName'                  => $sym,
+        'longName'                   => $sym,
+        'regularMarketPrice'         => (float)$last[4],
+        'regularMarketChange'        => 0,
+        'regularMarketChangePercent' => 0,
+        'regularMarketPreviousClose' => (float)($last[1] ?? $last[4]),
+        'regularMarketOpen'          => (float)($last[1] ?? $last[4]),
+        'regularMarketDayHigh'       => (float)($last[2] ?? $last[4]),
+        'regularMarketDayLow'        => (float)($last[3] ?? $last[4]),
+        'regularMarketVolume'        => (int)($last[5] ?? 0),
+        'averageDailyVolume3Month'   => (int)($last[5] ?? 0),
+        'fiftyTwoWeekHigh'           => (float)($last[2] ?? $last[4]),
+        'fiftyTwoWeekLow'            => (float)($last[3] ?? $last[4]),
+        'trailingPE' => null, 'priceToBook' => null, 'marketCap' => null,
+        'sector' => null, 'industry' => null, 'returnOnEquity' => null, 'debtToEquity' => null,
+        '_source' => 'groww',
+    ];
+}
+
 /**
  * Bulk-fetch quotes: tries NSE+Stooq first (reliable), then Yahoo Finance.
  * Caches to bulk_quotes.json for 5 minutes.
@@ -1061,20 +1195,18 @@ function yahooQuoteBulk(array $symbols): array
         if (!empty($cached)) return $cached;
     }
 
-    // ── Priority 1: Stooq parallel fetch (fast, no auth) ────────
+    $all = [];
+
+    // ── Priority 1: Stooq parallel fetch (.ns format) ────────────
     $all = stooqBulkFetch($symbols);
 
-    // ── Priority 2: Fill missing symbols from NSE ────────────────
-    $missing = array_filter($symbols, fn($s) => !isset($all[$s]));
-    foreach ($missing as $sym) {
-        $nse = nseQuoteFallback($sym);
-        if ($nse && ($nse['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $nse;
-        usleep(100000); // 100ms between NSE calls to avoid rate-limit
+    // ── Priority 2: Yahoo Finance v7 (mobile UA, less blocked) ───
+    if (empty($all)) {
+        $all = yahooV7BulkFetch($symbols);
     }
 
-    // ── Priority 3: Yahoo Finance for any still missing ──────────
-    $stillMissing = array_filter($symbols, fn($s) => !isset($all[$s]));
-    if (!empty($stillMissing)) {
+    // ── Priority 3: Yahoo Finance v8 with crumb ──────────────────
+    if (empty($all)) {
         $crumbData  = yahooGetCrumb();
         $crumb      = $crumbData['crumb'] ?? '';
         $cookie     = $crumbData['cookie'] ?? '';
@@ -1085,8 +1217,7 @@ function yahooQuoteBulk(array $symbols): array
                     . 'trailingPE,priceToBook,marketCap,shortName,longName,sector,industry,'
                     . 'returnOnEquity,debtToEquity,regularMarketDayHigh,regularMarketDayLow,'
                     . 'regularMarketPreviousClose,regularMarketOpen';
-
-        foreach (array_chunk(array_values($stillMissing), 50) as $chunk) {
+        foreach (array_chunk(array_values($symbols), 50) as $chunk) {
             $symsParam = implode(',', array_map('urlencode', $chunk));
             foreach (['query2', 'query1'] as $host) {
                 $url = "https://{$host}.finance.yahoo.com/v8/finance/quote?symbols={$symsParam}&fields={$fields}&lang=en-US&region=IN{$crumbParam}";
@@ -1109,10 +1240,22 @@ function yahooQuoteBulk(array $symbols): array
                 if (!$raw || $code !== 200) continue;
                 $data = json_decode($raw, true);
                 foreach ($data['quoteResponse']['result'] ?? [] as $q) {
-                    if (!empty($q['symbol']) && ($q['regularMarketPrice'] ?? 0) > 0) $all[$q['symbol']] = $q;
+                    if (!empty($q['symbol']) && ($q['regularMarketPrice'] ?? 0) > 0) {
+                        $q['_source'] = 'yahoo_v8';
+                        $all[$q['symbol']] = $q;
+                    }
                 }
                 if (!empty($all)) break;
             }
+        }
+    }
+
+    // ── Priority 4: NSE India one-by-one (rate-limited, last resort) ─
+    if (empty($all)) {
+        foreach (array_slice($symbols, 0, 20) as $sym) {
+            $nse = nseQuoteFallback($sym);
+            if ($nse && ($nse['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $nse;
+            usleep(200000);
         }
     }
 
