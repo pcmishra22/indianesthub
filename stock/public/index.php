@@ -201,7 +201,7 @@ if ($uri === '/api/debug/quicktest') {
     // CHECKPOINT 1: Stooq single symbol (raw HTTP + CSV parse)
     // ══════════════════════════════════════════════════════
     $t0 = microtime(true);
-    $stooqUrl = 'https://stooq.com/q/l/?s=reliance.in&f=sd2t2ohlcv&h&e=csv';
+    $stooqUrl = 'https://stooq.com/q/l/?s=reliance.ns&f=sd2t2ohlcv&h&e=csv'; // .ns format (correct for NSE)
     $ch = curl_init($stooqUrl);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10,
@@ -934,9 +934,9 @@ function nseQuoteFallback(string $symbol): ?array
  */
 function stooqQuoteFallback(string $symbol): ?array
 {
-    // Stooq uses format: TCS.IN for NSE stocks
+    // Stooq uses format: TCS.NS (lowercase .ns) for NSE stocks
     $base   = strtolower(str_replace('.NS', '', $symbol));
-    $stooqSym = $base . '.in';
+    $stooqSym = $base . '.ns';
 
     $url = 'https://stooq.com/q/l/?s=' . urlencode($stooqSym) . '&f=sd2t2ohlcv&h&e=csv';
     $ch  = curl_init($url);
@@ -994,7 +994,7 @@ function stooqBulkFetch(array $symbols): array
 
     foreach ($symbols as $sym) {
         $base     = strtolower(str_replace('.NS', '', $sym));
-        $stooqSym = $base . '.in';
+        $stooqSym = $base . '.ns';
         $url = 'https://stooq.com/q/l/?s=' . urlencode($stooqSym) . '&f=sd2t2ohlcv&h&e=csv';
         $ch  = curl_init($url);
         curl_setopt_array($ch, [
@@ -1127,7 +1127,7 @@ function yahooQuoteBulk(array $symbols): array
 function stooqHistoryFallback(string $symbol, int $days = 90): array
 {
     $base     = strtolower(str_replace('.NS', '', $symbol));
-    $stooqSym = $base . '.in';
+    $stooqSym = $base . '.ns';
     $from = date('Ymd', strtotime("-{$days} days -30 days"));
     $to   = date('Ymd');
     $url  = "https://stooq.com/q/d/l/?s={$stooqSym}&d1={$from}&d2={$to}&i=d";
