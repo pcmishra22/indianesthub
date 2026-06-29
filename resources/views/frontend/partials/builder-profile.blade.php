@@ -331,7 +331,7 @@
                   @if($project->price_to) ₹{{ number_format($project->price_to/10000000,2) }}Cr @endif
                 </p>
                 @endif
-                <a href="{{ route('projects.show', $project) }}" class="bp-proj-btn">
+                <a href="{{ $project->slug ? route('projects.show', $project->slug) : route('projects.show.by-id', $project->id) }}" class="bp-proj-btn">
                   <i class="bi bi-eye me-1"></i> View Project
                 </a>
               </div>
@@ -498,10 +498,14 @@ if (bpForm) {
     const btn = document.getElementById('bp-lead-submit-btn');
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Sending...';
+    const formData = new FormData(this);
     fetch(this.action, {
       method: 'POST',
-      body: new FormData(this),
-      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      body: formData,
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('input[name="_token"]')?.value || ''
+      }
     })
     .then(r => r.json())
     .then(data => {
