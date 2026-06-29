@@ -190,68 +190,197 @@ header_remove('X-Powered-By');
 // ── Quick connectivity test ──────────────────────────────────
 if ($uri === '/api/debug/quicktest') {
     header('Content-Type: application/json');
-    $out = ['ts' => date('Y-m-d H:i:s'), 'tests' => []];
+    $out = [
+        'ts'          => date('Y-m-d H:i:s'),
+        'php_version' => PHP_VERSION,
+        'server_ip'   => gethostbyname(gethostname()),
+        'checkpoints' => [],
+    ];
 
-    // Test 1: Stooq single symbol
+    // ══════════════════════════════════════════════════════
+    // CHECKPOINT 1: Stooq single symbol (raw HTTP + CSV parse)
+    // ══════════════════════════════════════════════════════
     $t0 = microtime(true);
     $stooqUrl = 'https://stooq.com/q/l/?s=reliance.in&f=sd2t2ohlcv&h&e=csv';
     $ch = curl_init($stooqUrl);
-    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>10,
-        CURLOPT_SSL_VERIFYPEER=>false, CURLOPT_FOLLOWLOCATION=>true,
-        CURLOPT_HTTPHEADER=>['User-Agent: Mozilla/5.0']]);
-    $raw = curl_exec($ch);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10,
+        CURLOPT_SSL_VERIFYPEER => false, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_HTTPHEADER => ['User-Agent: Mozilla/5.0'],
+    ]);
+    $raw  = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $err = curl_error($ch);
+    $err  = curl_error($ch);
     curl_close($ch);
-    $lines = $raw ? array_values(array_filter(explode("
-", trim($raw)))) : [];
-    $out['tests']['stooq'] = [
-        'ok' => $code === 200 && count($lines) >= 2 && str_contains($raw ?? '', 'Reliance'),
-        'http' => $code, 'curl_err' => $err ?: null,
-        'lines' => count($lines), 'sample' => $lines[1] ?? null,
-        'ms' => round((microtime(true)-$t0)*1000),
+    $lines = $raw ? array_values(array_filter(explode("\n", trim($raw)))) : [];
+    $cp1_price = null;
+    if (count($lines) >= 2) {
+        $row = str_getcsv($lines[1]);
+        $cp1_price = isset($row[6]) ? (float)$row[6] : null;
+    }
+    $out['checkpoints']['CP1_stooq_single'] = [
+        'label'       => 'Stooq single symbol HTTP fetch (reliance.in)',
+        'ok'          => $code === 200 && $cp1_price > 0,
+        'http_code'   => $code,
+        'curl_error'  => $err ?: null,
+        'csv_lines'   => count($lines),
+        'header_row'  => $lines[0] ?? null,
+        'data_row'    => $lines[1] ?? null,
+        'parsed_price'=> $cp1_price,
+        'ms'          => round((microtime(true) - $t0) * 1000),
+        'diagnosis'   => $code === 200 && $cp1_price > 0 ? 'PASS'
+            : ($code === 0   ? 'FAIL: No connection — Stooq unreachable from server (DNS/firewall block?)'
+            : ($code === 200 ? 'FAIL: Connected but price=0 — CSV parse issue or N/D response'
+            : "FAIL: HTTP {$code} — Stooq returned error")),
     ];
 
-    // Test 2: NSE India
+    // ══════════════════════════════════════════════════════
+    // CHECKPOINT 2: stooqBulkFetch() function with 3 symbols
+    // ══════════════════════════════════════════════════════
     $t0 = microtime(true);
-    $ch2 = curl_init('https://www.nseindia.com/api/quote-equity?symbol=RELIANCE');
-    curl_setopt_array($ch2, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>10,
-        CURLOPT_SSL_VERIFYPEER=>false, CURLOPT_FOLLOWLOCATION=>true,
-        CURLOPT_HTTPHEADER=>['User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept: application/json', 'Referer: https://www.nseindia.com/']]);
-    $raw2 = curl_exec($ch2);
-    $code2 = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
-    $err2 = curl_error($ch2);
-    curl_close($ch2);
-    $d2 = $raw2 ? json_decode($raw2, true) : null;
-    $out['tests']['nse'] = [
-        'ok' => !empty($d2['priceInfo']['lastPrice']),
-        'http' => $code2, 'curl_err' => $err2 ?: null,
-        'price' => $d2['priceInfo']['lastPrice'] ?? null,
-        'ms' => round((microtime(true)-$t0)*1000),
+    $bulkResult = stooqBulkFetch(['RELIANCE.NS', 'TCS.NS', 'INFY.NS']);
+    $out['checkpoints']['CP2_stooq_bulk_function'] = [
+        'label'        => 'stooqBulkFetch() with RELIANCE, TCS, INFY',
+        'ok'           => count($bulkResult) > 0,
+        'symbols_sent' => ['RELIANCE.NS', 'TCS.NS', 'INFY.NS'],
+        'symbols_got'  => array_keys($bulkResult),
+        'count'        => count($bulkResult),
+        'sample_price' => $bulkResult['RELIANCE.NS']['regularMarketPrice'] ?? null,
+        'ms'           => round((microtime(true) - $t0) * 1000),
+        'diagnosis'    => count($bulkResult) === 3 ? 'PASS: All 3 symbols fetched'
+            : (count($bulkResult) > 0 ? 'PARTIAL: Only ' . count($bulkResult) . '/3 fetched — some symbols may be wrong format'
+            : 'FAIL: 0 symbols returned — stooqBulkFetch returning empty (CP1 likely also failed)'),
     ];
 
-    // Test 3: stooqBulkFetch with 3 symbols
+    // ══════════════════════════════════════════════════════
+    // CHECKPOINT 3: NSE India API connectivity
+    // ══════════════════════════════════════════════════════
     $t0 = microtime(true);
-    $bulkResult = stooqBulkFetch(['RELIANCE.NS','TCS.NS','INFY.NS']);
-    $out['tests']['stooq_bulk'] = [
-        'ok' => count($bulkResult) > 0,
-        'count' => count($bulkResult),
-        'symbols_got' => array_keys($bulkResult),
-        'ms' => round((microtime(true)-$t0)*1000),
+    // Step 3a: get NSE cookie first
+    $cookieJar = STORAGE . '/nse_cookie_debug.txt';
+    $ch3 = curl_init('https://www.nseindia.com/');
+    curl_setopt_array($ch3, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8,
+        CURLOPT_SSL_VERIFYPEER => false, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_COOKIEJAR => $cookieJar, CURLOPT_COOKIEFILE => $cookieJar,
+        CURLOPT_HTTPHEADER => ['User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'],
+    ]);
+    $rawHome = curl_exec($ch3);
+    $codeHome = curl_getinfo($ch3, CURLINFO_HTTP_CODE);
+    curl_close($ch3);
+    // Step 3b: actual API call
+    $ch3b = curl_init('https://www.nseindia.com/api/quote-equity?symbol=RELIANCE');
+    curl_setopt_array($ch3b, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10,
+        CURLOPT_SSL_VERIFYPEER => false, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_COOKIEJAR => $cookieJar, CURLOPT_COOKIEFILE => $cookieJar,
+        CURLOPT_HTTPHEADER => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept: application/json', 'Referer: https://www.nseindia.com/',
+            'X-Requested-With: XMLHttpRequest',
+        ],
+    ]);
+    $raw3  = curl_exec($ch3b);
+    $code3 = curl_getinfo($ch3b, CURLINFO_HTTP_CODE);
+    $err3  = curl_error($ch3b);
+    curl_close($ch3b);
+    $d3    = $raw3 ? json_decode($raw3, true) : null;
+    $nsePrice = $d3['priceInfo']['lastPrice'] ?? null;
+    $out['checkpoints']['CP3_nse_india'] = [
+        'label'            => 'NSE India API (nseindia.com)',
+        'ok'               => $nsePrice > 0,
+        'homepage_http'    => $codeHome,
+        'api_http'         => $code3,
+        'curl_error'       => $err3 ?: null,
+        'reliance_price'   => $nsePrice,
+        'raw_snippet'      => $raw3 ? substr($raw3, 0, 200) : null,
+        'ms'               => round((microtime(true) - $t0) * 1000),
+        'diagnosis'        => $nsePrice > 0 ? 'PASS'
+            : ($code3 === 401 || $code3 === 403 ? 'FAIL: NSE blocking server IP (403/401) — cookie/session rejected'
+            : ($code3 === 0 ? 'FAIL: Cannot reach nseindia.com — DNS or firewall block'
+            : "FAIL: HTTP {$code3} — " . (substr($raw3 ?? '', 0, 100) ?: 'empty response'))),
     ];
 
-    // Test 4: bulk_quotes.json cache status
-    $cacheFile = STORAGE . '/bulk_quotes.json';
-    $out['cache'] = [
-        'exists' => file_exists($cacheFile),
-        'age_sec' => file_exists($cacheFile) ? (time() - filemtime($cacheFile)) : null,
-        'size_bytes' => file_exists($cacheFile) ? filesize($cacheFile) : 0,
-        'count' => file_exists($cacheFile) ? count(json_decode(file_get_contents($cacheFile),true)??[]) : 0,
+    // ══════════════════════════════════════════════════════
+    // CHECKPOINT 4: /api/quotes/bulk endpoint self-test
+    // (simulates what JS calls — does it return quotes array?)
+    // ══════════════════════════════════════════════════════
+    $t0 = microtime(true);
+    $testSyms = ['RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS'];
+    // Re-run exactly what the endpoint does
+    $ep4_quotes = stooqBulkFetch($testSyms);
+    if (empty($ep4_quotes)) {
+        foreach (array_slice($testSyms, 0, 3) as $s4) {
+            $nq = nseQuoteFallback($s4);
+            if ($nq && ($nq['regularMarketPrice'] ?? 0) > 0) $ep4_quotes[$s4] = $nq;
+        }
+    }
+    $ep4_arr = array_values($ep4_quotes);
+    $out['checkpoints']['CP4_bulk_endpoint_simulation'] = [
+        'label'          => '/api/quotes/bulk simulation (what JS actually receives)',
+        'ok'             => count($ep4_arr) > 0,
+        'quotes_count'   => count($ep4_arr),
+        'source_used'    => !empty($ep4_quotes) ? ($ep4_arr[0]['_source'] ?? 'unknown') : 'none',
+        'sample'         => !empty($ep4_arr) ? [
+            'symbol' => $ep4_arr[0]['symbol'] ?? null,
+            'price'  => $ep4_arr[0]['regularMarketPrice'] ?? null,
+            'source' => $ep4_arr[0]['_source'] ?? null,
+        ] : null,
+        'json_response_preview' => json_encode([
+            'ok'    => count($ep4_arr) > 0,
+            'count' => count($ep4_arr),
+            'quotes'=> array_slice($ep4_arr, 0, 1),
+        ]),
+        'ms'             => round((microtime(true) - $t0) * 1000),
+        'diagnosis'      => count($ep4_arr) > 0
+            ? 'PASS: JS will receive ' . count($ep4_arr) . ' quotes — watchlist should load'
+            : 'FAIL: JS receives empty quotes array — this triggers the error message on screen',
     ];
 
-    $out['recommended'] = $out['tests']['stooq_bulk']['ok'] ? 'Stooq bulk OK'
-        : ($out['tests']['nse']['ok'] ? 'NSE OK but Stooq blocked' : 'ALL SOURCES BLOCKED');
+    // ══════════════════════════════════════════════════════
+    // CHECKPOINT 5: Storage directory + cache file status
+    // ══════════════════════════════════════════════════════
+    $cacheFile   = STORAGE . '/bulk_quotes.json';
+    $storageOk   = is_dir(STORAGE) && is_writable(STORAGE);
+    $cacheExists = file_exists($cacheFile);
+    $cacheData   = $cacheExists ? json_decode(file_get_contents($cacheFile), true) : null;
+    $cacheCount  = is_array($cacheData) ? count($cacheData) : 0;
+    $cacheAge    = $cacheExists ? (time() - filemtime($cacheFile)) : null;
+    $out['checkpoints']['CP5_storage_and_cache'] = [
+        'label'             => 'Storage directory + bulk_quotes.json cache',
+        'ok'                => $storageOk && $cacheCount > 0,
+        'storage_path'      => STORAGE,
+        'storage_writable'  => $storageOk,
+        'cache_exists'      => $cacheExists,
+        'cache_age_sec'     => $cacheAge,
+        'cache_age_human'   => $cacheAge !== null ? ($cacheAge < 60 ? "{$cacheAge}s ago" : round($cacheAge/60) . 'min ago') : 'N/A',
+        'cache_valid'       => $cacheAge !== null && $cacheAge < 300,
+        'cached_symbols'    => $cacheCount,
+        'sample_keys'       => $cacheData ? array_slice(array_keys($cacheData), 0, 5) : [],
+        'diagnosis'         => !$storageOk ? 'FAIL: Storage dir not writable — cache cannot be saved'
+            : (!$cacheExists ? 'WARN: No cache file yet — first load will be slow'
+            : ($cacheAge > 300 ? "WARN: Cache is stale ({$cacheAge}s old, >5min) — will re-fetch"
+            : "PASS: Cache has {$cacheCount} symbols, " . round($cacheAge) . "s old")),
+    ];
+
+    // ── Summary ──────────────────────────────────────────
+    $passes = array_filter($out['checkpoints'], fn($c) => $c['ok']);
+    $out['summary'] = [
+        'passed'     => count($passes) . '/' . count($out['checkpoints']),
+        'overall_ok' => count($passes) >= 4,
+        'root_cause' => !$out['checkpoints']['CP1_stooq_single']['ok']
+            ? 'SERVER CANNOT REACH STOOQ — outbound HTTP blocked on this host'
+            : (!$out['checkpoints']['CP2_stooq_bulk_function']['ok']
+            ? 'stooqBulkFetch() broken — check symbol format sent'
+            : (!$out['checkpoints']['CP4_bulk_endpoint_simulation']['ok']
+            ? 'Both Stooq and NSE failed — all data sources blocked on server'
+            : 'No critical issue — check CP5 cache for staleness')),
+        'next_action' => count($passes) >= 4
+            ? 'All good — watchlist should work. Hard refresh browser (Ctrl+Shift+R).'
+            : (!$out['checkpoints']['CP1_stooq_single']['ok']
+            ? 'Fix: Contact hosting provider to unblock outbound HTTPS to stooq.com'
+            : 'Fix: Share this JSON output for further diagnosis'),
+    ];
 
     echo json_encode($out, JSON_PRETTY_PRINT);
     exit;
