@@ -664,3 +664,4 @@ Route::get('/builders',              [BuilderController::class, 'index'])->name(
 Route::get('/builders/{builder}',    [BuilderController::class, 'show'])->name('builders.show');
 Route::get('/projects/{project}',    [BuilderController::class, 'projectDetail'])->name('projects.show');
 Route::post('/projects/{project}/lead', [BuilderController::class, 'submitLead'])->name('projects.lead');
+Route::post('/builders/{builder}/inquiry', [BuilderController::class, 'submitBuilderInquiry'])->name('builders.inquiry');
