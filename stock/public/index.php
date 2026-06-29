@@ -1259,6 +1259,15 @@ function yahooQuoteBulk(array $symbols): array
         }
     }
 
+    // ── Priority 5: Groww API (India-based, works on IN hosting) ─────
+    if (empty($all)) {
+        foreach (array_slice($symbols, 0, 30) as $sym) {
+            $gw = growwQuoteFetch($sym);
+            if ($gw && ($gw['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $gw;
+            usleep(100000);
+        }
+    }
+
     if (!empty($all)) file_put_contents($bulkCache, json_encode($all));
     return $all;
 }
@@ -3984,21 +3993,76 @@ async function loadWatchlist(force=false){
   }
 }
 
-// ── Server-side quote fetcher via Stooq (no CORS issues) ────────
+// ── Quote fetcher: server-side first, then browser-side fallback ──
 async function browserFetchQuotes(symbols){
+  // Step 1: try server-side (Stooq / Yahoo / NSE via PHP)
   try{
     const r=await fetch(apiUrl('api/quotes/bulk'),{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({symbols})
     });
-    if(!r.ok) return [];
-    const d=await r.json();
-    return d.quotes||[];
+    if(r.ok){
+      const d=await r.json();
+      if(d.quotes&&d.quotes.length>0) return d.quotes;
+    }
   }catch(e){
-    console.error('Quote fetch error:',e);
-    return [];
+    console.warn('Server-side quote fetch failed, trying browser fallback:',e);
   }
+
+  // Step 2: server sources all blocked — fetch directly from browser
+  // Browser is NOT subject to server IP blocks
+  console.warn('Server could not fetch quotes. Using browser-direct Yahoo Finance fallback.');
+  document.getElementById('watchLoading').innerHTML=`
+    <div class="spin"></div>
+    <div>Server sources blocked — fetching quotes directly from browser…</div>
+    <div style="font-size:11px;color:var(--muted)">Using Yahoo Finance via browser (bypasses server IP restrictions)</div>`;
+
+  const allQuotes=[];
+  const FIELDS='regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,averageDailyVolume3Month,regularMarketDayHigh,regularMarketDayLow,regularMarketPreviousClose,regularMarketOpen,fiftyTwoWeekHigh,fiftyTwoWeekLow,shortName,longName';
+  const CHUNK=20;
+  const chunks=[];
+  for(let i=0;i<symbols.length;i+=CHUNK) chunks.push(symbols.slice(i,i+CHUNK));
+
+  for(const chunk of chunks){
+    const syms=chunk.join(',');
+    let fetched=false;
+
+    // Try Yahoo Finance directly (works from browser, blocked on server)
+    for(const host of ['query1','query2']){
+      if(fetched) break;
+      try{
+        const url=`https://${host}.finance.yahoo.com/v8/finance/quote?symbols=${encodeURIComponent(syms)}&fields=${FIELDS}&lang=en-US&region=IN`;
+        const r=await fetch(url);
+        if(r.ok){
+          const j=await r.json();
+          const results=j?.quoteResponse?.result||[];
+          results.forEach(q=>{ if(q.regularMarketPrice>0){ q._source='yahoo_browser'; allQuotes.push(q); } });
+          if(results.length>0){ fetched=true; break; }
+        }
+      }catch(e){}
+    }
+
+    // Try via allorigins CORS proxy if direct Yahoo is also blocked in browser
+    if(!fetched){
+      try{
+        const targetUrl=`https://query1.finance.yahoo.com/v8/finance/quote?symbols=${encodeURIComponent(syms)}&fields=${FIELDS}&lang=en-US&region=IN`;
+        const r=await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
+        if(r.ok){
+          const j=await r.json();
+          const data=JSON.parse(j.contents||'{}');
+          const results=data?.quoteResponse?.result||[];
+          results.forEach(q=>{ if(q.regularMarketPrice>0){ q._source='yahoo_allorigins'; allQuotes.push(q); } });
+          if(results.length>0) fetched=true;
+        }
+      }catch(e){}
+    }
+
+    // Small delay between chunks to avoid rate-limiting
+    if(chunks.indexOf(chunk)<chunks.length-1) await new Promise(res=>setTimeout(res,200));
+  }
+
+  return allQuotes;
 }
 
 
