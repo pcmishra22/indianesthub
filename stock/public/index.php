@@ -255,6 +255,52 @@ if ($uri === '/api/watchlist/reset' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+// ── Clear Yahoo Finance crumb/cookie/quote cache (force re-auth) ──
+if ($uri === '/api/cache/clear') {
+    header('Content-Type: application/json');
+    $cleared = [];
+    foreach (['/yahoo_crumb.json', '/yahoo_cookie.txt', '/bulk_quotes.json'] as $f) {
+        $p = STORAGE . $f;
+        if (file_exists($p)) { unlink($p); $cleared[] = basename($f); }
+    }
+    echo json_encode(['ok' => true, 'cleared' => $cleared]);
+    exit;
+}
+
+// ── Debug: test Yahoo Finance connectivity + crumb ─────────────
+if ($uri === '/api/debug/yahoo') {
+    header('Content-Type: application/json');
+    $out = [];
+
+    // Test 1: plain connectivity
+    $ch = curl_init('https://query1.finance.yahoo.com/v8/finance/quote?symbols=TCS.NS&fields=regularMarketPrice&lang=en-US&region=IN');
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>10, CURLOPT_SSL_VERIFYPEER=>false,
+        CURLOPT_HTTPHEADER=>['User-Agent: Mozilla/5.0','Accept: application/json']]);
+    $r = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+    $out['plain_fetch'] = ['http_code'=>$code, 'curl_error'=>$err, 'body_preview'=>substr($r,0,200)];
+
+    // Test 2: crumb fetch
+    $crumb = yahooGetCrumb();
+    $out['crumb'] = ['crumb'=>$crumb['crumb']??'', 'cookie_len'=>strlen($crumb['cookie']??''), 'ts'=>$crumb['ts']??0];
+
+    // Test 3: authenticated fetch
+    $raw = httpGet('https://query1.finance.yahoo.com/v8/finance/quote?symbols=TCS.NS&fields=regularMarketPrice&lang=en-US&region=IN', 15);
+    $data = $raw ? json_decode($raw, true) : null;
+    $out['auth_fetch'] = ['got_data'=>!empty($data['quoteResponse']['result']), 'price'=>$data['quoteResponse']['result'][0]['regularMarketPrice']??null, 'raw_preview'=>substr($raw??'',0,300)];
+
+    // Test 4: Stooq fallback
+    $stooqResult = stooqQuoteFallback('TCS.NS');
+    $out['stooq_fetch'] = ['got_data'=>!empty($stooqResult), 'price'=>$stooqResult['regularMarketPrice']??null];
+
+    // Test 5: NSE fallback
+    $nseResult = nseQuoteFallback('TCS.NS');
+    $out['nse_fetch'] = ['got_data'=>!empty($nseResult), 'price'=>$nseResult['regularMarketPrice']??null];
+
+    echo json_encode($out, JSON_PRETTY_PRINT);
+    exit;
+}
+
+
 // ── Price alerts ──────────────────────────────────────────────
 if ($uri === '/api/alerts/save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
@@ -402,9 +448,9 @@ function yahooQuote(string $symbol): ?array
     $bulkCache = STORAGE . '/bulk_quotes.json';
     if (file_exists($bulkCache) && (time() - filemtime($bulkCache)) < 300) {
         $all = json_decode(file_get_contents($bulkCache), true) ?? [];
-        if (isset($all[$symbol])) return $all[$symbol];
+        if (!empty($all) && isset($all[$symbol])) return $all[$symbol];
     }
-    // Single fetch fallback
+    // Single fetch via Yahoo (httpGet handles crumb + query1/query2 fallback)
     $fields = 'regularMarketPrice,regularMarketChange,regularMarketChangePercent,'
             . 'regularMarketVolume,averageDailyVolume3Month,fiftyTwoWeekHigh,fiftyTwoWeekLow,'
             . 'trailingPE,priceToBook,marketCap,shortName,longName,sector,industry,'
@@ -413,13 +459,207 @@ function yahooQuote(string $symbol): ?array
     $url = 'https://query2.finance.yahoo.com/v8/finance/quote?symbols=' . urlencode($symbol)
          . '&fields=' . $fields . '&lang=en-US&region=IN';
     $raw = httpGet($url);
-    if (!$raw) return null;
-    $data = json_decode($raw, true);
-    return $data['quoteResponse']['result'][0] ?? null;
+    if ($raw) {
+        $data = json_decode($raw, true);
+        $result = $data['quoteResponse']['result'][0] ?? null;
+        if ($result) return $result;
+    }
+
+    // Fallback chain: NSE India → Stooq
+    return nseQuoteFallback($symbol) ?? stooqQuoteFallback($symbol);
 }
 
 /**
- * Bulk-fetch up to 200 symbols in parallel batches of 50.
+ * Fallback quote from NSE India's public API.
+ * Normalises the response to match Yahoo Finance field names so callers need no changes.
+ */
+function nseQuoteFallback(string $symbol): ?array
+{
+    $nseSym    = strtoupper(str_replace('.NS', '', $symbol));
+    $cookieJar = STORAGE . '/nse_cookie.txt';
+
+    // NSE needs a browser session — hit the homepage first to get cookies
+    if (!file_exists($cookieJar) || (time() - filemtime($cookieJar)) > 3600) {
+        $ch = curl_init('https://www.nseindia.com/');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_COOKIEJAR => $cookieJar, CURLOPT_COOKIEFILE => $cookieJar,
+            CURLOPT_HTTPHEADER => [
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept: text/html,*/*', 'Accept-Language: en-IN,en;q=0.9',
+            ],
+        ]);
+        curl_exec($ch); curl_close($ch);
+    }
+
+    $ch = curl_init('https://www.nseindia.com/api/quote-equity?symbol=' . urlencode($nseSym));
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_COOKIEJAR => $cookieJar, CURLOPT_COOKIEFILE => $cookieJar,
+        CURLOPT_HTTPHEADER => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept: application/json, text/plain, */*',
+            'Accept-Language: en-IN,en;q=0.9',
+            'Referer: https://www.nseindia.com/',
+            'X-Requested-With: XMLHttpRequest',
+        ],
+    ]);
+    $raw  = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if (!$raw || $code !== 200) return stooqQuoteFallback($symbol);
+    $d = json_decode($raw, true);
+    if (empty($d['priceInfo'])) return stooqQuoteFallback($symbol);
+
+    $p  = $d['priceInfo'];
+    $md = $d['metadata'] ?? [];
+    return [
+        'symbol'                     => $nseSym . '.NS',
+        'shortName'                  => $md['companyName'] ?? $nseSym,
+        'longName'                   => $md['companyName'] ?? $nseSym,
+        'regularMarketPrice'         => (float)($p['lastPrice'] ?? 0),
+        'regularMarketChange'        => (float)($p['change'] ?? 0),
+        'regularMarketChangePercent' => (float)($p['pChange'] ?? 0),
+        'regularMarketPreviousClose' => (float)($p['previousClose'] ?? 0),
+        'regularMarketOpen'          => (float)($p['open'] ?? 0),
+        'regularMarketDayHigh'       => (float)($p['intraDayHighLow']['max'] ?? 0),
+        'regularMarketDayLow'        => (float)($p['intraDayHighLow']['min'] ?? 0),
+        'regularMarketVolume'        => (int)($d['securityInfo']['tradedVolume'] ?? 0),
+        'averageDailyVolume3Month'   => (int)($d['securityInfo']['tradedVolume'] ?? 0),
+        'fiftyTwoWeekHigh'           => (float)($p['weekHighLow']['max'] ?? 0),
+        'fiftyTwoWeekLow'            => (float)($p['weekHighLow']['min'] ?? 0),
+        'trailingPE' => null, 'priceToBook' => null, 'marketCap' => null,
+        'sector' => null, 'industry' => null, 'returnOnEquity' => null, 'debtToEquity' => null,
+        '_source' => 'nse',
+    ];
+}
+
+/**
+ * Last-resort price fetch from Stooq (no auth, no cookies, works everywhere).
+ * Returns a minimal quote array or null.
+ */
+function stooqQuoteFallback(string $symbol): ?array
+{
+    // Stooq uses format: TCS.IN for NSE stocks
+    $base   = strtolower(str_replace('.NS', '', $symbol));
+    $stooqSym = $base . '.in';
+
+    $url = 'https://stooq.com/q/l/?s=' . urlencode($stooqSym) . '&f=sd2t2ohlcv&h&e=csv';
+    $ch  = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 8, CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_HTTPHEADER => ['User-Agent: Mozilla/5.0', 'Accept: text/csv,*/*'],
+    ]);
+    $raw  = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if (!$raw || $code !== 200) return null;
+
+    // Parse CSV: Symbol,Date,Time,Open,High,Low,Close,Volume
+    $lines = array_filter(explode("\n", trim($raw)));
+    if (count($lines) < 2) return null;
+    $row = str_getcsv(array_values($lines)[1]);
+    if (count($row) < 7) return null;
+    [$sym, $date, $time, $open, $high, $low, $close, $volume] = array_pad($row, 8, 0);
+
+    $close = (float)$close;
+    if ($close <= 0) return null;
+
+    $nseSym = strtoupper(str_replace('.NS', '', $symbol));
+    return [
+        'symbol'                     => $nseSym . '.NS',
+        'shortName'                  => $nseSym,
+        'longName'                   => $nseSym,
+        'regularMarketPrice'         => $close,
+        'regularMarketChange'        => 0,
+        'regularMarketChangePercent' => 0,
+        'regularMarketPreviousClose' => $close,
+        'regularMarketOpen'          => (float)$open,
+        'regularMarketDayHigh'       => (float)$high,
+        'regularMarketDayLow'        => (float)$low,
+        'regularMarketVolume'        => (int)$volume,
+        'averageDailyVolume3Month'   => (int)$volume,
+        'fiftyTwoWeekHigh'           => (float)$high,
+        'fiftyTwoWeekLow'            => (float)$low,
+        'trailingPE' => null, 'priceToBook' => null, 'marketCap' => null,
+        'sector' => null, 'industry' => null, 'returnOnEquity' => null, 'debtToEquity' => null,
+        '_source' => 'stooq',
+    ];
+}
+
+/**
+ * Parallel bulk fetch from Stooq for multiple symbols.
+ */
+function stooqBulkFetch(array $symbols): array
+{
+    $all = [];
+    $mh  = curl_multi_init();
+    $handles = [];
+
+    foreach ($symbols as $sym) {
+        $base     = strtolower(str_replace('.NS', '', $sym));
+        $stooqSym = $base . '.in';
+        $url = 'https://stooq.com/q/l/?s=' . urlencode($stooqSym) . '&f=sd2t2ohlcv&h&e=csv';
+        $ch  = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => 12, CURLOPT_CONNECTTIMEOUT => 6,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_HTTPHEADER => ['User-Agent: Mozilla/5.0', 'Accept: text/csv,*/*'],
+        ]);
+        curl_multi_add_handle($mh, $ch);
+        $handles[$sym] = $ch;
+    }
+
+    $active = null;
+    do { curl_multi_exec($mh, $active); curl_multi_select($mh, 0.2); } while ($active);
+
+    foreach ($handles as $sym => $ch) {
+        $raw  = curl_multi_getcontent($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_multi_remove_handle($mh, $ch); curl_close($ch);
+        if (!$raw || $code !== 200) continue;
+
+        $lines = array_values(array_filter(explode("\n", trim($raw))));
+        if (count($lines) < 2) continue;
+        $row = str_getcsv($lines[1]);
+        if (count($row) < 7) continue;
+        [$s, $date, $time, $open, $high, $low, $close, $volume] = array_pad($row, 8, 0);
+        $close = (float)$close;
+        if ($close <= 0) continue;
+
+        $nseSym = strtoupper(str_replace('.NS', '', $sym)) . '.NS';
+        $all[$nseSym] = [
+            'symbol'                     => $nseSym,
+            'shortName'                  => strtoupper(str_replace('.NS', '', $sym)),
+            'longName'                   => strtoupper(str_replace('.NS', '', $sym)),
+            'regularMarketPrice'         => $close,
+            'regularMarketChange'        => 0,
+            'regularMarketChangePercent' => 0,
+            'regularMarketPreviousClose' => $close,
+            'regularMarketOpen'          => (float)$open,
+            'regularMarketDayHigh'       => (float)$high,
+            'regularMarketDayLow'        => (float)$low,
+            'regularMarketVolume'        => (int)($volume ?? 0),
+            'averageDailyVolume3Month'   => (int)($volume ?? 0),
+            'fiftyTwoWeekHigh'           => (float)$high,
+            'fiftyTwoWeekLow'            => (float)$low,
+            'trailingPE' => null, 'priceToBook' => null, 'marketCap' => null,
+            'sector' => null, 'industry' => null, 'returnOnEquity' => null, 'debtToEquity' => null,
+            '_source' => 'stooq',
+        ];
+    }
+    curl_multi_close($mh);
+    return $all;
+}
+
+/**
+ * Bulk-fetch quotes: tries Yahoo Finance first, falls back to Stooq if blocked.
  * Caches to bulk_quotes.json for 5 minutes.
  */
 function yahooQuoteBulk(array $symbols): array
@@ -429,49 +669,63 @@ function yahooQuoteBulk(array $symbols): array
         $cached = json_decode(file_get_contents($bulkCache), true) ?? [];
         if (!empty($cached)) return $cached;
     }
-    $fields = 'regularMarketPrice,regularMarketChange,regularMarketChangePercent,'
-            . 'regularMarketVolume,averageDailyVolume3Month,fiftyTwoWeekHigh,fiftyTwoWeekLow,'
-            . 'trailingPE,priceToBook,marketCap,shortName,longName,sector,industry,'
-            . 'returnOnEquity,debtToEquity,regularMarketDayHigh,regularMarketDayLow,'
-            . 'regularMarketPreviousClose,regularMarketOpen';
-    $all    = [];
-    $chunks = array_chunk($symbols, 50);
-    $mh     = curl_multi_init();
-    $handles = [];
-    foreach ($chunks as $ci => $chunk) {
-        $url = 'https://query2.finance.yahoo.com/v8/finance/quote?symbols='
-             . implode(',', array_map('urlencode', $chunk))
-             . '&fields=' . $fields . '&lang=en-US&region=IN';
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_TIMEOUT => 25, CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_ENCODING => 'gzip', CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_HTTPHEADER => [
-                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36',
-                'Accept: application/json', 'Referer: https://finance.yahoo.com/',
-            ],
-        ]);
-        curl_multi_add_handle($mh, $ch);
-        $handles[$ci] = $ch;
-    }
-    $active = null;
-    do { curl_multi_exec($mh, $active); curl_multi_select($mh, 0.3); } while ($active);
-    foreach ($handles as $ch) {
-        $raw = curl_multi_getcontent($ch);
-        curl_multi_remove_handle($mh, $ch); curl_close($ch);
-        if (!$raw) continue;
-        $data = json_decode($raw, true);
-        foreach ($data['quoteResponse']['result'] ?? [] as $q) {
-            if (!empty($q['symbol'])) $all[$q['symbol']] = $q;
+
+    // ── Try Yahoo Finance (with crumb auth) ──────────────────────
+    $crumbData  = yahooGetCrumb();
+    $crumb      = $crumbData['crumb'] ?? '';
+    $cookie     = $crumbData['cookie'] ?? '';
+    $cookieJar  = STORAGE . '/yahoo_cookie.txt';
+    $crumbParam = $crumb ? '&crumb=' . urlencode($crumb) : '';
+    $fields     = 'regularMarketPrice,regularMarketChange,regularMarketChangePercent,'
+                . 'regularMarketVolume,averageDailyVolume3Month,fiftyTwoWeekHigh,fiftyTwoWeekLow,'
+                . 'trailingPE,priceToBook,marketCap,shortName,longName,sector,industry,'
+                . 'returnOnEquity,debtToEquity,regularMarketDayHigh,regularMarketDayLow,'
+                . 'regularMarketPreviousClose,regularMarketOpen';
+    $all = [];
+
+    foreach (array_chunk($symbols, 50) as $chunk) {
+        $symsParam = implode(',', array_map('urlencode', $chunk));
+        foreach (['query2', 'query1'] as $host) {
+            $url = "https://{$host}.finance.yahoo.com/v8/finance/quote?symbols={$symsParam}&fields={$fields}&lang=en-US&region=IN{$crumbParam}";
+            $ch  = curl_init($url);
+            $opts = [
+                CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_TIMEOUT => 20, CURLOPT_CONNECTTIMEOUT => 8,
+                CURLOPT_ENCODING => 'gzip', CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_HTTPHEADER => [
+                    'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                    'Accept: application/json', 'Accept-Language: en-US,en;q=0.9',
+                    'Referer: https://finance.yahoo.com/',
+                ],
+            ];
+            if ($cookie) { $opts[CURLOPT_COOKIE] = $cookie; $opts[CURLOPT_COOKIEFILE] = $cookieJar; $opts[CURLOPT_COOKIEJAR] = $cookieJar; }
+            curl_setopt_array($ch, $opts);
+            $raw  = curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            if (!$raw || $code !== 200) continue;
+            $data = json_decode($raw, true);
+            foreach ($data['quoteResponse']['result'] ?? [] as $q) {
+                if (!empty($q['symbol'])) $all[$q['symbol']] = $q;
+            }
+            if (!empty($all)) break;
         }
+        if (!empty($all)) break; // got data from first chunk, stop (rest will be in cache next call)
     }
-    curl_multi_close($mh);
+
+    if (!empty($all)) {
+        file_put_contents($bulkCache, json_encode($all));
+        return $all;
+    }
+
+    // ── Yahoo failed — fall back to Stooq (parallel, no auth needed) ──
+    $all = stooqBulkFetch($symbols);
     if (!empty($all)) file_put_contents($bulkCache, json_encode($all));
     return $all;
 }
 
 /**
+ * Fetch historical OHLCV./**
  * Fetch historical OHLCV. Cached per-symbol for 6 hours (daily data is stable intraday).
  */
 function yahooHistory(string $symbol, int $days = 90): array
@@ -510,28 +764,135 @@ function yahooHistory(string $symbol, int $days = 90): array
     return $rows;
 }
 
-/** Simple HTTP GET with browser-like headers (Yahoo blocks plain cURL). */
-function httpGet(string $url, int $timeout = 15): string|false
+/**
+ * Fetch Yahoo Finance crumb + cookies (required since 2023 anti-bot update).
+ * Cached in storage for 30 minutes.
+ */
+function yahooGetCrumb(): array
 {
-    $ch = curl_init($url);
+    $crumbFile = STORAGE . '/yahoo_crumb.json';
+    if (file_exists($crumbFile) && (time() - filemtime($crumbFile)) < 1800) {
+        $cached = json_decode(file_get_contents($crumbFile), true);
+        if (!empty($cached['crumb']) && !empty($cached['cookie'])) return $cached;
+    }
+
+    $cookieJar = STORAGE . '/yahoo_cookie.txt';
+
+    // Step 1: hit the main page to get cookies
+    $ch = curl_init('https://finance.yahoo.com/');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_TIMEOUT        => $timeout,
+        CURLOPT_TIMEOUT        => 15,
         CURLOPT_CONNECTTIMEOUT => 8,
         CURLOPT_ENCODING       => 'gzip',
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_COOKIEJAR      => $cookieJar,
+        CURLOPT_COOKIEFILE     => $cookieJar,
         CURLOPT_HTTPHEADER     => [
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Accept: application/json,text/html,*/*',
+            'Accept: text/html,application/xhtml+xml,*/*',
             'Accept-Language: en-US,en;q=0.9',
-            'Cache-Control: no-cache',
+        ],
+    ]);
+    curl_exec($ch);
+    curl_close($ch);
+
+    // Step 2: fetch crumb token
+    $ch2 = curl_init('https://query1.finance.yahoo.com/v1/test/csrfToken');
+    curl_setopt_array($ch2, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT        => 10,
+        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_ENCODING       => 'gzip',
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_COOKIEJAR      => $cookieJar,
+        CURLOPT_COOKIEFILE     => $cookieJar,
+        CURLOPT_HTTPHEADER     => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept: application/json',
             'Referer: https://finance.yahoo.com/',
         ],
-        CURLOPT_SSL_VERIFYPEER => false,
     ]);
-    $res = curl_exec($ch);
-    curl_close($ch);
-    return $res;
+    $raw   = curl_exec($ch2);
+    curl_close($ch2);
+
+    $crumb = '';
+    if ($raw) {
+        $json  = json_decode($raw, true);
+        $crumb = $json['crumb'] ?? '';
+        if (!$crumb && strlen(trim($raw)) < 60) $crumb = trim($raw);
+    }
+
+    // Read cookie string from Netscape cookie jar file
+    $cookieStr = '';
+    if (file_exists($cookieJar)) {
+        foreach (file($cookieJar) as $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] === '#') continue;
+            $parts = explode("\t", $line);
+            if (count($parts) >= 7) {
+                $cookieStr .= ($cookieStr ? '; ' : '') . $parts[5] . '=' . $parts[6];
+            }
+        }
+    }
+
+    $result = ['crumb' => $crumb, 'cookie' => $cookieStr, 'ts' => time()];
+    if ($crumb) file_put_contents($crumbFile, json_encode($result));
+    return $result;
+}
+
+/** HTTP GET with Yahoo crumb/cookie auth + query1 fallback. */
+function httpGet(string $url, int $timeout = 15): string|false
+{
+    $crumbData = yahooGetCrumb();
+    $crumb     = $crumbData['crumb'] ?? '';
+    $cookie    = $crumbData['cookie'] ?? '';
+    $cookieJar = STORAGE . '/yahoo_cookie.txt';
+
+    // Append crumb to all Yahoo Finance API calls
+    if ($crumb && str_contains($url, 'finance.yahoo.com')) {
+        $url .= (str_contains($url, '?') ? '&' : '?') . 'crumb=' . urlencode($crumb);
+    }
+
+    // Try query2 first, then query1 as fallback (same API, different servers)
+    $urls = [$url];
+    if (str_contains($url, 'query2.finance.yahoo.com')) {
+        $urls[] = str_replace('query2.finance.yahoo.com', 'query1.finance.yahoo.com', $url);
+    } elseif (str_contains($url, 'query1.finance.yahoo.com')) {
+        $urls[] = str_replace('query1.finance.yahoo.com', 'query2.finance.yahoo.com', $url);
+    }
+
+    foreach ($urls as $tryUrl) {
+        $ch = curl_init($tryUrl);
+        $opts = [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT        => $timeout,
+            CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_ENCODING       => 'gzip',
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_HTTPHEADER     => [
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept: application/json,text/html,*/*',
+                'Accept-Language: en-US,en;q=0.9',
+                'Cache-Control: no-cache',
+                'Referer: https://finance.yahoo.com/',
+            ],
+        ];
+        if ($cookie) {
+            $opts[CURLOPT_COOKIE]     = $cookie;
+            $opts[CURLOPT_COOKIEFILE] = $cookieJar;
+            $opts[CURLOPT_COOKIEJAR]  = $cookieJar;
+        }
+        curl_setopt_array($ch, $opts);
+        $res  = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($res && $code === 200) return $res;
+    }
+    return false;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -2089,7 +2450,8 @@ function getActiveWatchlist(): array
         $custom = json_decode(file_get_contents(WL_FILE), true);
         if (!empty($custom)) return $custom;
     }
-    return array_values(WATCHLIST_SYMBOLS);
+    // Default: top 5 well-known NSE stocks for fast/reliable loading
+    return ['RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 'ICICIBANK.NS'];
 }
 
 /**
@@ -2332,7 +2694,7 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
         'ts'              => time(),
         'quotes_fetched'  => count($allQuotes),
         'skipped_no_quote'=> $skippedNoQuote ?? 0,
-        'warning'         => empty($allQuotes) ? 'Yahoo Finance returned no quotes — possible rate limit or network issue. Try refreshing in a minute.' : null,
+        'warning'         => empty($allQuotes) ? 'Could not fetch quotes from Yahoo Finance or NSE India. Your server IP may be blocked. Visit /api/debug/yahoo to diagnose.' : (count($allQuotes) < 10 ? 'Partial data: only ' . count($allQuotes) . ' quotes fetched. Some stocks may be missing.' : null),
     ];
 }
 
@@ -2663,6 +3025,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <span class="label">Auto-refresh in <strong id="cdSec">300</strong>s</span>
     <div class="rbar-bg"><div class="rbar-fill" id="rbar" style="width:100%"></div></div>
     <button class="btn btn-outline" onclick="wlPage=1;loadWatchlist()" style="padding:5px 12px;font-size:12px" id="refreshBtn">🔄 Refresh</button>
+    <button class="btn btn-outline" onclick="clearYahooCache()" style="padding:5px 12px;font-size:12px;color:var(--orange);border-color:var(--orange)" id="clearCacheBtn" title="Clear Yahoo Finance auth cache and reload">🗑️ Clear Cache</button>
     <div id="cacheNote" style="font-size:11px;color:var(--muted)"></div>
   </div>
 
@@ -2996,6 +3359,20 @@ async function loadWatchlist(force=false){
 
 function goPage(p){wlPage=p;loadWatchlist();}
 function setSector(s){wlSector=s;wlPage=1;loadWatchlist();}
+async function clearYahooCache(){
+  const btn=document.getElementById('clearCacheBtn');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Clearing…';}
+  try{
+    const r=await fetch(apiUrl('api/cache/clear'));
+    const d=await r.json();
+    if(btn){btn.disabled=false;btn.textContent='🗑️ Clear Cache';}
+    wlPage=1;
+    loadWatchlist(true);
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='🗑️ Clear Cache';}
+    alert('Cache clear failed: '+e.message);
+  }
+}
 function setSearch(q){wlSearch=q;wlPage=1;loadWatchlist();}
 
 function renderPagination(d){
@@ -3168,7 +3545,7 @@ async function removeFromWatchlist(sym){
 function renderWatchlistManager(wl){
   const el=document.getElementById('wlItems');
   if(!el)return;
-  if(!wl||!wl.length){el.innerHTML='<span style="color:var(--muted);font-size:11px">Using default 15 stocks</span>';return;}
+  if(!wl||!wl.length){el.innerHTML='<span style="color:var(--muted);font-size:11px">Using default 5 stocks</span>';return;}
   el.innerHTML=wl.map(s=>`<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(0,114,255,.1);border:1px solid rgba(0,114,255,.25);border-radius:5px;padding:2px 7px;font-size:11px;margin:2px">${escHtml(s.replace('.NS',''))}<button onclick="removeFromWatchlist('${escHtml(s)}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;padding:0 2px">×</button></span>`).join('');
 }
 
@@ -3692,7 +4069,7 @@ async function loadChart(sym, interval='5m'){
 
 // Reset custom watchlist to default
 async function resetWatchlist(){
-  if(!confirm('Reset to default 15 stocks?')) return;
+  if(!confirm('Reset to default 5 stocks?')) return;
   const r=await fetch(apiUrl('api/watchlist/reset'),{method:'POST'});
   renderWatchlistManager([]);
   loadWatchlist(true);
@@ -4027,7 +4404,7 @@ function renderPivots(pivots){
 
 // Reset watchlist to default
 async function resetWatchlist(){
-  if(!confirm('Reset to default watchlist? Custom stocks will be removed.')) return;
+  if(!confirm('Reset to default 5 stocks? Custom stocks will be removed.')) return;
   await fetch(apiUrl('api/watchlist/list')).then(r=>r.json()).then(async d=>{
     for(const s of (d.watchlist||[])){
       const fd=new FormData(); fd.append('symbol',s);
