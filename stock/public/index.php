@@ -555,6 +555,34 @@ if ($uri === '/api/eod/dates') {
 
 
 
+// ── Server-side bulk quotes via Stooq (replaces browser Yahoo fetch) ──
+if ($uri === '/api/quotes/bulk' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    header('Content-Type: application/json');
+    $body    = file_get_contents('php://input');
+    $data    = json_decode($body, true);
+    $symbols = $data['symbols'] ?? [];
+    if (empty($symbols)) {
+        echo json_encode(['ok' => false, 'error' => 'No symbols']); exit;
+    }
+    // Sanitize
+    $symbols = array_map(fn($s) => strtoupper(trim($s)), $symbols);
+    $symbols = array_filter($symbols, fn($s) => preg_match('/^[A-Z0-9\.\-&]+$/', $s));
+
+    $quotes = stooqBulkFetch(array_values($symbols));
+
+    // Also save to bulk_quotes.json so server-side TA can read it
+    if (!empty($quotes)) {
+        if (!is_dir(STORAGE)) mkdir(STORAGE, 0755, true);
+        $existing = file_exists(STORAGE . '/bulk_quotes.json')
+            ? json_decode(file_get_contents(STORAGE . '/bulk_quotes.json'), true) : [];
+        foreach ($quotes as $sym => $q) $existing[$sym] = $q;
+        file_put_contents(STORAGE . '/bulk_quotes.json', json_encode($existing));
+    }
+
+    echo json_encode(['ok' => true, 'quotes' => array_values($quotes), 'count' => count($quotes)]);
+    exit;
+}
+
 dashboardPage($APP_NAME, $_SESSION['user'] ?? 'Trader');
 
 // ══════════════════════════════════════════════════════════════
@@ -3579,64 +3607,23 @@ async function loadWatchlist(force=false){
   }
 }
 
-// ── Browser-side quote fetcher with CORS-friendly sources ────────
+// ── Server-side quote fetcher via Stooq (no CORS issues) ────────
 async function browserFetchQuotes(symbols){
-  const all=[];
-  // Fetch one by one using a public CORS proxy approach
-  // Use allorigins.win as CORS proxy to reach Yahoo Finance
-  for(let i=0;i<symbols.length;i+=10){
-    const chunk=symbols.slice(i,i+10);
-    const syms=chunk.map(encodeURIComponent).join(',');
-    const fields='regularMarketPrice,regularMarketChange,regularMarketChangePercent,'
-      +'regularMarketVolume,averageDailyVolume3Month,fiftyTwoWeekHigh,fiftyTwoWeekLow,'
-      +'shortName,longName,regularMarketDayHigh,regularMarketDayLow,'
-      +'regularMarketPreviousClose,regularMarketOpen';
-
-    // Try direct Yahoo first (works if browser allows CORS)
-    let fetched=false;
-    for(const host of ['query1','query2']){
-      try{
-        const r=await fetch(`https://${host}.finance.yahoo.com/v8/finance/quote?symbols=${syms}&fields=${fields}&lang=en-US&region=IN`,
-          {headers:{'Accept':'application/json'},mode:'cors'});
-        if(r.ok){
-          const j=await r.json();
-          const results=j?.quoteResponse?.result||[];
-          if(results.length){all.push(...results);fetched=true;break;}
-        }
-      }catch(e){}
-    }
-
-    // Fallback: use allorigins CORS proxy
-    if(!fetched){
-      try{
-        const targetUrl=encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/quote?symbols=${syms}&fields=${fields}&lang=en-US&region=IN`);
-        const r=await fetch(`https://api.allorigins.win/get?url=${targetUrl}`);
-        if(r.ok){
-          const j=await r.json();
-          const data=JSON.parse(j.contents||'{}');
-          const results=data?.quoteResponse?.result||[];
-          if(results.length){all.push(...results);fetched=true;}
-        }
-      }catch(e){}
-    }
-
-    // Fallback 2: corsproxy.io
-    if(!fetched){
-      try{
-        const targetUrl=`https://query1.finance.yahoo.com/v8/finance/quote?symbols=${syms}&fields=${fields}&lang=en-US&region=IN`;
-        const r=await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
-        if(r.ok){
-          const j=await r.json();
-          const results=j?.quoteResponse?.result||[];
-          if(results.length){all.push(...results);fetched=true;}
-        }
-      }catch(e){}
-    }
-
-    if(i+10<symbols.length) await new Promise(r=>setTimeout(r,200));
+  try{
+    const r=await fetch(apiUrl('api/quotes/bulk'),{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({symbols})
+    });
+    if(!r.ok) return [];
+    const d=await r.json();
+    return d.quotes||[];
+  }catch(e){
+    console.error('Quote fetch error:',e);
+    return [];
   }
-  return all;
 }
+
 
 // ── Browser-side history fetcher ──────────────────────────────────
 async function browserFetchHistory(yahooSym){
