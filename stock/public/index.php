@@ -655,11 +655,12 @@ if ($uri === '/api/debug/yahoo') {
         'diagnosis' => $code === 200 ? 'PASS' : ($errno !== 0 ? "FAIL: curl error {$errno} — {$err}" : "FAIL: HTTP {$code}"),
     ];
 
-    // Test 2: crumb fetch (needed for authenticated v8 calls)
-    $crumb = yahooGetCrumb();
+    // Test 2: crumb fetch (needed for authenticated v8 calls) — force fresh, bypass cache
+    $crumb = yahooGetCrumb(true);
     $out['crumb'] = [
         'crumb'=>$crumb['crumb']??'', 'cookie_len'=>strlen($crumb['cookie']??''), 'ts'=>$crumb['ts']??0,
-        'diagnosis' => !empty($crumb['crumb']) ? 'PASS: got crumb' : 'FAIL: no crumb obtained — Yahoo auth handshake failed',
+        'steps' => $crumb['debug'] ?? null,
+        'diagnosis' => !empty($crumb['crumb']) ? 'PASS: got crumb' : 'FAIL: see steps.step1_homepage / steps.step2_crumb for exact cause',
     ];
 
     // Test 3: authenticated fetch via httpGetDebug (shows every attempt, no swallowing)
@@ -1575,15 +1576,17 @@ function yahooHistory(string $symbol, int $days = 90): array
  * Fetch Yahoo Finance crumb + cookies (required since 2023 anti-bot update).
  * Cached in storage for 30 minutes.
  */
-function yahooGetCrumb(): array
+function yahooGetCrumb(bool $forceDebug = false): array
 {
     $crumbFile = STORAGE . '/yahoo_crumb.json';
-    if (file_exists($crumbFile) && (time() - filemtime($crumbFile)) < 1800) {
+    if (!$forceDebug && file_exists($crumbFile) && (time() - filemtime($crumbFile)) < 1800) {
         $cached = json_decode(file_get_contents($crumbFile), true);
         if (!empty($cached['crumb']) && !empty($cached['cookie'])) return $cached;
     }
 
     $cookieJar = STORAGE . '/yahoo_cookie.txt';
+    @unlink($cookieJar); // start fresh so the cookie jar reflects this attempt only
+    $debug = [];
 
     // Step 1: hit the main page to get cookies
     $ch = curl_init('https://finance.yahoo.com/');
@@ -1602,10 +1605,25 @@ function yahooGetCrumb(): array
             'Accept-Language: en-US,en;q=0.9',
         ],
     ]);
-    curl_exec($ch);
+    $step1Body = curl_exec($ch);
+    $debug['step1_homepage'] = [
+        'http_code'  => curl_getinfo($ch, CURLINFO_HTTP_CODE),
+        'curl_errno' => curl_errno($ch),
+        'curl_error' => curl_error($ch) ?: null,
+        'final_url'  => curl_getinfo($ch, CURLINFO_EFFECTIVE_URL),
+        'body_len'   => $step1Body !== false ? strlen($step1Body) : 0,
+    ];
     curl_close($ch);
 
-    // Step 2: fetch crumb token
+    $cookieCountAfterStep1 = 0;
+    if (file_exists($cookieJar)) {
+        foreach (file($cookieJar) as $line) {
+            if (trim($line) !== '' && $line[0] !== '#') $cookieCountAfterStep1++;
+        }
+    }
+    $debug['step1_homepage']['cookies_set'] = $cookieCountAfterStep1;
+
+    // Step 2: fetch crumb token (requires the cookie from step 1)
     $ch2 = curl_init('https://query1.finance.yahoo.com/v1/test/csrfToken');
     curl_setopt_array($ch2, [
         CURLOPT_RETURNTRANSFER => true,
@@ -1622,15 +1640,22 @@ function yahooGetCrumb(): array
             'Referer: https://finance.yahoo.com/',
         ],
     ]);
-    $raw   = curl_exec($ch2);
+    $raw = curl_exec($ch2);
+    $debug['step2_crumb'] = [
+        'http_code'  => curl_getinfo($ch2, CURLINFO_HTTP_CODE),
+        'curl_errno' => curl_errno($ch2),
+        'curl_error' => curl_error($ch2) ?: null,
+        'body_preview' => $raw !== false ? substr((string)$raw, 0, 200) : null,
+    ];
     curl_close($ch2);
 
     $crumb = '';
     if ($raw) {
         $json  = json_decode($raw, true);
         $crumb = $json['crumb'] ?? '';
-        if (!$crumb && strlen(trim($raw)) < 60) $crumb = trim($raw);
+        if (!$crumb && strlen(trim($raw)) < 60 && !str_contains($raw, '<')) $crumb = trim($raw, "\" \t\n\r");
     }
+    $debug['step2_crumb']['extracted_crumb'] = $crumb ?: null;
 
     // Read cookie string from Netscape cookie jar file
     $cookieStr = '';
@@ -1645,7 +1670,7 @@ function yahooGetCrumb(): array
         }
     }
 
-    $result = ['crumb' => $crumb, 'cookie' => $cookieStr, 'ts' => time()];
+    $result = ['crumb' => $crumb, 'cookie' => $cookieStr, 'ts' => time(), 'debug' => $debug];
     if ($crumb) file_put_contents($crumbFile, json_encode($result));
     return $result;
 }
