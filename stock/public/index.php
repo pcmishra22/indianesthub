@@ -4314,6 +4314,9 @@ async function fetchQuotesDirect(symbols){
 async function browserFetchQuotes(symbols){
   return fetchQuotesDirect(symbols);
 }
+
+// ── Browser-side history fetcher ──────────────────────────────────
+async function browserFetchHistory(yahooSym){
   const p2=Math.floor(Date.now()/1000);
   const p1=p2-(90*86400);
   const base=yahooSym.replace('.NS','').replace('.BO','');
