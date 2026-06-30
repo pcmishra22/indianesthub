@@ -303,24 +303,36 @@ if ($uri === '/api/debug/quicktest') {
     // CHECKPOINT 3: NSE India API connectivity
     // ══════════════════════════════════════════════════════
     $t0 = microtime(true);
-    // Step 3a: get NSE cookie first
-    $cookieJar = STORAGE . '/nse_cookie_debug.txt';
+    // Step 3a: get NSE cookie first (parse Set-Cookie headers directly — jar file proven unreliable)
+    $rawHeaders3 = '';
     $ch3 = curl_init('https://www.nseindia.com/');
     curl_setopt_array($ch3, [
         CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8,
         CURLOPT_SSL_VERIFYPEER => false, CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_COOKIEJAR => $cookieJar, CURLOPT_COOKIEFILE => $cookieJar,
+        CURLOPT_HEADERFUNCTION => function ($c, $h) use (&$rawHeaders3) { $rawHeaders3 .= $h; return strlen($h); },
         CURLOPT_HTTPHEADER => ['User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'],
     ]);
-    $rawHome = curl_exec($ch3);
+    curl_exec($ch3);
     $codeHome = curl_getinfo($ch3, CURLINFO_HTTP_CODE);
     curl_close($ch3);
+
+    $nseCookieMap = [];
+    foreach (explode("\r\n", $rawHeaders3) as $hLine) {
+        if (stripos($hLine, 'set-cookie:') !== 0) continue;
+        $seg = explode(';', trim(substr($hLine, strlen('set-cookie:'))), 2)[0];
+        $eq  = strpos($seg, '=');
+        if ($eq === false) continue;
+        $nseCookieMap[trim(substr($seg, 0, $eq))] = trim(substr($seg, $eq + 1));
+    }
+    $nseCookieStr = '';
+    foreach ($nseCookieMap as $name => $value) { $nseCookieStr .= ($nseCookieStr ? '; ' : '') . $name . '=' . $value; }
+
     // Step 3b: actual API call
     $ch3b = curl_init('https://www.nseindia.com/api/quote-equity?symbol=RELIANCE');
     curl_setopt_array($ch3b, [
         CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10,
         CURLOPT_SSL_VERIFYPEER => false, CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_COOKIEJAR => $cookieJar, CURLOPT_COOKIEFILE => $cookieJar,
+        CURLOPT_COOKIE => $nseCookieStr,
         CURLOPT_HTTPHEADER => [
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept: application/json', 'Referer: https://www.nseindia.com/',
@@ -337,6 +349,7 @@ if ($uri === '/api/debug/quicktest') {
         'label'            => 'NSE India API (nseindia.com)',
         'ok'               => $nsePrice > 0,
         'homepage_http'    => $codeHome,
+        'cookies_captured' => count($nseCookieMap),
         'api_http'         => $code3,
         'curl_error'       => $err3 ?: null,
         'reliance_price'   => $nsePrice,
@@ -631,7 +644,7 @@ if ($uri === '/api/watchlist/reset' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 if ($uri === '/api/cache/clear') {
     header('Content-Type: application/json');
     $cleared = [];
-    foreach (['/yahoo_crumb.json', '/yahoo_cookie.txt', '/bulk_quotes.json'] as $f) {
+    foreach (['/yahoo_crumb.json', '/nse_cookie.json', '/nse_mkt_cookie.json', '/bulk_quotes.json'] as $f) {
         $p = STORAGE . $f;
         if (file_exists($p)) { unlink($p); $cleared[] = basename($f); }
     }
@@ -913,29 +926,49 @@ function yahooQuote(string $symbol): ?array
  */
 function nseQuoteFallback(string $symbol): ?array
 {
-    $nseSym    = strtoupper(str_replace('.NS', '', $symbol));
-    $cookieJar = STORAGE . '/nse_cookie.txt';
+    $nseSym = strtoupper(str_replace('.NS', '', $symbol));
 
-    // NSE needs a browser session — hit the homepage first to get cookies
-    if (!file_exists($cookieJar) || (time() - filemtime($cookieJar)) > 3600) {
+    $cookieFile = STORAGE . '/nse_cookie.json';
+    $cookieStr  = '';
+    if (file_exists($cookieFile) && (time() - filemtime($cookieFile)) < 3600) {
+        $cookieStr = json_decode(file_get_contents($cookieFile), true)['cookie'] ?? '';
+    }
+
+    if (!$cookieStr) {
+        // NSE needs a browser session — hit the homepage first to capture cookies from headers
+        $rawHeaders = '';
         $ch = curl_init('https://www.nseindia.com/');
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_COOKIEJAR => $cookieJar, CURLOPT_COOKIEFILE => $cookieJar,
+            CURLOPT_HEADERFUNCTION => function ($c, $h) use (&$rawHeaders) { $rawHeaders .= $h; return strlen($h); },
             CURLOPT_HTTPHEADER => [
                 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
                 'Accept: text/html,*/*', 'Accept-Language: en-IN,en;q=0.9',
             ],
         ]);
         curl_exec($ch); curl_close($ch);
+
+        $cookieMap = [];
+        foreach (explode("\r\n", $rawHeaders) as $hLine) {
+            if (stripos($hLine, 'set-cookie:') !== 0) continue;
+            $part = trim(substr($hLine, strlen('set-cookie:')));
+            $seg  = explode(';', $part, 2)[0];
+            $eq   = strpos($seg, '=');
+            if ($eq === false) continue;
+            $cookieMap[trim(substr($seg, 0, $eq))] = trim(substr($seg, $eq + 1));
+        }
+        foreach ($cookieMap as $name => $value) {
+            $cookieStr .= ($cookieStr ? '; ' : '') . $name . '=' . $value;
+        }
+        if ($cookieStr) file_put_contents($cookieFile, json_encode(['cookie' => $cookieStr]));
     }
 
     $ch = curl_init('https://www.nseindia.com/api/quote-equity?symbol=' . urlencode($nseSym));
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_COOKIEJAR => $cookieJar, CURLOPT_COOKIEFILE => $cookieJar,
+        CURLOPT_COOKIE => $cookieStr,
         CURLOPT_HTTPHEADER => [
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             'Accept: application/json, text/plain, */*',
@@ -1245,15 +1278,20 @@ function growwQuoteFetch(string $nseSymbol): ?array
 function nseMarketFetch(string $symbol): ?array
 {
     $sym = strtoupper(str_replace('.NS', '', $symbol));
-    $cookieJar = STORAGE . '/nse_mkt_cookie.txt';
+    $cookieFile = STORAGE . '/nse_mkt_cookie.json';
+    $cookieStr  = '';
+    if (file_exists($cookieFile) && (time() - filemtime($cookieFile)) < 1800) {
+        $cookieStr = json_decode(file_get_contents($cookieFile), true)['cookie'] ?? '';
+    }
 
-    // Warm up session with homepage visit
-    if (!file_exists($cookieJar) || (time() - filemtime($cookieJar)) > 1800) {
+    // Warm up session with homepage visit if we don't have a fresh cookie
+    if (!$cookieStr) {
+        $rawHeaders = '';
         $ch = curl_init('https://www.nseindia.com/market-data/live-equity-market');
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_COOKIEJAR => $cookieJar, CURLOPT_COOKIEFILE => $cookieJar,
+            CURLOPT_HEADERFUNCTION => function ($c, $h) use (&$rawHeaders) { $rawHeaders .= $h; return strlen($h); },
             CURLOPT_HTTPHEADER => [
                 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
                 'Accept: text/html,application/xhtml+xml,*/*;q=0.9',
@@ -1265,6 +1303,17 @@ function nseMarketFetch(string $symbol): ?array
         ]);
         curl_exec($ch); curl_close($ch);
         usleep(500000); // 500ms pause — NSE needs time between calls
+
+        $cookieMap = [];
+        foreach (explode("\r\n", $rawHeaders) as $hLine) {
+            if (stripos($hLine, 'set-cookie:') !== 0) continue;
+            $seg = explode(';', trim(substr($hLine, strlen('set-cookie:'))), 2)[0];
+            $eq  = strpos($seg, '=');
+            if ($eq === false) continue;
+            $cookieMap[trim(substr($seg, 0, $eq))] = trim(substr($seg, $eq + 1));
+        }
+        foreach ($cookieMap as $name => $value) { $cookieStr .= ($cookieStr ? '; ' : '') . $name . '=' . $value; }
+        if ($cookieStr) file_put_contents($cookieFile, json_encode(['cookie' => $cookieStr]));
     }
 
     // API call with full session headers
@@ -1273,7 +1322,7 @@ function nseMarketFetch(string $symbol): ?array
         CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_TIMEOUT => 12, CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_ENCODING => 'gzip',
-        CURLOPT_COOKIEJAR => $cookieJar, CURLOPT_COOKIEFILE => $cookieJar,
+        CURLOPT_COOKIE => $cookieStr,
         CURLOPT_HTTPHEADER => [
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
             'Accept: application/json, text/plain, */*',
@@ -1398,7 +1447,6 @@ function yahooQuoteBulk(array $symbols): array
         $crumbData  = yahooGetCrumb();
         $crumb      = $crumbData['crumb'] ?? '';
         $cookie     = $crumbData['cookie'] ?? '';
-        $cookieJar  = STORAGE . '/yahoo_cookie.txt';
         $crumbParam = $crumb ? '&crumb=' . urlencode($crumb) : '';
         $fields     = 'regularMarketPrice,regularMarketChange,regularMarketChangePercent,'
                     . 'regularMarketVolume,averageDailyVolume3Month,fiftyTwoWeekHigh,fiftyTwoWeekLow,'
@@ -1420,7 +1468,7 @@ function yahooQuoteBulk(array $symbols): array
                         'Referer: https://finance.yahoo.com/',
                     ],
                 ];
-                if ($cookie) { $opts[CURLOPT_COOKIE] = $cookie; $opts[CURLOPT_COOKIEFILE] = $cookieJar; $opts[CURLOPT_COOKIEJAR] = $cookieJar; }
+                if ($cookie) { $opts[CURLOPT_COOKIE] = $cookie; }
                 curl_setopt_array($ch, $opts);
                 $raw  = curl_exec($ch);
                 $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -1584,11 +1632,12 @@ function yahooGetCrumb(bool $forceDebug = false): array
         if (!empty($cached['crumb']) && !empty($cached['cookie'])) return $cached;
     }
 
-    $cookieJar = STORAGE . '/yahoo_cookie.txt';
-    @unlink($cookieJar); // start fresh so the cookie jar reflects this attempt only
     $debug = [];
 
-    // Step 1: hit the main page to get cookies
+    // ── Step 1: hit the homepage and capture Set-Cookie headers directly ──
+    // (Not relying on CURLOPT_COOKIEJAR file — proven unreliable in this environment;
+    //  parsing Set-Cookie headers via CURLOPT_HEADERFUNCTION is robust everywhere.)
+    $rawHeaders1 = '';
     $ch = curl_init('https://finance.yahoo.com/');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
@@ -1597,44 +1646,52 @@ function yahooGetCrumb(bool $forceDebug = false): array
         CURLOPT_CONNECTTIMEOUT => 8,
         CURLOPT_ENCODING       => 'gzip',
         CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_HEADER         => true,
-        CURLOPT_COOKIEJAR      => $cookieJar,
-        CURLOPT_COOKIEFILE     => $cookieJar,
+        CURLOPT_HEADERFUNCTION => function ($curlHandle, $headerLine) use (&$rawHeaders1) {
+            $rawHeaders1 .= $headerLine;
+            return strlen($headerLine);
+        },
         CURLOPT_HTTPHEADER     => [
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             'Accept: text/html,application/xhtml+xml,*/*',
             'Accept-Language: en-US,en;q=0.9',
         ],
     ]);
-    $step1Raw = curl_exec($ch);
-    $step1HeaderSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-    $step1Headers = $step1Raw !== false ? substr($step1Raw, 0, $step1HeaderSize) : '';
-    $step1Body = $step1Raw !== false ? substr($step1Raw, $step1HeaderSize) : false;
-    $setCookieLines = [];
-    foreach (explode("\r\n", $step1Headers) as $hLine) {
-        if (stripos($hLine, 'set-cookie:') === 0) $setCookieLines[] = $hLine;
-    }
-    $debug['step1_homepage'] = [
-        'http_code'        => curl_getinfo($ch, CURLINFO_HTTP_CODE),
-        'curl_errno'       => curl_errno($ch),
-        'curl_error'       => curl_error($ch) ?: null,
-        'final_url'        => curl_getinfo($ch, CURLINFO_EFFECTIVE_URL),
-        'body_len'         => $step1Body !== false ? strlen($step1Body) : 0,
-        'raw_set_cookie_headers' => $setCookieLines,
-        'set_cookie_header_count' => count($setCookieLines),
-        'all_response_headers_preview' => substr($step1Headers, 0, 1500),
-    ];
+    $step1Body = curl_exec($ch);
+    $step1Code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $step1Err  = curl_error($ch);
+    $step1Errno= curl_errno($ch);
     curl_close($ch);
 
-    $cookieCountAfterStep1 = 0;
-    if (file_exists($cookieJar)) {
-        foreach (file($cookieJar) as $line) {
-            if (trim($line) !== '' && $line[0] !== '#') $cookieCountAfterStep1++;
-        }
+    // Parse cookie NAME=VALUE pairs out of every Set-Cookie header (handles redirects: multiple headers possible)
+    $cookieJarMap = []; // name => value
+    foreach (explode("\r\n", $rawHeaders1) as $hLine) {
+        if (stripos($hLine, 'set-cookie:') !== 0) continue;
+        $cookiePart = trim(substr($hLine, strlen('set-cookie:')));
+        $firstSegment = explode(';', $cookiePart, 2)[0]; // "NAME=VALUE"
+        $eqPos = strpos($firstSegment, '=');
+        if ($eqPos === false) continue;
+        $name  = trim(substr($firstSegment, 0, $eqPos));
+        $value = trim(substr($firstSegment, $eqPos + 1));
+        if ($name !== '') $cookieJarMap[$name] = $value;
     }
-    $debug['step1_homepage']['cookies_set'] = $cookieCountAfterStep1;
 
-    // Step 2: fetch crumb token (requires the cookie from step 1)
+    $debug['step1_homepage'] = [
+        'http_code'   => $step1Code,
+        'curl_errno'  => $step1Errno,
+        'curl_error'  => $step1Err ?: null,
+        'body_len'    => $step1Body !== false ? strlen($step1Body) : 0,
+        'cookies_parsed_from_headers' => array_keys($cookieJarMap),
+        'cookies_set' => count($cookieJarMap),
+    ];
+
+    // Build the Cookie header string to send on subsequent requests
+    $cookieStr = '';
+    foreach ($cookieJarMap as $name => $value) {
+        $cookieStr .= ($cookieStr ? '; ' : '') . $name . '=' . $value;
+    }
+
+    // ── Step 2: fetch crumb token, sending the cookie string we just parsed ──
+    $rawHeaders2 = '';
     $ch2 = curl_init('https://query1.finance.yahoo.com/v1/test/csrfToken');
     curl_setopt_array($ch2, [
         CURLOPT_RETURNTRANSFER => true,
@@ -1643,8 +1700,11 @@ function yahooGetCrumb(bool $forceDebug = false): array
         CURLOPT_CONNECTTIMEOUT => 8,
         CURLOPT_ENCODING       => 'gzip',
         CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_COOKIEJAR      => $cookieJar,
-        CURLOPT_COOKIEFILE     => $cookieJar,
+        CURLOPT_COOKIE         => $cookieStr,
+        CURLOPT_HEADERFUNCTION => function ($curlHandle, $headerLine) use (&$rawHeaders2) {
+            $rawHeaders2 .= $headerLine;
+            return strlen($headerLine);
+        },
         CURLOPT_HTTPHEADER     => [
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
             'Accept: application/json',
@@ -1652,13 +1712,34 @@ function yahooGetCrumb(bool $forceDebug = false): array
         ],
     ]);
     $raw = curl_exec($ch2);
+    $step2Code  = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+    $step2Err   = curl_error($ch2);
+    $step2Errno = curl_errno($ch2);
+    curl_close($ch2);
+
+    // Step 2 may also set/refresh cookies — merge them in too
+    foreach (explode("\r\n", $rawHeaders2) as $hLine) {
+        if (stripos($hLine, 'set-cookie:') !== 0) continue;
+        $cookiePart = trim(substr($hLine, strlen('set-cookie:')));
+        $firstSegment = explode(';', $cookiePart, 2)[0];
+        $eqPos = strpos($firstSegment, '=');
+        if ($eqPos === false) continue;
+        $name  = trim(substr($firstSegment, 0, $eqPos));
+        $value = trim(substr($firstSegment, $eqPos + 1));
+        if ($name !== '') $cookieJarMap[$name] = $value;
+    }
+    $cookieStr = '';
+    foreach ($cookieJarMap as $name => $value) {
+        $cookieStr .= ($cookieStr ? '; ' : '') . $name . '=' . $value;
+    }
+
     $debug['step2_crumb'] = [
-        'http_code'  => curl_getinfo($ch2, CURLINFO_HTTP_CODE),
-        'curl_errno' => curl_errno($ch2),
-        'curl_error' => curl_error($ch2) ?: null,
+        'http_code'    => $step2Code,
+        'curl_errno'   => $step2Errno,
+        'curl_error'   => $step2Err ?: null,
+        'cookie_sent_len' => strlen($cookieStr),
         'body_preview' => $raw !== false ? substr((string)$raw, 0, 200) : null,
     ];
-    curl_close($ch2);
 
     $crumb = '';
     if ($raw) {
@@ -1667,19 +1748,6 @@ function yahooGetCrumb(bool $forceDebug = false): array
         if (!$crumb && strlen(trim($raw)) < 60 && !str_contains($raw, '<')) $crumb = trim($raw, "\" \t\n\r");
     }
     $debug['step2_crumb']['extracted_crumb'] = $crumb ?: null;
-
-    // Read cookie string from Netscape cookie jar file
-    $cookieStr = '';
-    if (file_exists($cookieJar)) {
-        foreach (file($cookieJar) as $line) {
-            $line = trim($line);
-            if ($line === '' || $line[0] === '#') continue;
-            $parts = explode("\t", $line);
-            if (count($parts) >= 7) {
-                $cookieStr .= ($cookieStr ? '; ' : '') . $parts[5] . '=' . $parts[6];
-            }
-        }
-    }
 
     $result = ['crumb' => $crumb, 'cookie' => $cookieStr, 'ts' => time(), 'debug' => $debug];
     if ($crumb) file_put_contents($crumbFile, json_encode($result));
@@ -1702,7 +1770,6 @@ function httpGetDebug(string $url, int $timeout = 15): array
     $crumbData = yahooGetCrumb();
     $crumb     = $crumbData['crumb'] ?? '';
     $cookie    = $crumbData['cookie'] ?? '';
-    $cookieJar = STORAGE . '/yahoo_cookie.txt';
 
     if ($crumb && str_contains($url, 'finance.yahoo.com')) {
         $url .= (str_contains($url, '?') ? '&' : '?') . 'crumb=' . urlencode($crumb);
@@ -1734,9 +1801,7 @@ function httpGetDebug(string $url, int $timeout = 15): array
             ],
         ];
         if ($cookie) {
-            $opts[CURLOPT_COOKIE]     = $cookie;
-            $opts[CURLOPT_COOKIEFILE] = $cookieJar;
-            $opts[CURLOPT_COOKIEJAR]  = $cookieJar;
+            $opts[CURLOPT_COOKIE] = $cookie;
         }
         curl_setopt_array($ch, $opts);
         $res       = curl_exec($ch);
