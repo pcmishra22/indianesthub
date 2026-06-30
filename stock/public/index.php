@@ -1597,6 +1597,7 @@ function yahooGetCrumb(bool $forceDebug = false): array
         CURLOPT_CONNECTTIMEOUT => 8,
         CURLOPT_ENCODING       => 'gzip',
         CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_HEADER         => true,
         CURLOPT_COOKIEJAR      => $cookieJar,
         CURLOPT_COOKIEFILE     => $cookieJar,
         CURLOPT_HTTPHEADER     => [
@@ -1605,13 +1606,23 @@ function yahooGetCrumb(bool $forceDebug = false): array
             'Accept-Language: en-US,en;q=0.9',
         ],
     ]);
-    $step1Body = curl_exec($ch);
+    $step1Raw = curl_exec($ch);
+    $step1HeaderSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+    $step1Headers = $step1Raw !== false ? substr($step1Raw, 0, $step1HeaderSize) : '';
+    $step1Body = $step1Raw !== false ? substr($step1Raw, $step1HeaderSize) : false;
+    $setCookieLines = [];
+    foreach (explode("\r\n", $step1Headers) as $hLine) {
+        if (stripos($hLine, 'set-cookie:') === 0) $setCookieLines[] = $hLine;
+    }
     $debug['step1_homepage'] = [
-        'http_code'  => curl_getinfo($ch, CURLINFO_HTTP_CODE),
-        'curl_errno' => curl_errno($ch),
-        'curl_error' => curl_error($ch) ?: null,
-        'final_url'  => curl_getinfo($ch, CURLINFO_EFFECTIVE_URL),
-        'body_len'   => $step1Body !== false ? strlen($step1Body) : 0,
+        'http_code'        => curl_getinfo($ch, CURLINFO_HTTP_CODE),
+        'curl_errno'       => curl_errno($ch),
+        'curl_error'       => curl_error($ch) ?: null,
+        'final_url'        => curl_getinfo($ch, CURLINFO_EFFECTIVE_URL),
+        'body_len'         => $step1Body !== false ? strlen($step1Body) : 0,
+        'raw_set_cookie_headers' => $setCookieLines,
+        'set_cookie_header_count' => count($setCookieLines),
+        'all_response_headers_preview' => substr($step1Headers, 0, 1500),
     ];
     curl_close($ch);
 
