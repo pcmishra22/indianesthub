@@ -688,11 +688,64 @@ if ($uri === '/api/debug/yahoo') {
             : 'FAIL: see attempts[] above for exact HTTP code + curl error per host tried',
     ];
 
-    // Test 4: Stooq fallback
+    // Test 4: v8 quote with cookie only, NO crumb param at all — isolates whether crumb is actually required
+    $crumbForCookie = yahooGetCrumb();
+    $cookieOnly = $crumbForCookie['cookie'] ?? '';
+    $rawHeadersT4 = '';
+    $ch4 = curl_init('https://query1.finance.yahoo.com/v8/finance/quote?symbols=TCS.NS&fields=regularMarketPrice&lang=en-US&region=IN');
+    curl_setopt_array($ch4, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 12, CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_COOKIE => $cookieOnly,
+        CURLOPT_HEADERFUNCTION => function($c,$h) use (&$rawHeadersT4) { $rawHeadersT4 .= $h; return strlen($h); },
+        CURLOPT_HTTPHEADER => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept: application/json', 'Referer: https://finance.yahoo.com/',
+        ],
+    ]);
+    $rawT4 = curl_exec($ch4);
+    $codeT4 = curl_getinfo($ch4, CURLINFO_HTTP_CODE);
+    curl_close($ch4);
+    $dataT4 = $rawT4 ? json_decode($rawT4, true) : null;
+    $out['test4_v8_cookie_no_crumb'] = [
+        'http_code' => $codeT4,
+        'cookie_sent_len' => strlen($cookieOnly),
+        'got_data'  => !empty($dataT4['quoteResponse']['result']),
+        'price'     => $dataT4['quoteResponse']['result'][0]['regularMarketPrice'] ?? null,
+        'body_preview' => $rawT4 !== false ? substr((string)$rawT4, 0, 300) : null,
+        'diagnosis' => !empty($dataT4['quoteResponse']['result']) ? 'PASS: v8 works with cookie alone, crumb not required!'
+            : "FAIL: HTTP {$codeT4} even with cookie, no crumb",
+    ];
+
+    // Test 5: v7 quote endpoint with cookie (different endpoint, sometimes has different rules)
+    $ch5 = curl_init('https://query1.finance.yahoo.com/v7/finance/quote?symbols=TCS.NS&fields=regularMarketPrice');
+    curl_setopt_array($ch5, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 12, CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_COOKIE => $cookieOnly,
+        CURLOPT_HTTPHEADER => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept: application/json', 'Referer: https://finance.yahoo.com/',
+        ],
+    ]);
+    $rawT5 = curl_exec($ch5);
+    $codeT5 = curl_getinfo($ch5, CURLINFO_HTTP_CODE);
+    curl_close($ch5);
+    $dataT5 = $rawT5 ? json_decode($rawT5, true) : null;
+    $out['test5_v7_with_cookie'] = [
+        'http_code' => $codeT5,
+        'got_data'  => !empty($dataT5['quoteResponse']['result']),
+        'price'     => $dataT5['quoteResponse']['result'][0]['regularMarketPrice'] ?? null,
+        'body_preview' => $rawT5 !== false ? substr((string)$rawT5, 0, 300) : null,
+        'diagnosis' => !empty($dataT5['quoteResponse']['result']) ? 'PASS: v7 works with cookie!'
+            : "FAIL: HTTP {$codeT5}",
+    ];
+
+    // Test 6: Stooq fallback
     $stooqResult = stooqQuoteFallback('TCS.NS');
     $out['stooq_fetch'] = ['got_data'=>!empty($stooqResult), 'price'=>$stooqResult['regularMarketPrice']??null];
 
-    // Test 5: NSE fallback
+    // Test 7: NSE fallback
     $nseResult = nseQuoteFallback('TCS.NS');
     $out['nse_fetch'] = ['got_data'=>!empty($nseResult), 'price'=>$nseResult['regularMarketPrice']??null];
 
@@ -1739,6 +1792,8 @@ function yahooGetCrumb(bool $forceDebug = false): array
         'curl_error'   => $step2Err ?: null,
         'cookie_sent_len' => strlen($cookieStr),
         'body_preview' => $raw !== false ? substr((string)$raw, 0, 200) : null,
+        'body_full_len' => $raw !== false ? strlen($raw) : 0,
+        'body_full'    => $raw !== false ? $raw : null,
     ];
 
     $crumb = '';
