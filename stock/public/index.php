@@ -644,21 +644,35 @@ if ($uri === '/api/debug/yahoo') {
     header('Content-Type: application/json');
     $out = [];
 
-    // Test 1: plain connectivity
+    // Test 1: plain connectivity (no crumb, no cookie)
     $ch = curl_init('https://query1.finance.yahoo.com/v8/finance/quote?symbols=TCS.NS&fields=regularMarketPrice&lang=en-US&region=IN');
     curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>10, CURLOPT_SSL_VERIFYPEER=>false,
         CURLOPT_HTTPHEADER=>['User-Agent: Mozilla/5.0','Accept: application/json']]);
-    $r = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
-    $out['plain_fetch'] = ['http_code'=>$code, 'curl_error'=>$err, 'body_preview'=>substr($r,0,200)];
+    $r = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); $errno = curl_errno($ch); curl_close($ch);
+    $out['plain_fetch'] = [
+        'http_code'=>$code, 'curl_errno'=>$errno, 'curl_error'=>$err ?: null,
+        'body_preview'=>substr((string)($r ?: ''), 0, 300),
+        'diagnosis' => $code === 200 ? 'PASS' : ($errno !== 0 ? "FAIL: curl error {$errno} — {$err}" : "FAIL: HTTP {$code}"),
+    ];
 
-    // Test 2: crumb fetch
+    // Test 2: crumb fetch (needed for authenticated v8 calls)
     $crumb = yahooGetCrumb();
-    $out['crumb'] = ['crumb'=>$crumb['crumb']??'', 'cookie_len'=>strlen($crumb['cookie']??''), 'ts'=>$crumb['ts']??0];
+    $out['crumb'] = [
+        'crumb'=>$crumb['crumb']??'', 'cookie_len'=>strlen($crumb['cookie']??''), 'ts'=>$crumb['ts']??0,
+        'diagnosis' => !empty($crumb['crumb']) ? 'PASS: got crumb' : 'FAIL: no crumb obtained — Yahoo auth handshake failed',
+    ];
 
-    // Test 3: authenticated fetch
-    $raw = httpGet('https://query1.finance.yahoo.com/v8/finance/quote?symbols=TCS.NS&fields=regularMarketPrice&lang=en-US&region=IN', 15);
-    $data = $raw ? json_decode($raw, true) : null;
-    $out['auth_fetch'] = ['got_data'=>!empty($data['quoteResponse']['result']), 'price'=>$data['quoteResponse']['result'][0]['regularMarketPrice']??null, 'raw_preview'=>substr($raw??'',0,300)];
+    // Test 3: authenticated fetch via httpGetDebug (shows every attempt, no swallowing)
+    $debugResult = httpGetDebug('https://query1.finance.yahoo.com/v8/finance/quote?symbols=TCS.NS&fields=regularMarketPrice&lang=en-US&region=IN', 15);
+    $data = $debugResult['body'] ? json_decode($debugResult['body'], true) : null;
+    $out['auth_fetch'] = [
+        'got_data'    => !empty($data['quoteResponse']['result']),
+        'price'       => $data['quoteResponse']['result'][0]['regularMarketPrice'] ?? null,
+        'final_code'  => $debugResult['code'],
+        'attempts'    => $debugResult['attempts'],
+        'diagnosis'   => !empty($data['quoteResponse']['result']) ? 'PASS'
+            : 'FAIL: see attempts[] above for exact HTTP code + curl error per host tried',
+    ];
 
     // Test 4: Stooq fallback
     $stooqResult = stooqQuoteFallback('TCS.NS');
@@ -1639,17 +1653,25 @@ function yahooGetCrumb(): array
 /** HTTP GET with Yahoo crumb/cookie auth + query1 fallback. */
 function httpGet(string $url, int $timeout = 15): string|false
 {
+    $result = httpGetDebug($url, $timeout);
+    return $result['body'] !== null && $result['code'] === 200 ? $result['body'] : false;
+}
+
+/**
+ * Same as httpGet but returns full diagnostic info instead of swallowing errors.
+ * Used by debug endpoints and by httpGet() itself.
+ */
+function httpGetDebug(string $url, int $timeout = 15): array
+{
     $crumbData = yahooGetCrumb();
     $crumb     = $crumbData['crumb'] ?? '';
     $cookie    = $crumbData['cookie'] ?? '';
     $cookieJar = STORAGE . '/yahoo_cookie.txt';
 
-    // Append crumb to all Yahoo Finance API calls
     if ($crumb && str_contains($url, 'finance.yahoo.com')) {
         $url .= (str_contains($url, '?') ? '&' : '?') . 'crumb=' . urlencode($crumb);
     }
 
-    // Try query2 first, then query1 as fallback (same API, different servers)
     $urls = [$url];
     if (str_contains($url, 'query2.finance.yahoo.com')) {
         $urls[] = str_replace('query2.finance.yahoo.com', 'query1.finance.yahoo.com', $url);
@@ -1657,6 +1679,7 @@ function httpGet(string $url, int $timeout = 15): string|false
         $urls[] = str_replace('query1.finance.yahoo.com', 'query2.finance.yahoo.com', $url);
     }
 
+    $attempts = [];
     foreach ($urls as $tryUrl) {
         $ch = curl_init($tryUrl);
         $opts = [
@@ -1680,12 +1703,25 @@ function httpGet(string $url, int $timeout = 15): string|false
             $opts[CURLOPT_COOKIEJAR]  = $cookieJar;
         }
         curl_setopt_array($ch, $opts);
-        $res  = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $res       = curl_exec($ch);
+        $code      = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr   = curl_error($ch);
+        $curlErrno = curl_errno($ch);
         curl_close($ch);
-        if ($res && $code === 200) return $res;
+
+        $attempts[] = [
+            'url'        => $tryUrl,
+            'http_code'  => $code,
+            'curl_errno' => $curlErrno,
+            'curl_error' => $curlErr ?: null,
+            'body_preview' => $res !== false ? substr((string)$res, 0, 300) : null,
+        ];
+
+        if ($res !== false && $code === 200) {
+            return ['body' => $res, 'code' => $code, 'attempts' => $attempts];
+        }
     }
-    return false;
+    return ['body' => null, 'code' => $attempts[count($attempts)-1]['http_code'] ?? 0, 'attempts' => $attempts];
 }
 
 // ══════════════════════════════════════════════════════════════
