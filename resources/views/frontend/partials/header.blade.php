@@ -85,9 +85,15 @@
             <a href="#" onclick="event.preventDefault(); openLegalModal(null, null, 'header');" style="color:#7c3aed!important;"><i class="bi bi-briefcase me-1"></i> Legal Help</a>
           </li>
 
-          {{-- Post Property link (visible to everyone, links to dealer login) --}}
+          {{-- Post Property link (visible to everyone) --}}
           <li class="d-xl-none">
             <a href="{{ route('dealer.login') }}"><i class="bi bi-plus-circle me-1"></i> Post Property</a>
+          </li>
+          <li class="d-xl-none">
+            <a href="{{ route('builder.login') }}"><i class="bi bi-buildings me-1"></i> Builder Login</a>
+          </li>
+          <li class="d-xl-none">
+            <a href="{{ route('service-provider.register') }}" style="color:#0078d4!important;"><i class="bi bi-tools me-1"></i> Offer a Service</a>
           </li>
 
           {{-- Mobile-only auth links --}}
@@ -113,46 +119,54 @@
       {{-- Desktop auth buttons --}}
       <div class="d-none d-xl-flex align-items-center gap-2">
 
-        {{-- Post Property Button --}}
-        <a href="{{ route('dealer.login') }}" class="btn btn-sm px-3 py-2" style="background: linear-gradient(135deg, #0a2d5e, #0078d4); color: #fff; border-radius: 8px; font-weight: 600; font-size: 13px; border: none;">
-          <i class="bi bi-plus-circle me-1"></i> Post Property
+        {{-- Post Property dropdown --}}
+        <div class="dropdown">
+          <a href="{{ route('dealer.login') }}" class="btn btn-sm px-3 py-2 dropdown-toggle" data-bs-toggle="dropdown"
+             style="background:linear-gradient(135deg,#0a2d5e,#0078d4);color:#fff;border-radius:8px;font-weight:600;font-size:13px;border:none;">
+            <i class="bi bi-plus-circle me-1"></i> Post Property
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius:10px;min-width:200px;">
+            <li><h6 class="dropdown-header text-muted small">Post as...</h6></li>
+            <li>
+              <a class="dropdown-item py-2" href="{{ route('dealer.login') }}">
+                <i class="bi bi-building me-2 text-primary"></i> Property Dealer
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item py-2" href="{{ route('builder.login') }}">
+                <i class="bi bi-buildings me-2 text-success"></i> Builder
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        {{-- Register as Service Provider button --}}
+        <a href="{{ route('service-provider.register') }}" class="btn btn-sm px-3 py-2"
+           style="background:#fff;color:#0078d4;border:1.5px solid #0078d4;border-radius:8px;font-weight:600;font-size:13px;">
+          <i class="bi bi-tools me-1"></i> Offer a Service
         </a>
 
         @guest
-          <a href="{{ route('login') }}" class="btn btn-sm btn-outline-primary px-3 py-2" style="border-radius: 8px; font-weight: 600; font-size: 13px; border-color: #0078d4; color: #0078d4;">
+          {{-- Divider --}}
+          <span style="width:1px;height:28px;background:#e2e8f0;display:inline-block;"></span>
+          <a href="{{ route('login') }}" class="btn btn-sm btn-outline-secondary px-3 py-2" style="border-radius:8px;font-weight:600;font-size:13px;">
             <i class="bi bi-box-arrow-in-right me-1"></i> Login
           </a>
-          <a href="{{ route('register') }}" class="btn btn-sm px-3 py-2" style="background: linear-gradient(135deg, #0a2d5e, #0078d4); color: #fff; border-radius: 8px; font-weight: 600; font-size: 13px; border: none;">
+          <a href="{{ route('register') }}" class="btn btn-sm px-3 py-2" style="background:linear-gradient(135deg,#0a2d5e,#0078d4);color:#fff;border-radius:8px;font-weight:600;font-size:13px;border:none;">
             <i class="bi bi-person-plus me-1"></i> Register
           </a>
         @endguest
 
         @auth
           <div class="dropdown">
-            <a class="btn btn-sm btn-outline-primary dropdown-toggle px-3 py-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="border-radius: 8px; font-weight: 600; font-size: 13px; border-color: #0078d4; color: #0078d4;">
+            <a class="btn btn-sm btn-outline-primary dropdown-toggle px-3 py-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="border-radius:8px;font-weight:600;font-size:13px;border-color:#0078d4;color:#0078d4;">
               <i class="bi bi-person-circle me-1"></i> {{ Auth::user()->name }}
             </a>
-            <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius: 10px; border: 1px solid #e9ecef; min-width: 200px;">
-              <li>
-                <a class="dropdown-item py-2" href="{{ route('user.dashboard') }}">
-                  <i class="bi bi-speedometer2 me-2 text-muted"></i> Dashboard
-                </a>
-              </li>
-              <li>
-                <a class="dropdown-item py-2" href="{{ route('user.profile') }}">
-                  <i class="bi bi-person me-2 text-muted"></i> My Profile
-                </a>
-              </li>
-              <li>
-                <a class="dropdown-item py-2" href="{{ route('user.wishlist') }}">
-                  <i class="bi bi-heart me-2 text-muted"></i> My Wishlist
-                </a>
-              </li>
-              <li>
-                <a class="dropdown-item py-2" href="{{ route('user.inquiries') }}">
-                  <i class="bi bi-chat-left-text me-2 text-muted"></i> My Inquiries
-                </a>
-              </li>
+            <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius:10px;border:1px solid #e9ecef;min-width:200px;">
+              <li><a class="dropdown-item py-2" href="{{ route('user.dashboard') }}"><i class="bi bi-speedometer2 me-2 text-muted"></i> Dashboard</a></li>
+              <li><a class="dropdown-item py-2" href="{{ route('user.profile') }}"><i class="bi bi-person me-2 text-muted"></i> My Profile</a></li>
+              <li><a class="dropdown-item py-2" href="{{ route('user.wishlist') }}"><i class="bi bi-heart me-2 text-muted"></i> My Wishlist</a></li>
+              <li><a class="dropdown-item py-2" href="{{ route('user.inquiries') }}"><i class="bi bi-chat-left-text me-2 text-muted"></i> My Inquiries</a></li>
               <li><hr class="dropdown-divider"></li>
               <li>
                 <a class="dropdown-item py-2 text-danger" href="{{ route('logout') }}"

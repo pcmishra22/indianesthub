@@ -19,9 +19,11 @@
                 <div class="d-table-cell align-middle">
 
                     <div class="text-center mt-4 mb-3">
-                        <h1 class="h2">Dealer Portal</h1>
+                        <h1 class="h2">Partner Login</h1>
                         <p class="text-muted">Sign in to manage your listings</p>
                     </div>
+
+                    @include('partials.partner-role-switcher', ['activeRole' => 'dealer', 'mode' => 'login'])
 
                     {{-- Session / error alerts --}}
                     @if(session('success'))

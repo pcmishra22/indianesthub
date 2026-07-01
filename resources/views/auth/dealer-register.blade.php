@@ -19,9 +19,11 @@
                 <div class="d-table-cell align-middle">
 
                     <div class="text-center mt-4 mb-3">
-                        <h1 class="h2">Create Dealer Account</h1>
-                        <p class="text-muted">Start listing properties on our platform</p>
+                        <h1 class="h2">Create Partner Account</h1>
+                        <p class="text-muted">Start listing properties or offering services on our platform</p>
                     </div>
+
+                    @include('partials.partner-role-switcher', ['activeRole' => 'dealer', 'mode' => 'register'])
 
                     @if($errors->any())
                     <div class="alert alert-danger alert-dismissible fade show" role="alert">

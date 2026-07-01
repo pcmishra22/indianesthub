@@ -19,9 +19,11 @@
                 <div class="d-table-cell align-middle">
 
                     <div class="text-center mt-4 mb-3">
-                        <h1 class="h2">Service Provider Login</h1>
+                        <h1 class="h2">Partner Login</h1>
                         <p class="text-muted">Electricians, Interior Designers, Loan Providers & more</p>
                     </div>
+
+                    @include('partials.partner-role-switcher', ['activeRole' => 'service_provider', 'mode' => 'login'])
 
                     @if(session('status'))
                     <div class="alert alert-success alert-dismissible fade show" role="alert">

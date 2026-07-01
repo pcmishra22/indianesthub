@@ -302,7 +302,6 @@ Route::get('/agent-profile/{dealer:slug}', [AgentsController::class, 'profile'])
 Route::get('/blog', [BlogController::class, 'index'])->name('blog');
 Route::get('/blog/{blog:slug}', [BlogController::class, 'show'])->name('blog.show');
 Route::get('/blog-details', [BlogDetailsController::class, 'index'])->name('blog-details');
-Route::get('/services', [ServicesController::class, 'index'])->name('services');
 Route::get('/service-details', [ServiceDetailsController::class, 'index'])->name('service-details');
 Route::get('/contact', [ContactController::class, 'index'])->name('contact');
 Route::post('/contact', [ContactController::class, 'store'])->name('contact.store');
@@ -465,12 +464,54 @@ Route::prefix('dealer')->middleware('auth:dealer')->name('dealer.')->group(funct
     Route::get('/subscription/subscribe', [SubscriptionController::class, 'subscribe'])->name('subscription.subscribe');
     Route::post('/subscription/payment/{payment}/mark-paid', [SubscriptionController::class, 'markPaid'])->name('subscription.payment.markPaid');
 });
-// ============================================================
-// ADD THIS BLOCK to routes/web.php — paste it right after your
-// existing "Dealer Dashboard Routes (auth:dealer)" group (the
-// one ending with subscription.payment.markPaid), around line 454.
-// Do NOT replace your whole web.php — just insert this block.
-// ============================================================
+
+/*
+|--------------------------------------------------------------------------
+| Builder Authentication Routes
+| (Self-registration — previously builders could only be created by admin.
+|  Now a builder can sign up directly, same pattern as Dealer.)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('builder')->name('builder.')->group(function () {
+    Route::get('/login', [\App\Http\Controllers\Builder\AuthController::class, 'showLogin'])->name('login');
+    Route::post('/login', [\App\Http\Controllers\Builder\AuthController::class, 'login']);
+    Route::post('/logout', [\App\Http\Controllers\Builder\AuthController::class, 'logout'])->name('logout');
+    Route::get('/register', [\App\Http\Controllers\Builder\AuthController::class, 'showRegister'])->name('register');
+    Route::post('/register', [\App\Http\Controllers\Builder\AuthController::class, 'register']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Builder Dashboard Routes (auth:builder)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('builder')->middleware('auth:builder')->name('builder.')->group(function () {
+    Route::get('/dashboard', [\App\Http\Controllers\Builder\DashboardController::class, 'index'])->name('dashboard');
+
+    // Profile
+    Route::get('/profile', [\App\Http\Controllers\Builder\ProfileController::class, 'show'])->name('profile');
+    Route::put('/profile', [\App\Http\Controllers\Builder\ProfileController::class, 'update'])->name('profile.update');
+
+    // Projects CRUD
+    Route::resource('projects', \App\Http\Controllers\Builder\ProjectController::class);
+
+    // Properties (units) within a project
+    Route::get('/projects/{project}/properties', [\App\Http\Controllers\Builder\PropertyController::class, 'index'])->name('projects.properties.index');
+    Route::get('/projects/{project}/properties/create', [\App\Http\Controllers\Builder\PropertyController::class, 'create'])->name('projects.properties.create');
+    Route::post('/projects/{project}/properties', [\App\Http\Controllers\Builder\PropertyController::class, 'store'])->name('projects.properties.store');
+    Route::get('/projects/{project}/properties/{property}/edit', [\App\Http\Controllers\Builder\PropertyController::class, 'edit'])->name('projects.properties.edit');
+    Route::put('/projects/{project}/properties/{property}', [\App\Http\Controllers\Builder\PropertyController::class, 'update'])->name('projects.properties.update');
+    Route::delete('/projects/{project}/properties/{property}', [\App\Http\Controllers\Builder\PropertyController::class, 'destroy'])->name('projects.properties.destroy');
+
+    // Leads
+    Route::get('/leads', [\App\Http\Controllers\Builder\LeadsController::class, 'index'])->name('leads.index');
+    Route::put('/leads/{lead}/status', [\App\Http\Controllers\Builder\LeadsController::class, 'updateStatus'])->name('leads.updateStatus');
+    Route::put('/leads/{lead}/notes', [\App\Http\Controllers\Builder\LeadsController::class, 'saveNotes'])->name('leads.save-notes');
+    Route::post('/leads/{lead}/call-log', [\App\Http\Controllers\Builder\LeadsController::class, 'addCallLog'])->name('leads.add-call-log');
+    Route::get('/leads/export', [\App\Http\Controllers\Builder\LeadsController::class, 'export'])->name('leads.export');
+    Route::delete('/leads/{lead}', [\App\Http\Controllers\Builder\LeadsController::class, 'destroy'])->name('leads.destroy');
+});
+
 
 /*
 |--------------------------------------------------------------------------

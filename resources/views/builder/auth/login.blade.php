@@ -20,6 +20,8 @@
                         <p class="lead">Sign in to manage your projects & properties</p>
                     </div>
 
+                    @include('partials.partner-role-switcher', ['activeRole' => 'builder', 'mode' => 'login'])
+
                     <div class="card">
                         <div class="card-body">
                             <div class="m-sm-3">

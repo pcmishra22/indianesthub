@@ -9,11 +9,6 @@ use Illuminate\Http\Request;
 
 class ServicePublicController extends Controller
 {
-    /**
-     * City slug => display name. Kept in sync with SeoController::getSeoLandingCities().
-     * Add a city here and every category automatically gets a clean
-     * /services/{category}/{city} page — no new routes ever required.
-     */
     public static function getCityMap(): array
     {
         return [
@@ -30,53 +25,69 @@ class ServicePublicController extends Controller
         ];
     }
 
-    /**
-     * /services
-     * Hub page listing every active category.
-     */
+    /** /services — hub page listing every category */
     public function index()
     {
         $categories = ServiceCategory::active()
-            ->withCount(['providers' => fn ($q) => $q->where('status', 'approved')])
+            ->withCount(['providers' => fn($q) => $q->where('status', 'approved')])
             ->get();
 
-        $cities = self::getCityMap();
+        $cities            = self::getCityMap();
+        $totalProviders    = ServiceProvider::where('status', 'approved')->count();
 
-        return view('frontend.services.index', compact('categories', 'cities'));
+        return view('frontend.services.index', compact('categories', 'cities', 'totalProviders'));
     }
 
-    /**
-     * /services/{category}
-     * All approved providers in one category, across every city, with a city filter.
-     */
+    /** /services/{category} — all cities, with search + AJAX scroll */
     public function category(ServiceCategory $category, Request $request)
     {
+        if ($request->ajax()) {
+            $providers = $category->providers()
+                ->when($request->filled('city'),   fn($q) => $q->where('city', $request->city))
+                ->when($request->filled('search'), fn($q) =>
+                    $q->where(function($q2) use ($request) {
+                        $q2->where('full_name', 'like', '%'.$request->search.'%')
+                           ->orWhere('business_name', 'like', '%'.$request->search.'%')
+                           ->orWhere('city', 'like', '%'.$request->search.'%');
+                    })
+                )
+                ->orderByDesc('is_verified')
+                ->paginate(12);
+
+            return response()->json([
+                'html'     => view('frontend.services.partials.provider-cards', compact('providers', 'category'))->render(),
+                'has_more' => $providers->hasMorePages(),
+                'total'    => $providers->total(),
+            ]);
+        }
+
         $providers = $category->providers()
-            ->when($request->filled('city'), fn ($q) => $q->where('city', $request->city))
+            ->when($request->filled('city'),   fn($q) => $q->where('city', $request->city))
+            ->when($request->filled('search'), fn($q) =>
+                $q->where(function($q2) use ($request) {
+                    $q2->where('full_name', 'like', '%'.$request->search.'%')
+                       ->orWhere('business_name', 'like', '%'.$request->search.'%')
+                       ->orWhere('city', 'like', '%'.$request->search.'%');
+                })
+            )
             ->orderByDesc('is_verified')
             ->paginate(12);
 
-        $cities = self::getCityMap();
+        $cities      = self::getCityMap();
+        $allCats     = ServiceCategory::active()->get();
 
-        return view('frontend.services.category', compact('category', 'providers', 'cities'));
+        return view('frontend.services.category', compact('category', 'providers', 'cities', 'allCats'));
     }
 
-    /**
-     * /services/{category}/{city}
-     * The hyperlocal SEO money page — e.g. "Electricians in Zirakpur".
-     */
+    /** /services/{category}/{city} — hyperlocal SEO page */
     public function categoryCity(ServiceCategory $category, string $city)
     {
         $cityMap = self::getCityMap();
-
-        if (!array_key_exists($city, $cityMap)) {
-            abort(404);
-        }
-
+        if (!array_key_exists($city, $cityMap)) abort(404);
         $cityLabel = $cityMap[$city];
 
         $providers = $category->providers()
-            ->where(function ($q) use ($cityLabel) {
+            ->where(function($q) use ($cityLabel) {
                 $q->where('city', $cityLabel)
                   ->orWhereJsonContains('operating_areas', $cityLabel);
             })
@@ -86,18 +97,11 @@ class ServicePublicController extends Controller
         return view('frontend.services.category-city', compact('category', 'city', 'cityLabel', 'providers', 'cityMap'));
     }
 
-    /**
-     * /professionals/{provider}
-     * Individual public profile page (lead capture lives here).
-     */
+    /** /professionals/{provider} — public profile with login-gate contact */
     public function profile(ServiceProvider $provider)
     {
-        if ($provider->status !== 'approved') {
-            abort(404);
-        }
-
+        if ($provider->status !== 'approved') abort(404);
         $provider->load('categories');
-
         return view('frontend.services.profile', compact('provider'));
     }
 }

@@ -20,6 +20,8 @@
                     <p class="lead">Join {{ config('app.name') }} to list your projects and properties</p>
                 </div>
 
+                @include('partials.partner-role-switcher', ['activeRole' => 'builder', 'mode' => 'register'])
+
                 <div class="card">
                     <div class="card-body">
                         <div class="m-sm-3">

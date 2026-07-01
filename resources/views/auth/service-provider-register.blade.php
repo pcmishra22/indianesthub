@@ -36,6 +36,8 @@
                     <p class="text-muted">One signup for every home service — Electricians, Plumbers, Interior Designers, Loan Providers and more.</p>
                 </div>
 
+                @include('partials.partner-role-switcher', ['activeRole' => 'service_provider', 'mode' => 'register'])
+
                 @if($errors->any())
                 <div class="alert alert-danger" role="alert">
                     <i class="fas fa-exclamation-circle me-2"></i>
