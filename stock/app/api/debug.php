@@ -435,40 +435,32 @@ if ($uri === '/api/debug/apikeys') {
     $out = [
         'eodhd_key_set'      => !empty($key),
         'twelvedata_key_set' => !empty(DATA_API_KEY),
-        'note'               => 'EODHD uses .NS for NSE India (not .NSE which is Nigerian Stock Exchange). Returns "NA" when market is closed — previousClose is used as fallback.',
+        'note'               => 'Testing what EODHD free plan actually provides for NSE India.',
     ];
 
-    // Test 1: EODHD single quote via our fixed function (handles NA, uses previousClose)
-    $eodhdResult = eodhdQuoteDebug('TCS');
-    $out['eodhd_quote_test'] = [
-        'symbol'       => 'TCS.NS',
-        'http_code'    => $eodhdResult['http_code'],
-        'diagnosis'    => $eodhdResult['diagnosis'],
-        'price'        => $eodhdResult['quote']['regularMarketPrice'] ?? null,
-        'market_note'  => 'NSE hours: Mon-Fri 9:15 AM - 3:30 PM IST. NA values outside hours are normal — previousClose is used.',
-        'raw_response' => $eodhdResult['raw'],
-    ];
-
-    // Test 2: EODHD history (TCS, last 5 trading days)
-    $histRows = eodhdHistory('TCS', 5);
-    $out['eodhd_history_test'] = [
-        'rows_returned' => count($histRows),
-        'sample'        => $histRows[count($histRows)-1] ?? null,
-        'diagnosis'     => count($histRows) > 0 ? 'PASS' : 'FAIL — no history rows returned',
-    ];
-
-    // Test 3: EODHD intraday (requires All-World plan; EOD plan returns error)
-    $ch = curl_init('https://eodhd.com/api/intraday/TCS.NS?api_token=' . urlencode($key) . '&fmt=json&interval=5m');
+    // Test 1: EODHD real-time (known to return NA during market hours on free plan)
+    $ch = curl_init('https://eodhd.com/api/real-time/TCS.NS?api_token=' . urlencode($key) . '&fmt=json');
     curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>10, CURLOPT_SSL_VERIFYPEER=>false]);
     $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
-    $intra = $raw ? json_decode($raw, true) : null;
-    $out['eodhd_intraday_test'] = [
-        'http_code'  => $code,
-        'bars'       => is_array($intra) ? count($intra) : 0,
-        'sample_bar' => is_array($intra) ? ($intra[0] ?? null) : null,
-        'raw_preview'=> !is_array($intra) ? substr((string)$raw, 0, 200) : null,
-        'diagnosis'  => (is_array($intra) && count($intra) > 0) ? 'PASS — intraday charts will work' : "FAIL HTTP {$code} — intraday needs EODHD All-World plan; daily charts still work fine",
-    ];
+    $out['realtime_TCS_NS'] = ['http_code'=>$code, 'raw'=>$raw ? json_decode($raw,true) : substr($raw,0,200)];
+
+    // Test 2: EODHD EOD historical (this should work on free plan)
+    $ch = curl_init('https://eodhd.com/api/eod/TCS.NS?api_token=' . urlencode($key) . '&fmt=json&order=d&limit=5');
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>10, CURLOPT_SSL_VERIFYPEER=>false]);
+    $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    $out['eod_history_TCS_NS'] = ['http_code'=>$code, 'rows'=>is_array(json_decode($raw,true)) ? count(json_decode($raw,true)) : 0, 'sample'=>json_decode($raw,true)[0] ?? null, 'raw_preview'=>substr($raw,0,300)];
+
+    // Test 3: Try BSE symbol too
+    $ch = curl_init('https://eodhd.com/api/eod/TCS.BO?api_token=' . urlencode($key) . '&fmt=json&order=d&limit=3');
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>10, CURLOPT_SSL_VERIFYPEER=>false]);
+    $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    $out['eod_history_TCS_BO'] = ['http_code'=>$code, 'rows'=>is_array(json_decode($raw,true)) ? count(json_decode($raw,true)) : 0, 'sample'=>json_decode($raw,true)[0] ?? null, 'raw_preview'=>substr($raw,0,300)];
+
+    // Test 4: Check user subscription details
+    $ch = curl_init('https://eodhd.com/api/user?api_token=' . urlencode($key) . '&fmt=json');
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>10, CURLOPT_SSL_VERIFYPEER=>false]);
+    $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    $out['user_subscription'] = ['http_code'=>$code, 'raw'=>$raw ? json_decode($raw,true) : substr($raw,0,300)];
 
     echo json_encode($out, JSON_PRETTY_PRINT);
     exit;
