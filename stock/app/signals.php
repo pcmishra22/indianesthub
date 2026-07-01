@@ -6,17 +6,28 @@ declare(strict_types=1);
  * (pure math) and, for multiTimeframe(), on http.php for a weekly-data fetch.
  */
 
+/**
+ * Return the last non-null value from an array.
+ * Avoids passing a temporary expression to end() by reference, which
+ * causes a PHP Notice on strict hosts (e.g. Hostinger shared hosting).
+ */
+function lastNonNull(array $arr, mixed $default = null): mixed
+{
+    $filtered = array_filter($arr, fn($v) => $v !== null);
+    return empty($filtered) ? $default : end($filtered);
+}
+
 /** Generate buy/sell signal + reasoning from indicators */
 function generateSignal(array $quote, array $history, array $indicators): array
 {
     $price  = $quote['regularMarketPrice'] ?? 0;
-    $rsiVal = end(array_filter($indicators['rsi'], fn($v) => $v !== null)) ?: 50;
-    $macdH  = end(array_filter($indicators['macd']['hist'], fn($v) => $v !== null)) ?: 0;
-    $macdV  = end(array_filter($indicators['macd']['macd'], fn($v) => $v !== null)) ?: 0;
-    $ema20  = end(array_filter($indicators['ema20'], fn($v) => $v !== null)) ?: $price;
-    $ema50  = end(array_filter($indicators['ema50'], fn($v) => $v !== null)) ?: $price;
-    $bbU    = end(array_filter($indicators['bb']['upper'], fn($v) => $v !== null)) ?: $price * 1.05;
-    $bbL    = end(array_filter($indicators['bb']['lower'], fn($v) => $v !== null)) ?: $price * 0.95;
+    $rsiVal = lastNonNull($indicators['rsi']) ?: 50;
+    $macdH  = lastNonNull($indicators['macd']['hist']) ?: 0;
+    $macdV  = lastNonNull($indicators['macd']['macd']) ?: 0;
+    $ema20  = lastNonNull($indicators['ema20']) ?: $price;
+    $ema50  = lastNonNull($indicators['ema50']) ?: $price;
+    $bbU    = lastNonNull($indicators['bb']['upper']) ?: $price * 1.05;
+    $bbL    = lastNonNull($indicators['bb']['lower']) ?: $price * 0.95;
     $vwap   = $indicators['vwap'];
     $st     = $indicators['supertrend'];
 
@@ -120,7 +131,7 @@ function momentumScore(array $quote, array $history, array $indicators): array
     $stMom   = $prev3 > 0 ? (($recent3 - $prev3) / $prev3) * 100 : 0;
 
     // 3. RSI momentum — distance from 50 (neutral)
-    $rsiLast = end(array_filter($indicators['rsi'], fn($v) => $v !== null)) ?: 50;
+    $rsiLast = lastNonNull($indicators['rsi']) ?: 50;
     $rsiMom  = ($rsiLast - 50) / 50 * 30; // scale to ±30
 
     // 4. MACD histogram direction and strength
@@ -131,8 +142,8 @@ function momentumScore(array $quote, array $history, array $indicators): array
     $macdMom = ($hLast > $hPrev ? 1 : -1) * min(abs($hLast) * 10, 20); // direction + strength
 
     // 5. EMA alignment
-    $ema20L = end(array_filter($indicators['ema20'], fn($v) => $v !== null)) ?: $price;
-    $ema50L = end(array_filter($indicators['ema50'], fn($v) => $v !== null)) ?: $price;
+    $ema20L = lastNonNull($indicators['ema20']) ?: $price;
+    $ema50L = lastNonNull($indicators['ema50']) ?: $price;
     $emaScore = 0;
     if ($price > $ema20L && $ema20L > $ema50L) $emaScore = 15;
     elseif ($price > $ema20L) $emaScore = 8;
@@ -216,16 +227,16 @@ function multiTimeframe(string $symbol, float $price, array $dailyHistory): arra
     $wCloses  = array_column($weekly, 'close');
     $wEma20   = ema($wCloses, 20);
     $wRsi     = rsi($wCloses);
-    $wRsiLast = end(array_filter($wRsi, fn($v) => $v !== null)) ?: 50;
-    $wEmaLast = end(array_filter($wEma20, fn($v) => $v !== null)) ?: $price;
+    $wRsiLast = lastNonNull($wRsi) ?: 50;
+    $wEmaLast = lastNonNull($wEma20) ?: $price;
     $wMacd    = macd($wCloses);
-    $wMacdH   = end(array_filter($wMacd['hist'] ?? [], fn($v) => $v !== null)) ?: 0;
+    $wMacdH   = lastNonNull($wMacd['hist'] ?? []) ?: 0;
 
     // Daily signal
     $dCloses  = array_column($dailyHistory, 'close');
-    $dEma20L  = end(array_filter(ema($dCloses, 20), fn($v) => $v !== null)) ?: $price;
+    $dEma20L  = lastNonNull(ema($dCloses, 20)) ?: $price;
     $dRsiArr  = rsi($dCloses);
-    $dRsiLast = end(array_filter($dRsiArr, fn($v) => $v !== null)) ?: 50;
+    $dRsiLast = lastNonNull($dRsiArr) ?: 50;
 
     $dailySig  = $price > $dEma20L && $dRsiLast > 50 ? 'Bullish' : ($price < $dEma20L && $dRsiLast < 50 ? 'Bearish' : 'Neutral');
     $weeklySig = $price > $wEmaLast && $wRsiLast > 50 && $wMacdH > 0 ? 'Bullish'
@@ -266,10 +277,10 @@ function scoreBreakdown(array $quote, array $history, array $indicators, array $
 {
     $price  = $quote['regularMarketPrice'] ?? 0;
     $chg    = $quote['regularMarketChangePercent'] ?? 0;
-    $rsiVal = end(array_filter($indicators['rsi'], fn($v) => $v !== null)) ?: 50;
-    $macdH  = end(array_filter($indicators['macd']['hist'], fn($v) => $v !== null)) ?: 0;
-    $ema20  = end(array_filter($indicators['ema20'], fn($v) => $v !== null)) ?: $price;
-    $ema50  = end(array_filter($indicators['ema50'], fn($v) => $v !== null)) ?: $price;
+    $rsiVal = lastNonNull($indicators['rsi']) ?: 50;
+    $macdH  = lastNonNull($indicators['macd']['hist']) ?: 0;
+    $ema20  = lastNonNull($indicators['ema20']) ?: $price;
+    $ema50  = lastNonNull($indicators['ema50']) ?: $price;
     $st     = $indicators['supertrend'];
     $vwap   = $indicators['vwap'];
 
