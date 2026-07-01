@@ -23,7 +23,7 @@ function apiIntraday(string $symbol, string $interval = '5m'): array
             default => '5m',
         };
         $from = date('Y-m-d', strtotime($interval === '1h' ? '-5 days' : '-1 day'));
-        $url  = 'https://eodhd.com/api/intraday/' . urlencode($nseSym . '.NSE')
+        $url  = 'https://eodhd.com/api/intraday/' . urlencode($nseSym . '.NS')
               . '?api_token=' . urlencode($eodhdKey)
               . '&fmt=json&interval=' . $eodhdInterval
               . '&from=' . $from;

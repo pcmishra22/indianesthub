@@ -435,46 +435,40 @@ if ($uri === '/api/debug/apikeys') {
     $out = [
         'eodhd_key_set'      => !empty($key),
         'twelvedata_key_set' => !empty(DATA_API_KEY),
+        'note'               => 'EODHD uses .NS for NSE India (not .NSE which is Nigerian Stock Exchange). Returns "NA" when market is closed — previousClose is used as fallback.',
     ];
 
-    // Test every possible EODHD symbol format for TCS
-    $formats = ['TCS.NSE', 'TCS.BSE', 'TCS.NS', 'TCS.BO', 'TATACONSULTANCY.NSE'];
-    foreach ($formats as $sym) {
-        $url = 'https://eodhd.com/api/real-time/' . urlencode($sym)
-             . '?api_token=' . urlencode($key) . '&fmt=json';
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>8, CURLOPT_SSL_VERIFYPEER=>false]);
-        $raw  = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-        $d = $raw ? json_decode($raw, true) : null;
-        $out['format_test'][$sym] = [
-            'http_code' => $code,
-            'price'     => is_array($d) ? ($d['close'] ?? null) : null,
-            'raw'       => is_array($d) ? $d : substr((string)$raw, 0, 100),
-        ];
-    }
+    // Test 1: EODHD single quote via our fixed function (handles NA, uses previousClose)
+    $eodhdResult = eodhdQuoteDebug('TCS');
+    $out['eodhd_quote_test'] = [
+        'symbol'       => 'TCS.NS',
+        'http_code'    => $eodhdResult['http_code'],
+        'diagnosis'    => $eodhdResult['diagnosis'],
+        'price'        => $eodhdResult['quote']['regularMarketPrice'] ?? null,
+        'market_note'  => 'NSE hours: Mon-Fri 9:15 AM - 3:30 PM IST. NA values outside hours are normal — previousClose is used.',
+        'raw_response' => $eodhdResult['raw'],
+    ];
 
-    // Also fetch EODHD's list of Indian exchanges to find the correct code
-    $url = 'https://eodhd.com/api/exchanges-list/?api_token=' . urlencode($key) . '&fmt=json';
-    $ch  = curl_init($url);
+    // Test 2: EODHD history (TCS, last 5 trading days)
+    $histRows = eodhdHistory('TCS', 5);
+    $out['eodhd_history_test'] = [
+        'rows_returned' => count($histRows),
+        'sample'        => $histRows[count($histRows)-1] ?? null,
+        'diagnosis'     => count($histRows) > 0 ? 'PASS' : 'FAIL — no history rows returned',
+    ];
+
+    // Test 3: EODHD intraday (requires All-World plan; EOD plan returns error)
+    $ch = curl_init('https://eodhd.com/api/intraday/TCS.NS?api_token=' . urlencode($key) . '&fmt=json&interval=5m');
     curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>10, CURLOPT_SSL_VERIFYPEER=>false]);
-    $raw  = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    $exchanges = $raw ? json_decode($raw, true) : null;
-    // Filter to India-related exchanges only
-    if (is_array($exchanges)) {
-        $out['india_exchanges'] = array_values(array_filter($exchanges, fn($e) =>
-            str_contains(strtolower($e['Country'] ?? ''), 'india') ||
-            str_contains(strtoupper($e['Code'] ?? ''), 'NS') ||
-            str_contains(strtoupper($e['Code'] ?? ''), 'BSE') ||
-            str_contains(strtoupper($e['Code'] ?? ''), 'NSE') ||
-            str_contains(strtoupper($e['Name'] ?? ''), 'INDIA') ||
-            str_contains(strtoupper($e['Name'] ?? ''), 'BOMBAY') ||
-            str_contains(strtoupper($e['Name'] ?? ''), 'NATIONAL STOCK')
-        ));
-    }
+    $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    $intra = $raw ? json_decode($raw, true) : null;
+    $out['eodhd_intraday_test'] = [
+        'http_code'  => $code,
+        'bars'       => is_array($intra) ? count($intra) : 0,
+        'sample_bar' => is_array($intra) ? ($intra[0] ?? null) : null,
+        'raw_preview'=> !is_array($intra) ? substr((string)$raw, 0, 200) : null,
+        'diagnosis'  => (is_array($intra) && count($intra) > 0) ? 'PASS — intraday charts will work' : "FAIL HTTP {$code} — intraday needs EODHD All-World plan; daily charts still work fine",
+    ];
 
     echo json_encode($out, JSON_PRETTY_PRINT);
     exit;

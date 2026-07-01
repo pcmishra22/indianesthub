@@ -64,9 +64,9 @@ function apiWatchlist(): array
         $pivots  = pivotPoints($history);
 
         $price   = $quote['regularMarketPrice'] ?? 0;
-        $rsiLast = end(array_filter($rsiArr, fn($v) => $v !== null)) ?: 50;
-        $ema20L  = round(end(array_filter($ema20, fn($v) => $v !== null)) ?: $price, 2);
-        $ema50L  = round(end(array_filter($ema50, fn($v) => $v !== null)) ?: $price, 2);
+        $rsiLast = lastNonNull($rsiArr) ?: 50;
+        $ema20L  = round(lastNonNull($ema20) ?: $price, 2);
+        $ema50L  = round(lastNonNull($ema50) ?: $price, 2);
 
         // ATR-based target/SL
         $n    = count($history);
@@ -89,11 +89,11 @@ function apiWatchlist(): array
         $indCache = file_exists($indFile) ? json_decode(file_get_contents($indFile), true) : [];
         $display = toNseDisplay($sym);
         $indCache[$sym] = [
-            'rsi'        => round(end(array_filter($rsiArr, fn($v) => $v !== null)) ?: 50, 1),
-            'ema20'      => round(end(array_filter($ema20, fn($v) => $v !== null)) ?: $price, 2),
-            'ema50'      => round(end(array_filter($ema50, fn($v) => $v !== null)) ?: $price, 2),
+            'rsi'        => round(lastNonNull($rsiArr) ?: 50, 1),
+            'ema20'      => round(lastNonNull($ema20) ?: $price, 2),
+            'ema50'      => round(lastNonNull($ema50) ?: $price, 2),
             'supertrend' => $st,
-            'macd_hist'  => round(end(array_filter($macdArr['hist'], fn($v) => $v !== null)) ?: 0, 4),
+            'macd_hist'  => round(lastNonNull($macdArr['hist']) ?: 0, 4),
             'updated'    => time(),
         ];
         if (!is_dir(STORAGE)) mkdir(STORAGE, 0755, true);
@@ -221,14 +221,14 @@ function apiAnalyze(string $symbol): array
     $high52  = (float)($quote['fiftyTwoWeekHigh'] ?? 0);
     $low52   = (float)($quote['fiftyTwoWeekLow']  ?? 0);
     $pos52w  = position52W($price, $high52, $low52);
-    $rsiLast = end(array_filter($rsiArr, fn($v) => $v !== null)) ?: 50;
-    $ema20L  = round(end(array_filter($ema20, fn($v) => $v !== null)) ?: $price, 2);
-    $ema50L  = round(end(array_filter($ema50, fn($v) => $v !== null)) ?: $price, 2);
-    $macdL   = end(array_filter($macdArr['macd'], fn($v) => $v !== null)) ?: 0;
-    $macdS   = end(array_filter($macdArr['signal'], fn($v) => $v !== null)) ?: 0;
-    $bbU     = end(array_filter($bbArr['upper'], fn($v) => $v !== null)) ?: $price;
-    $bbM     = end(array_filter($bbArr['middle'], fn($v) => $v !== null)) ?: $price;
-    $bbLo    = end(array_filter($bbArr['lower'], fn($v) => $v !== null)) ?: $price;
+    $rsiLast = lastNonNull($rsiArr) ?: 50;
+    $ema20L  = round(lastNonNull($ema20) ?: $price, 2);
+    $ema50L  = round(lastNonNull($ema50) ?: $price, 2);
+    $macdL   = lastNonNull($macdArr['macd']) ?: 0;
+    $macdS   = lastNonNull($macdArr['signal']) ?: 0;
+    $bbU     = lastNonNull($bbArr['upper']) ?: $price;
+    $bbM     = lastNonNull($bbArr['middle']) ?: $price;
+    $bbLo    = lastNonNull($bbArr['lower']) ?: $price;
 
     $bbPos = $price >= $bbU * 0.98 ? 'Near upper band' : ($price <= $bbLo * 1.02 ? 'Near lower band' : 'Middle of band');
 
@@ -730,7 +730,7 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
             $price    = (float)($quote['regularMarketPrice'] ?? 0);
             $chg      = (float)($quote['regularMarketChangePercent'] ?? 0);
             $chg5d    = change5d($history);
-            $rsiLast  = end(array_filter($rsiArr, fn($v) => $v !== null)) ?: 50;
+            $rsiLast  = lastNonNull($rsiArr) ?: 50;
             $topPat   = !empty($candlePats) ? $candlePats[0]['name'] : '';
             $atrV     = $atrVal ?? $price * 0.015;
             $target   = $sig['signal'] === 'Buy'  ? round($price + $atrV * 2, 2) : round($price - $atrV * 2, 2);
@@ -750,8 +750,8 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
                 'direction'     => $mom['score'] >= 15 ? 'rising' : ($mom['score'] <= -15 ? 'falling' : 'flat'),
                 'rsi'           => round($rsiLast, 1),
                 'supertrend'    => $stSuper,
-                'ema_signal'    => ($ema20 && $ema50) ? (end(array_filter($ema20,fn($v)=>$v!==null)) > end(array_filter($ema50,fn($v)=>$v!==null)) ? 'Golden' : 'Death') : null,
-                'macd_signal'   => end(array_filter($macdArr['hist'] ?? [], fn($v) => $v !== null)) > 0 ? 'Bullish' : 'Bearish',
+                'ema_signal'    => ($ema20 && $ema50) ? (lastNonNull($ema20) > lastNonNull($ema50) ? 'Golden' : 'Death') : null,
+                'macd_signal'   => lastNonNull($macdArr['hist'] ?? []) > 0 ? 'Bullish' : 'Bearish',
                 'adx'           => $adxData['adx'],
                 'adx_strength'  => $adxData['trend_strength'] ?? null,
                 'adx_direction' => $adxData['direction'] ?? null,

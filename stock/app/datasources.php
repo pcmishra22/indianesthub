@@ -259,8 +259,18 @@ function twelveDataHistory(string $symbol, int $days = 90): array
 //  SECONDARY: EODHD (eodhistoricaldata.com) — free tier fallback
 //  Used automatically if Twelve Data returns no data (e.g. quota exceeded).
 //  Free tier: end-of-day data only (no intraday), up to 20 API calls/day.
-//  NSE symbols format: TCS.NSE (not TCS.NS like Yahoo).
+//  NSE India symbols use .NS suffix (NOT .NSE — that is Nigerian Stock Exchange).
+//  BSE India symbols use .BO suffix.
+//  NOTE: EODHD returns "NA" (string) for all price fields when market is closed.
+//  Use eoN() helper to safely parse these values.
 // ══════════════════════════════════════════════════════════════
+
+/** Safely parse an EODHD price field that may be "NA", null, or a real number. */
+function eoN(mixed $v, float $default = 0.0): float
+{
+    if ($v === null || $v === 'NA' || $v === '') return $default;
+    return (float)$v;
+}
 
 function eodhdQuote(string $symbol): ?array
 {
@@ -276,7 +286,7 @@ function eodhdQuoteDebug(string $symbol): array
     $key = getenv('EODHD_API_KEY') ?: '';
     if (!$key) return ['quote' => null, 'http_code' => null, 'raw' => null, 'diagnosis' => 'No EODHD_API_KEY set in .env'];
 
-    $nseSym = strtoupper(str_replace('.NS', '', $symbol)) . '.NSE';
+    $nseSym = strtoupper(str_replace('.NS', '', $symbol)) . '.NS';
     $url = 'https://eodhd.com/api/real-time/' . urlencode($nseSym)
          . '?api_token=' . urlencode($key) . '&fmt=json';
 
@@ -298,8 +308,14 @@ function eodhdQuoteDebug(string $symbol): array
     if (!is_array($d))        return ['quote' => null, 'http_code' => $code, 'raw' => substr((string)$raw, 0, 500), 'diagnosis' => 'Response is not valid JSON'];
     if (!isset($d['close']))  return ['quote' => null, 'http_code' => $code, 'raw' => $d, 'diagnosis' => 'No "close" field in response — unexpected shape'];
 
-    $price = (float)$d['close'];
-    if ($price <= 0) return ['quote' => null, 'http_code' => $code, 'raw' => $d, 'diagnosis' => "close={$price} is not a valid price"];
+    // EODHD returns "NA" (string) for all fields when the market is closed.
+    // Use previousClose as the price in that case — it's the last known price.
+    $closeRaw = $d['close'];
+    $prevRaw  = $d['previousClose'] ?? 'NA';
+    $price    = eoN($closeRaw) > 0 ? eoN($closeRaw) : eoN($prevRaw);
+
+    if ($price <= 0) return ['quote' => null, 'http_code' => $code, 'raw' => $d,
+        'diagnosis' => "close={$closeRaw} and previousClose={$prevRaw} — market closed and no prior price available"];
 
     $base  = strtoupper(str_replace('.NS', '', $symbol));
     $quote = [
@@ -307,16 +323,16 @@ function eodhdQuoteDebug(string $symbol): array
         'shortName'                  => $base,
         'longName'                   => $base,
         'regularMarketPrice'         => $price,
-        'regularMarketChange'        => (float)($d['change'] ?? 0),
-        'regularMarketChangePercent' => (float)($d['change_p'] ?? 0),
-        'regularMarketPreviousClose' => (float)($d['previousClose'] ?? $price),
-        'regularMarketOpen'          => (float)($d['open'] ?? $price),
-        'regularMarketDayHigh'       => (float)($d['high'] ?? $price),
-        'regularMarketDayLow'        => (float)($d['low'] ?? $price),
-        'regularMarketVolume'        => (int)($d['volume'] ?? 0),
-        'averageDailyVolume3Month'   => (int)($d['volume'] ?? 0),
-        'fiftyTwoWeekHigh'           => (float)($d['52WeekHigh'] ?? $price),
-        'fiftyTwoWeekLow'            => (float)($d['52WeekLow'] ?? $price),
+        'regularMarketChange'        => eoN($d['change']),
+        'regularMarketChangePercent' => eoN($d['change_p']),
+        'regularMarketPreviousClose' => eoN($d['previousClose'], $price),
+        'regularMarketOpen'          => eoN($d['open'], $price),
+        'regularMarketDayHigh'       => eoN($d['high'], $price),
+        'regularMarketDayLow'        => eoN($d['low'], $price),
+        'regularMarketVolume'        => (int)eoN($d['volume']),
+        'averageDailyVolume3Month'   => (int)eoN($d['volume']),
+        'fiftyTwoWeekHigh'           => eoN($d['52WeekHigh'], $price),
+        'fiftyTwoWeekLow'            => eoN($d['52WeekLow'], $price),
         'trailingPE' => null, 'priceToBook' => null, 'marketCap' => null,
         'sector' => null, 'industry' => null, 'returnOnEquity' => null, 'debtToEquity' => null,
         '_source' => 'eodhd',
@@ -337,7 +353,7 @@ function eodhdQuoteBulk(array $symbols): array
 
     $all = [];
     foreach (array_chunk($symbols, 50) as $chunk) {
-        $nseSyms = array_map(fn($s) => strtoupper(str_replace('.NS', '', $s)) . '.NSE', $chunk);
+        $nseSyms = array_map(fn($s) => strtoupper(str_replace('.NS', '', $s)) . '.NS', $chunk);
         // First symbol is the endpoint path, rest go in &s= param
         $primary = array_shift($nseSyms);
         $extra   = implode(',', $nseSyms);
@@ -364,12 +380,12 @@ function eodhdQuoteBulk(array $symbols): array
 
         foreach ($entries as $d) {
             if (!is_array($d) || !isset($d['close'])) continue;
-            $price = (float)$d['close'];
+            // Use previousClose as fallback when market is closed ("NA" values)
+            $price = eoN($d['close']) > 0 ? eoN($d['close']) : eoN($d['previousClose'] ?? 0);
             if ($price <= 0) continue;
 
-            // EODHD returns code like "TCS.NSE" — strip the .NSE suffix
             $rawCode = $d['code'] ?? '';
-            $base    = strtoupper(str_replace('.NSE', '', $rawCode)) ?: strtoupper(str_replace('.NS', '', array_shift($chunk) ?? ''));
+            $base    = strtoupper(str_replace(['.NS', '.BO', '.NSE'], '', $rawCode)) ?: strtoupper(str_replace('.NS', '', array_shift($chunk) ?? ''));
             $nsKey   = $base . '.NS';
 
             $all[$nsKey] = [
@@ -377,16 +393,16 @@ function eodhdQuoteBulk(array $symbols): array
                 'shortName'                  => $base,
                 'longName'                   => $base,
                 'regularMarketPrice'         => $price,
-                'regularMarketChange'        => (float)($d['change'] ?? 0),
-                'regularMarketChangePercent' => (float)($d['change_p'] ?? 0),
-                'regularMarketPreviousClose' => (float)($d['previousClose'] ?? $price),
-                'regularMarketOpen'          => (float)($d['open'] ?? $price),
-                'regularMarketDayHigh'       => (float)($d['high'] ?? $price),
-                'regularMarketDayLow'        => (float)($d['low'] ?? $price),
-                'regularMarketVolume'        => (int)($d['volume'] ?? 0),
-                'averageDailyVolume3Month'   => (int)($d['volume'] ?? 0),
-                'fiftyTwoWeekHigh'           => (float)($d['52WeekHigh'] ?? $price),
-                'fiftyTwoWeekLow'            => (float)($d['52WeekLow'] ?? $price),
+                'regularMarketChange'        => eoN($d['change']),
+                'regularMarketChangePercent' => eoN($d['change_p']),
+                'regularMarketPreviousClose' => eoN($d['previousClose'], $price),
+                'regularMarketOpen'          => eoN($d['open'], $price),
+                'regularMarketDayHigh'       => eoN($d['high'], $price),
+                'regularMarketDayLow'        => eoN($d['low'], $price),
+                'regularMarketVolume'        => (int)eoN($d['volume']),
+                'averageDailyVolume3Month'   => (int)eoN($d['volume']),
+                'fiftyTwoWeekHigh'           => eoN($d['52WeekHigh'], $price),
+                'fiftyTwoWeekLow'            => eoN($d['52WeekLow'], $price),
                 'trailingPE' => null, 'priceToBook' => null, 'marketCap' => null,
                 'sector' => null, 'industry' => null, 'returnOnEquity' => null, 'debtToEquity' => null,
                 '_source' => 'eodhd',
@@ -402,7 +418,7 @@ function eodhdHistory(string $symbol, int $days = 90): array
     $key = getenv('EODHD_API_KEY') ?: '';
     if (!$key) return [];
 
-    $nseSym   = strtoupper(str_replace('.NS', '', $symbol)) . '.NSE';
+    $nseSym   = strtoupper(str_replace('.NS', '', $symbol)) . '.NS';
     $from     = date('Y-m-d', strtotime("-{$days} days -5 days"));
     $to       = date('Y-m-d');
     $url = 'https://eodhd.com/api/eod/' . urlencode($nseSym)
