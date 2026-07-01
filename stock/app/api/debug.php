@@ -428,55 +428,56 @@ if ($uri === '/api/debug/yahoo') {
     exit;
 }
 
-// ── Debug: test Twelve Data + EODHD API keys ─────────────────
-if ($uri === '/api/debug/twelvedata') {
+// ── Debug: test EODHD + Twelve Data API keys ─────────────────
+if ($uri === '/api/debug/twelvedata' || $uri === '/api/debug/apikeys') {
     header('Content-Type: application/json');
     $out = [
-        'data_api_key_set' => !empty(DATA_API_KEY),
-        'data_api_key_len' => strlen(DATA_API_KEY),
         'eodhd_key_set'    => !empty(getenv('EODHD_API_KEY')),
+        'twelvedata_key_set' => !empty(DATA_API_KEY),
+        'note' => 'EODHD is primary (NSE included on free plan). Twelve Data NSE requires paid plan.',
     ];
 
-    // Test 1: Twelve Data single quote (shows full raw response so we can
-    // verify field names are correct before the data layer uses them)
-    $result = twelveDataQuoteDebug('TCS');
-    $out['twelvedata_quote_test'] = [
-        'http_code'    => $result['http_code'],
-        'diagnosis'    => $result['diagnosis'],
-        'price'        => $result['quote']['regularMarketPrice'] ?? null,
-        'raw_response' => $result['raw'],
+    // Test 1: EODHD real-time quote (TCS.NSE)
+    $eodhdResult = eodhdQuoteDebug('TCS');
+    $out['eodhd_quote_test'] = [
+        'symbol'       => 'TCS.NSE',
+        'http_code'    => $eodhdResult['http_code'],
+        'diagnosis'    => $eodhdResult['diagnosis'],
+        'price'        => $eodhdResult['quote']['regularMarketPrice'] ?? null,
+        'raw_response' => $eodhdResult['raw'],
     ];
 
-    // Test 2: Twelve Data API usage / quota remaining
-    if (DATA_API_KEY) {
-        $ch = curl_init('https://api.twelvedata.com/api_usage?apikey=' . urlencode(DATA_API_KEY));
-        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>8, CURLOPT_SSL_VERIFYPEER=>false]);
-        $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
-        $out['api_usage'] = ($raw && $code === 200) ? json_decode($raw, true) : ['error' => "HTTP {$code}"];
-    }
+    // Test 2: EODHD historical data (TCS.NSE, last 5 days)
+    $histRows = eodhdHistory('TCS', 5);
+    $out['eodhd_history_test'] = [
+        'rows_returned' => count($histRows),
+        'sample'        => $histRows[0] ?? null,
+        'diagnosis'     => count($histRows) > 0 ? 'PASS' : 'FAIL — no history rows returned',
+    ];
 
-    // Test 3: Twelve Data intraday (5min candles for chart)
-    if (DATA_API_KEY) {
-        $ch = curl_init('https://api.twelvedata.com/time_series?symbol=TCS&exchange=NSE&interval=5min&outputsize=5&apikey=' . urlencode(DATA_API_KEY));
+    // Test 3: EODHD intraday (may require higher plan)
+    if (getenv('EODHD_API_KEY')) {
+        $key = getenv('EODHD_API_KEY');
+        $ch  = curl_init('https://eodhd.com/api/intraday/TCS.NSE?api_token=' . urlencode($key) . '&fmt=json&interval=5m');
         curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>10, CURLOPT_SSL_VERIFYPEER=>false]);
         $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
-        $td = $raw ? json_decode($raw, true) : null;
-        $out['intraday_test'] = [
+        $intra = $raw ? json_decode($raw, true) : null;
+        $out['eodhd_intraday_test'] = [
             'http_code'  => $code,
-            'got_values' => !empty($td['values']),
-            'bar_count'  => count($td['values'] ?? []),
-            'sample_bar' => ($td['values'][0] ?? null),
-            'diagnosis'  => !empty($td['values']) ? 'PASS' : ('FAIL: ' . ($td['message'] ?? $td['status'] ?? 'no values returned')),
+            'bars'       => is_array($intra) ? count($intra) : 0,
+            'sample_bar' => is_array($intra) ? ($intra[0] ?? null) : null,
+            'raw_preview'=> !is_array($intra) ? substr((string)$raw, 0, 200) : null,
+            'diagnosis'  => (is_array($intra) && count($intra) > 0) ? 'PASS' : "FAIL: HTTP {$code} — intraday may require a higher EODHD plan",
         ];
     }
 
-    // Test 4: EODHD real-time quote
-    if (getenv('EODHD_API_KEY')) {
-        $eodhdResult = eodhdQuote('TCS');
-        $out['eodhd_quote_test'] = [
-            'got_data'  => !empty($eodhdResult),
-            'price'     => $eodhdResult['regularMarketPrice'] ?? null,
-            'diagnosis' => !empty($eodhdResult) ? 'PASS' : 'FAIL — check EODHD_API_KEY or that TCS.NSE is a valid symbol',
+    // Test 4: Twelve Data (for reference — NSE needs paid plan)
+    if (DATA_API_KEY) {
+        $tdResult = twelveDataQuoteDebug('TCS');
+        $out['twelvedata_quote_test'] = [
+            'http_code' => $tdResult['http_code'],
+            'diagnosis' => $tdResult['diagnosis'],
+            'price'     => $tdResult['quote']['regularMarketPrice'] ?? null,
         ];
     }
 

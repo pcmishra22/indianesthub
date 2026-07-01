@@ -264,8 +264,17 @@ function twelveDataHistory(string $symbol, int $days = 90): array
 
 function eodhdQuote(string $symbol): ?array
 {
+    $result = eodhdQuoteDebug($symbol);
+    return $result['quote'];
+}
+
+/**
+ * Debug variant — surfaces raw response instead of returning null silently.
+ */
+function eodhdQuoteDebug(string $symbol): array
+{
     $key = getenv('EODHD_API_KEY') ?: '';
-    if (!$key) return null;
+    if (!$key) return ['quote' => null, 'http_code' => null, 'raw' => null, 'diagnosis' => 'No EODHD_API_KEY set in .env'];
 
     $nseSym = strtoupper(str_replace('.NS', '', $symbol)) . '.NSE';
     $url = 'https://eodhd.com/api/real-time/' . urlencode($nseSym)
@@ -279,17 +288,21 @@ function eodhdQuote(string $symbol): ?array
     ]);
     $raw  = curl_exec($ch);
     $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err  = curl_error($ch);
     curl_close($ch);
 
-    if (!$raw || $code !== 200) return null;
+    if ($raw === false) return ['quote' => null, 'http_code' => $code, 'raw' => null, 'diagnosis' => "curl error: {$err}"];
+    if ($code !== 200)  return ['quote' => null, 'http_code' => $code, 'raw' => substr((string)$raw, 0, 500), 'diagnosis' => "HTTP {$code}"];
+
     $d = json_decode($raw, true);
-    if (!is_array($d) || !isset($d['close'])) return null;
+    if (!is_array($d))        return ['quote' => null, 'http_code' => $code, 'raw' => substr((string)$raw, 0, 500), 'diagnosis' => 'Response is not valid JSON'];
+    if (!isset($d['close']))  return ['quote' => null, 'http_code' => $code, 'raw' => $d, 'diagnosis' => 'No "close" field in response — unexpected shape'];
 
     $price = (float)$d['close'];
-    if ($price <= 0) return null;
+    if ($price <= 0) return ['quote' => null, 'http_code' => $code, 'raw' => $d, 'diagnosis' => "close={$price} is not a valid price"];
 
-    $base = strtoupper(str_replace('.NS', '', $symbol));
-    return [
+    $base  = strtoupper(str_replace('.NS', '', $symbol));
+    $quote = [
         'symbol'                     => $base . '.NS',
         'shortName'                  => $base,
         'longName'                   => $base,
@@ -308,6 +321,80 @@ function eodhdQuote(string $symbol): ?array
         'sector' => null, 'industry' => null, 'returnOnEquity' => null, 'debtToEquity' => null,
         '_source' => 'eodhd',
     ];
+    return ['quote' => $quote, 'http_code' => $code, 'raw' => $d, 'diagnosis' => 'PASS'];
+}
+
+/**
+ * Bulk real-time quote from EODHD.
+ * EODHD supports fetching multiple symbols in one call:
+ * /api/real-time/TCS.NSE?api_token=KEY&fmt=json&s=INFY.NSE,RELIANCE.NSE
+ * Returns array of objects when multiple symbols are requested.
+ */
+function eodhdQuoteBulk(array $symbols): array
+{
+    $key = getenv('EODHD_API_KEY') ?: '';
+    if (!$key || empty($symbols)) return [];
+
+    $all = [];
+    foreach (array_chunk($symbols, 50) as $chunk) {
+        $nseSyms = array_map(fn($s) => strtoupper(str_replace('.NS', '', $s)) . '.NSE', $chunk);
+        // First symbol is the endpoint path, rest go in &s= param
+        $primary = array_shift($nseSyms);
+        $extra   = implode(',', $nseSyms);
+        $url = 'https://eodhd.com/api/real-time/' . urlencode($primary)
+             . '?api_token=' . urlencode($key) . '&fmt=json'
+             . ($extra ? '&s=' . urlencode($extra) : '');
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => 15, CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_HTTPHEADER => ['Accept: application/json'],
+        ]);
+        $raw  = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if (!$raw || $code !== 200) continue;
+        $data = json_decode($raw, true);
+        if (!is_array($data)) continue;
+
+        // Single symbol returns flat object; multiple returns array of objects
+        $entries = isset($data[0]) ? $data : [$data];
+
+        foreach ($entries as $d) {
+            if (!is_array($d) || !isset($d['close'])) continue;
+            $price = (float)$d['close'];
+            if ($price <= 0) continue;
+
+            // EODHD returns code like "TCS.NSE" — strip the .NSE suffix
+            $rawCode = $d['code'] ?? '';
+            $base    = strtoupper(str_replace('.NSE', '', $rawCode)) ?: strtoupper(str_replace('.NS', '', array_shift($chunk) ?? ''));
+            $nsKey   = $base . '.NS';
+
+            $all[$nsKey] = [
+                'symbol'                     => $nsKey,
+                'shortName'                  => $base,
+                'longName'                   => $base,
+                'regularMarketPrice'         => $price,
+                'regularMarketChange'        => (float)($d['change'] ?? 0),
+                'regularMarketChangePercent' => (float)($d['change_p'] ?? 0),
+                'regularMarketPreviousClose' => (float)($d['previousClose'] ?? $price),
+                'regularMarketOpen'          => (float)($d['open'] ?? $price),
+                'regularMarketDayHigh'       => (float)($d['high'] ?? $price),
+                'regularMarketDayLow'        => (float)($d['low'] ?? $price),
+                'regularMarketVolume'        => (int)($d['volume'] ?? 0),
+                'averageDailyVolume3Month'   => (int)($d['volume'] ?? 0),
+                'fiftyTwoWeekHigh'           => (float)($d['52WeekHigh'] ?? $price),
+                'fiftyTwoWeekLow'            => (float)($d['52WeekLow'] ?? $price),
+                'trailingPE' => null, 'priceToBook' => null, 'marketCap' => null,
+                'sector' => null, 'industry' => null, 'returnOnEquity' => null, 'debtToEquity' => null,
+                '_source' => 'eodhd',
+            ];
+        }
+        if (count($chunk) > 1) usleep(200000);
+    }
+    return $all;
 }
 
 function eodhdHistory(string $symbol, int $days = 90): array
@@ -374,13 +461,13 @@ function yahooQuote(string $symbol): ?array
         if (!empty($all) && isset($all[$symbol])) return $all[$symbol];
     }
 
-    // Priority 1: Twelve Data (real API, requires DATA_API_KEY)
-    $primary = twelveDataQuote($symbol);
-    if ($primary) return $primary;
-
-    // Priority 2: EODHD (real API, requires EODHD_API_KEY, end-of-day only)
+    // Priority 1: EODHD (primary — has NSE India on free plan, real API key)
     $eodhd = eodhdQuote($symbol);
     if ($eodhd && ($eodhd['regularMarketPrice'] ?? 0) > 0) return $eodhd;
+
+    // Priority 2: Twelve Data (NSE requires paid plan, kept as fallback)
+    $primary = twelveDataQuote($symbol);
+    if ($primary) return $primary;
 
     // Priority 3: NSE India (legacy fallback, frequently 403s on shared hosting)
     $nse = nseQuoteFallback($symbol);
@@ -425,16 +512,12 @@ function yahooQuoteBulk(array $symbols): array
         if (!empty($cached)) return $cached;
     }
 
-    // Priority 1: Twelve Data
-    $all = twelveDataQuoteBulk($symbols);
+    // Priority 1: EODHD bulk (primary — NSE supported on free plan)
+    $all = eodhdQuoteBulk($symbols);
 
-    // Priority 2: EODHD (per-symbol, slower but reliable end-of-day fallback)
+    // Priority 2: Twelve Data (NSE requires paid plan, try as fallback)
     if (empty($all)) {
-        foreach (array_slice($symbols, 0, 50) as $sym) {
-            $q = eodhdQuote($sym);
-            if ($q && ($q['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $q;
-            usleep(100000);
-        }
+        $all = twelveDataQuoteBulk($symbols);
     }
 
     // Priority 3: Stooq parallel fetch (legacy fallback)
@@ -497,13 +580,13 @@ function yahooHistory(string $symbol, int $days = 90): array
         if (!empty($cached)) return $cached;
     }
 
-    // Priority 1: Twelve Data
-    $primary = twelveDataHistory($symbol, $days);
-    if (!empty($primary)) return $primary;
-
-    // Priority 2: EODHD historical data
+    // Priority 1: EODHD historical data (primary — NSE supported on free plan)
     $eodhdRows = eodhdHistory($symbol, $days);
     if (!empty($eodhdRows)) return $eodhdRows;
+
+    // Priority 2: Twelve Data (NSE requires paid plan, try as fallback)
+    $primary = twelveDataHistory($symbol, $days);
+    if (!empty($primary)) return $primary;
 
     // Priority 3: Yahoo chart endpoint — verified unreliable, kept as attempt
     $period2 = time();

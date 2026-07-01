@@ -2,32 +2,31 @@
 declare(strict_types=1);
 /**
  * api/intraday.php — intraday candle data and pivot points.
- * Uses Twelve Data's /time_series endpoint (server-side, no CORS issues)
- * when DATA_API_KEY is configured. Falls back to Yahoo chart endpoint
- * (which is mostly dead but kept as a last-resort attempt).
+ * Primary: EODHD /api/intraday endpoint (1min, 5min, 1hour intervals, NSE free).
+ * Fallback: Twelve Data time_series (NSE requires paid plan).
+ * Last resort: Yahoo chart endpoint (mostly dead).
  */
 
 function apiIntraday(string $symbol, string $interval = '5m'): array
 {
     if (!$symbol) return ['error' => 'No symbol'];
-
     $nseSym = strtoupper(str_replace('.NS', '', $symbol));
 
-    // ── Twelve Data intraday (server-side, no CORS, reliable) ──
-    if (DATA_API_KEY) {
-        // Map our interval names to Twelve Data's format
-        $tdInterval = match($interval) {
-            '5m'  => '5min',
-            '15m' => '15min',
+    // ── Priority 1: EODHD intraday ───────────────────────────────
+    $eodhdKey = getenv('EODHD_API_KEY') ?: '';
+    if ($eodhdKey) {
+        // EODHD intraday interval format: 1m, 5m, 15m, 30m, 1h
+        $eodhdInterval = match($interval) {
+            '5m'  => '5m',
+            '15m' => '15m',
             '1h'  => '1h',
-            '1d'  => '1day',
-            default => '5min',
+            default => '5m',
         };
-        $outputSize = ($interval === '1h') ? 120 : 80; // more bars for hourly
-        $url = 'https://api.twelvedata.com/time_series?symbol=' . urlencode($nseSym)
-             . '&exchange=NSE&interval=' . $tdInterval
-             . '&outputsize=' . $outputSize
-             . '&apikey=' . urlencode(DATA_API_KEY);
+        $from = date('Y-m-d', strtotime($interval === '1h' ? '-5 days' : '-1 day'));
+        $url  = 'https://eodhd.com/api/intraday/' . urlencode($nseSym . '.NSE')
+              . '?api_token=' . urlencode($eodhdKey)
+              . '&fmt=json&interval=' . $eodhdInterval
+              . '&from=' . $from;
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
@@ -40,15 +39,13 @@ function apiIntraday(string $symbol, string $interval = '5m'): array
         curl_close($ch);
 
         if ($raw && $code === 200) {
-            $d      = json_decode($raw, true);
-            $values = $d['values'] ?? [];
-            if (!empty($values) && !isset($d['status'])) { // status=error means API error
+            $data = json_decode($raw, true);
+            if (is_array($data) && !empty($data)) {
                 $candles = [];
-                foreach (array_reverse($values) as $v) {
+                foreach ($data as $v) {
                     $close = (float)($v['close'] ?? 0);
                     if ($close <= 0) continue;
-                    // Convert "2024-01-15 09:15:00" datetime to a unix timestamp
-                    $ts = strtotime($v['datetime'] ?? '');
+                    $ts = isset($v['timestamp']) ? (int)$v['timestamp'] : strtotime($v['datetime'] ?? '');
                     if (!$ts) continue;
                     $candles[] = [
                         't' => $ts,
@@ -60,46 +57,67 @@ function apiIntraday(string $symbol, string $interval = '5m'): array
                     ];
                 }
                 if (!empty($candles)) {
-                    return ['symbol' => $symbol, 'interval' => $interval, 'candles' => $candles, 'count' => count($candles), 'source' => 'twelvedata'];
+                    return ['symbol' => $symbol, 'interval' => $interval, 'candles' => $candles, 'count' => count($candles), 'source' => 'eodhd'];
                 }
             }
         }
     }
 
-    // ── Legacy: Yahoo chart endpoint (mostly dead, kept as last resort) ──
-    $range = in_array($interval, ['1h']) ? '5d' : '1d';
-    $url   = "https://query2.finance.yahoo.com/v8/finance/chart/{$nseSym}.NS?range={$range}&interval={$interval}";
-    $raw   = httpGet($url, 15);
-    if (!$raw) return ['error' => 'Could not fetch intraday data (no API key configured or Twelve Data unavailable)'];
+    // ── Priority 2: Twelve Data intraday ─────────────────────────
+    if (DATA_API_KEY) {
+        $tdInterval = match($interval) { '5m' => '5min', '15m' => '15min', '1h' => '1h', default => '5min' };
+        $url = 'https://api.twelvedata.com/time_series?symbol=' . urlencode($nseSym)
+             . '&exchange=NSE&interval=' . $tdInterval . '&outputsize=80'
+             . '&apikey=' . urlencode(DATA_API_KEY);
 
-    $data   = json_decode($raw, true);
-    $result = $data['chart']['result'][0] ?? null;
-    if (!$result) return ['error' => 'No intraday data available'];
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 12, CURLOPT_SSL_VERIFYPEER => false]);
+        $raw  = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
 
-    $timestamps = $result['timestamp'] ?? [];
-    $q = $result['indicators']['quote'][0] ?? [];
-    $candles = [];
-    foreach ($timestamps as $i => $ts) {
-        $c = $q['close'][$i]  ?? null;
-        if ($c === null) continue;
-        $candles[] = [
-            't' => $ts,
-            'o' => round((float)($q['open'][$i]   ?? $c), 2),
-            'h' => round((float)($q['high'][$i]   ?? $c), 2),
-            'l' => round((float)($q['low'][$i]    ?? $c), 2),
-            'c' => round((float)$c, 2),
-            'v' => (int)($q['volume'][$i] ?? 0),
-        ];
+        if ($raw && $code === 200) {
+            $d = json_decode($raw, true);
+            if (!empty($d['values']) && !isset($d['status'])) {
+                $candles = [];
+                foreach (array_reverse($d['values']) as $v) {
+                    $close = (float)($v['close'] ?? 0);
+                    if ($close <= 0) continue;
+                    $ts = strtotime($v['datetime'] ?? '');
+                    if (!$ts) continue;
+                    $candles[] = ['t' => $ts, 'o' => round((float)($v['open'] ?? $close), 2), 'h' => round((float)($v['high'] ?? $close), 2), 'l' => round((float)($v['low'] ?? $close), 2), 'c' => round($close, 2), 'v' => (int)($v['volume'] ?? 0)];
+                }
+                if (!empty($candles)) return ['symbol' => $symbol, 'interval' => $interval, 'candles' => $candles, 'count' => count($candles), 'source' => 'twelvedata'];
+            }
+        }
     }
-    return ['symbol' => $symbol, 'interval' => $interval, 'candles' => $candles, 'count' => count($candles), 'source' => 'yahoo_legacy'];
+
+    // ── Priority 3: Yahoo chart (legacy last resort) ──────────────
+    $url = "https://query2.finance.yahoo.com/v8/finance/chart/{$nseSym}.NS?range=1d&interval={$interval}";
+    $raw = httpGet($url, 15);
+    if ($raw) {
+        $data   = json_decode($raw, true);
+        $result = $data['chart']['result'][0] ?? null;
+        if ($result) {
+            $ts  = $result['timestamp'] ?? [];
+            $q   = $result['indicators']['quote'][0] ?? [];
+            $candles = [];
+            foreach ($ts as $i => $t) {
+                $c = $q['close'][$i] ?? null;
+                if ($c === null) continue;
+                $candles[] = ['t' => $t, 'o' => round((float)($q['open'][$i] ?? $c), 2), 'h' => round((float)($q['high'][$i] ?? $c), 2), 'l' => round((float)($q['low'][$i] ?? $c), 2), 'c' => round((float)$c, 2), 'v' => (int)($q['volume'][$i] ?? 0)];
+            }
+            if (!empty($candles)) return ['symbol' => $symbol, 'interval' => $interval, 'candles' => $candles, 'count' => count($candles), 'source' => 'yahoo_legacy'];
+        }
+    }
+
+    return ['error' => 'No intraday data available. EODHD intraday requires the All-World plan — check your subscription at eodhistoricaldata.com'];
 }
 
-// ── Pivot points API ──────────────────────────────────────────
 function apiPivots(string $symbol): array
 {
     if (!$symbol) return ['error' => 'No symbol'];
     $history = yahooHistory($symbol, 5);
     if (count($history) < 2) return ['error' => 'Not enough historical data'];
-    $pivots = pivotPoints($history);
-    return ['symbol' => $symbol, 'pivots' => $pivots, 'computed_from' => 'Previous day OHLC'];
+    return ['symbol' => $symbol, 'pivots' => pivotPoints($history), 'computed_from' => 'Previous day OHLC'];
 }
