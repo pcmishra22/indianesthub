@@ -272,7 +272,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <span class="label">Auto-refresh in <strong id="cdSec">300</strong>s</span>
     <div class="rbar-bg"><div class="rbar-fill" id="rbar" style="width:100%"></div></div>
     <button class="btn btn-outline" onclick="wlPage=1;loadWatchlist()" style="padding:5px 12px;font-size:12px" id="refreshBtn">🔄 Refresh</button>
-    <button class="btn btn-outline" onclick="clearYahooCache()" style="padding:5px 12px;font-size:12px;color:var(--orange);border-color:var(--orange)" id="clearCacheBtn" title="Clear Yahoo Finance auth cache and reload">🗑️ Clear Cache</button>
+    <button class="btn btn-outline" onclick="clearYahooCache()" style="padding:5px 12px;font-size:12px;color:var(--orange);border-color:var(--orange)" id="clearCacheBtn" title="Clear data cache and reload">🗑️ Clear Cache</button>
     <div id="cacheNote" style="font-size:11px;color:var(--muted)"></div>
   </div>
 
@@ -335,7 +335,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <div class="analyze-box">
     <div class="search-card">
       <h3>🔍 Analyze a Stock</h3>
-      <p>Enter any NSE symbol for technical + fundamental analysis using real Yahoo Finance data</p>
+      <p>Enter any NSE symbol for technical + fundamental analysis using live market data</p>
       <input class="sym-input" type="text" id="symInput" placeholder="e.g. RELIANCE" maxlength="20"
         oninput="this.value=this.value.toUpperCase()"
         onkeydown="if(event.key==='Enter')runAnalyze()">
@@ -353,14 +353,14 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <div id="histItems"></div>
       </div>
       <div style="margin-top:14px;font-size:11px;color:var(--green);background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.15);border-radius:8px;padding:8px 10px">
-        ✅ Real data from Yahoo Finance · No API key needed · EMA, RSI, MACD, BB, Supertrend
+        ✅ Live NSE data · EMA, RSI, MACD, BB, Supertrend
       </div>
     </div>
     <div class="analysis-result" id="analyzeResult">
       <div class="result-placeholder">
         <div class="icon">🔬</div>
         <div style="font-size:14px;font-weight:600;color:var(--muted2);margin-bottom:6px">Stock Analysis</div>
-        <div style="font-size:12px">Enter a symbol and click Analyze<br>for full technical + fundamental breakdown<br>using real Yahoo Finance data</div>
+        <div style="font-size:12px">Enter a symbol and click Analyze<br>for full technical + fundamental breakdown<br>using live NSE market data</div>
       </div>
     </div>
   </div>
@@ -836,7 +836,7 @@ function renderWatchlist(d){
   }
 
   function stockTable(list,title,color,icon){
-    if(!list.length) return `<div style="padding:20px;color:var(--muted);font-size:13px">No ${title.includes('BUY')?'buy':'sell'} signals right now — stocks may be in a neutral/hold zone, or Yahoo Finance data is still loading. Try refreshing.</div>`;
+    if(!list.length) return `<div style="padding:20px;color:var(--muted);font-size:13px">No ${title.includes('BUY')?'buy':'sell'} signals right now — stocks may be in a neutral/hold zone, Try refreshing or wait a moment for data to load.</div>`;
     return `<div style="padding:12px 18px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:16px">${icon}</span>
       <span style="font-weight:700;color:${color};font-size:14px">${title}</span>
@@ -856,7 +856,7 @@ function renderWatchlist(d){
       <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:var(--r);margin-bottom:12px">${stockTable(buys,'📈 BUY Candidates','var(--green)','🟢')}</div>
       <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:var(--r)">${stockTable(sells,'📉 SELL / Avoid','var(--red)','🔴')}</div>
     </div>
-    <div style="padding:8px;font-size:10px;color:var(--muted)">Score = Price×Volume + RSI + MACD + EMA + ADX + Supertrend · Yahoo Finance (free) · Educational only</div>`;
+    <div style="padding:8px;font-size:10px;color:var(--muted)">Score = Price×Volume + RSI + MACD + EMA + ADX + Supertrend · Live NSE Data · Educational only</div>`;
   document.getElementById('watchTable').style.display='block';
 }
 
@@ -917,7 +917,7 @@ async function runAnalyze(){
 
   const el=document.getElementById('analyzeResult');
   el.innerHTML=`<div class="loading-card"><div class="spin"></div>
-    <div>Fetching <strong>${escHtml(sym)}</strong> data from Yahoo Finance…</div>
+    <div>Fetching <strong>${escHtml(sym)}</strong> data…</div>
     <div style="font-size:11px;color:var(--muted)">Browser fetching directly (bypasses server IP blocks)</div>
   </div>`;
 
@@ -938,7 +938,7 @@ async function runAnalyze(){
       }catch(e){}
     }
     if(!quote){
-      el.innerHTML=`<div class="err-box"><strong>Analysis failed</strong><br>Could not fetch quote for <strong>${escHtml(sym)}</strong> from Yahoo Finance.<br><small>Check that the symbol is correct (e.g. TCS, RELIANCE, INFY) and your internet connection.</small></div>`;
+      el.innerHTML=`<div class="err-box"><strong>Analysis failed</strong><br>Could not fetch data for <strong>${escHtml(sym)}</strong>.<br><small>Check that the symbol is correct (e.g. TCS, RELIANCE, INFY).</small></div>`;
       return;
     }
 
@@ -1239,7 +1239,7 @@ function renderAnalysis(el,d){
     <!-- Risk -->
     ${d.risk_warning?`<div class="risk-box">${escHtml(d.risk_warning)}</div>`:''}
     <div style="font-size:10px;color:var(--muted);margin-top:10px;text-align:center">
-      Data: Yahoo Finance (free) · ${(sb.components||[]).length} indicators computed · Educational only · ${new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})}
+      Data: Live NSE (EODHD) · ${(sb.components||[]).length} indicators computed · Educational only · ${new Date().toLocaleString('en-IN',{timeZone:'Asia/Kolkata'})}
     </div>
   </div>`;
 
@@ -1379,7 +1379,7 @@ async function loadChart(sym, interval='5m'){
   cv.style.display='none';
   try{
     const yahooSym=sym.endsWith('.NS')?sym:sym+'.NS';
-    // Map interval to Yahoo Finance params
+    // Map interval to API params
     const intervalMap={'5m':'5m','15m':'15m','1h':'60m'};
     const yInterval=intervalMap[interval]||'5m';
     const range=interval==='1h'?'5d':'1d';
@@ -1429,7 +1429,7 @@ async function loadChart(sym, interval='5m'){
     }
 
     if(!candles.length){
-      if(cl){cl.innerHTML='<span style="color:var(--muted)">No intraday data available from Yahoo Finance</span>';cl.style.display='flex';}
+      if(cl){cl.innerHTML='<span style="color:var(--muted)">No intraday data available</span>';cl.style.display='flex';}
       return;
     }
     cv.style.display='block';
