@@ -216,6 +216,19 @@ Route::get('/sco-for-sale-in-{city}',
 Route::get('/property-dealers-in-{city}',
     [\App\Http\Controllers\Frontend\SeoLandingController::class, 'dealersInCity'])
     ->name('seo.dealers.city');
+    
+Route::get('/services', [\App\Http\Controllers\Frontend\ServicePublicController::class, 'index'])
+    ->name('services');
+Route::get('/services/{category:slug}/{city}',
+    [\App\Http\Controllers\Frontend\ServicePublicController::class, 'categoryCity'])
+    ->where('city', '[a-z-]+')
+    ->name('services.category.city');
+Route::get('/services/{category:slug}',
+    [\App\Http\Controllers\Frontend\ServicePublicController::class, 'category'])
+    ->name('services.category');
+Route::get('/professionals/{provider:slug}',
+    [\App\Http\Controllers\Frontend\ServicePublicController::class, 'profile'])
+    ->name('services.profile');
 
 Route::get('/real-estate-agents-in-{city}',
     [\App\Http\Controllers\Frontend\SeoLandingController::class, 'agentsInCity'])
@@ -451,6 +464,39 @@ Route::prefix('dealer')->middleware('auth:dealer')->name('dealer.')->group(funct
     })->name('subscription');
     Route::get('/subscription/subscribe', [SubscriptionController::class, 'subscribe'])->name('subscription.subscribe');
     Route::post('/subscription/payment/{payment}/mark-paid', [SubscriptionController::class, 'markPaid'])->name('subscription.payment.markPaid');
+});
+// ============================================================
+// ADD THIS BLOCK to routes/web.php — paste it right after your
+// existing "Dealer Dashboard Routes (auth:dealer)" group (the
+// one ending with subscription.payment.markPaid), around line 454.
+// Do NOT replace your whole web.php — just insert this block.
+// ============================================================
+
+/*
+|--------------------------------------------------------------------------
+| Service Provider Authentication Routes
+| (Common login for Electrician, Plumber, Mistry, Interior Designer,
+|  Loan Provider, Insurance Agent, etc. — one signup, category selected
+|  at registration time and editable later from the dashboard.)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('service-provider')->name('service-provider.')->group(function () {
+    Route::get('/login', [\App\Http\Controllers\Auth\ServiceProviderLoginController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [\App\Http\Controllers\Auth\ServiceProviderLoginController::class, 'login']);
+    Route::post('/logout', [\App\Http\Controllers\Auth\ServiceProviderLoginController::class, 'logout'])->name('logout');
+    Route::get('/register', [\App\Http\Controllers\Auth\ServiceProviderRegisterController::class, 'showRegistrationForm'])->name('register');
+    Route::post('/register', [\App\Http\Controllers\Auth\ServiceProviderRegisterController::class, 'register']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Service Provider Dashboard Routes (auth:service_provider)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('service-provider')->middleware('auth:service_provider')->name('service-provider.')->group(function () {
+    Route::get('/dashboard', [\App\Http\Controllers\ServiceProvider\ServiceProviderDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/profile', [\App\Http\Controllers\ServiceProvider\ServiceProviderDashboardController::class, 'editProfile'])->name('profile');
+    Route::put('/profile', [\App\Http\Controllers\ServiceProvider\ServiceProviderDashboardController::class, 'updateProfile'])->name('profile.update');
 });
 
 /*

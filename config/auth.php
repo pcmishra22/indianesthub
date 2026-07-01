@@ -52,6 +52,10 @@ return [
             'driver' => 'session',
             'provider' => 'builders',
         ],
+        'service_provider' => [
+            'driver' => 'session',
+            'provider' => 'service_providers',
+        ],
     ],
 
     /*
@@ -87,6 +91,10 @@ return [
         'builders' => [
             'driver' => 'eloquent',
             'model' => App\Models\Builder::class,
+        ],
+        'service_providers' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\ServiceProvider::class,
         ],
     ],
 

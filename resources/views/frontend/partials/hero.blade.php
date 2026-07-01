@@ -114,9 +114,9 @@
 
       {{-- LEFT --}}
       <div class="col-lg-7">
-        <div class="hero-label"><i class="bi bi-shield-check"></i> India's Trusted Property Platform</div>
-        <h1>Find Your <span>Dream</span><br>Property in India</h1>
-        <p class="hero-sub">Search from <strong style="color:#50e6ff;">{{ number_format($totalProperties ?? 323) }}+</strong> verified listings across {{ $totalCities ?? 14 }} cities. Buy, Rent or Invest — all in one place.</p>
+        <div class="hero-label"><i class="bi bi-geo-alt-fill"></i> Chandigarh Tricity's Trusted Property Platform</div>
+        <h1>Buy, Sell & Rent Properties in <span>Chandigarh Tricity</span></h1>
+        <p class="hero-sub">Search <strong style="color:#50e6ff;">{{ number_format($totalProperties ?? 323) }}+</strong> verified flats, villas, plots & new projects across Chandigarh, Mohali, Zirakpur & Panchkula — all in one place.</p>
 
         {{-- Search Card --}}
         <div class="hero-search-card">
@@ -205,7 +205,8 @@
             </form>
             <div class="popular-tags">
               <span>Popular:</span>
-              <a href="{{ route('properties', ['looking_for'=>'Rent','city'=>'Bengaluru']) }}" class="popular-tag">Bengaluru</a>
+              <a href="{{ route('properties', ['looking_for'=>'Rent','city'=>'Zirakpur']) }}" class="popular-tag">Zirakpur</a>
+              <a href="{{ route('properties', ['looking_for'=>'Rent','city'=>'Mohali']) }}" class="popular-tag">Mohali</a>
               <a href="{{ route('properties', ['looking_for'=>'Rent','bhk_type'=>'2 BHK']) }}" class="popular-tag">2 BHK Rent</a>
               <a href="{{ route('properties', ['looking_for'=>'Rent','furnishing_status'=>'Furnished']) }}" class="popular-tag">Furnished</a>
             </div>
@@ -235,8 +236,8 @@
             </form>
             <div class="popular-tags">
               <span>Popular:</span>
-              <a href="{{ route('properties', ['looking_for'=>'PG','city'=>'Bengaluru']) }}" class="popular-tag">PG in Bengaluru</a>
-              <a href="{{ route('properties', ['looking_for'=>'PG','city'=>'Mumbai']) }}" class="popular-tag">PG in Mumbai</a>
+              <a href="{{ route('properties', ['looking_for'=>'PG','city'=>'Zirakpur']) }}" class="popular-tag">PG in Zirakpur</a>
+              <a href="{{ route('properties', ['looking_for'=>'PG','city'=>'Chandigarh']) }}" class="popular-tag">PG in Chandigarh</a>
             </div>
           </div>
 
@@ -299,25 +300,25 @@
       <div class="col-lg-5 d-none d-lg-block">
         <div class="hero-right-grid">
           <div class="hero-img-card tall">
-            <img src="/assets/img/real-estate/property-exterior-8.webp" alt="Premium Property" loading="eager">
+            <img src="/assets/img/real-estate/property-exterior-8.webp" alt="Premium Villa Zirakpur" loading="eager">
             <span class="hero-verified-badge"><i class="bi bi-patch-check-fill me-1"></i>Verified</span>
             <div class="hero-img-card-label">
-              <div class="price">₹2.40 Cr</div>
-              <div class="loc"><i class="bi bi-geo-alt me-1"></i>4 BHK Villa · Bengaluru</div>
+              <div class="price">₹1.39 Cr</div>
+              <div class="loc"><i class="bi bi-geo-alt me-1"></i>4 BHK Builder Floor · Zirakpur</div>
             </div>
           </div>
           <div class="hero-img-card">
-            <img src="/assets/img/real-estate/property-interior-5.webp" alt="Interior" loading="eager">
+            <img src="/assets/img/real-estate/property-interior-5.webp" alt="Independent Floor Panchkula" loading="eager">
             <div class="hero-img-card-label">
-              <div class="price">₹85 L</div>
-              <div class="loc"><i class="bi bi-geo-alt me-1"></i>3 BHK · Mumbai</div>
+              <div class="price">₹88.69 L</div>
+              <div class="loc"><i class="bi bi-geo-alt me-1"></i>3 BHK · Panchkula</div>
             </div>
           </div>
           <div class="hero-img-card">
-            <img src="/assets/img/real-estate/property-exterior-3.webp" alt="Modern Home" loading="eager">
+            <img src="/assets/img/real-estate/property-exterior-3.webp" alt="Villa Mohali" loading="eager">
             <div class="hero-img-card-label">
-              <div class="price">₹55 L</div>
-              <div class="loc"><i class="bi bi-geo-alt me-1"></i>2 BHK · Gurugram</div>
+              <div class="price">₹2.07 Cr</div>
+              <div class="loc"><i class="bi bi-geo-alt me-1"></i>3 BHK Villa · Chandigarh</div>
             </div>
           </div>
         </div>

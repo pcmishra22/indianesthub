@@ -3,7 +3,7 @@
     {{-- 1. Static Pages --}}
     @foreach($staticPages as $page)
     <url>
-        <loc>{{ rtrim($baseUrl, '/') . '/' . ltrim(route($page), '/') }}</loc>
+        <loc>{{ route($page) }}</loc>
         <changefreq>monthly</changefreq>
         <priority>{{ $page === 'home' ? '1.0' : '0.8' }}</priority>
     </url>
@@ -120,7 +120,7 @@
     </url>
     @endforeach
 
-    {{-- 5. Builder Projects --}}
+    {{-- 6. Builder Projects --}}
     @foreach($projects as $project)
     <url>
         <loc>{{ route('projects.show', $project->id) }}</loc>
@@ -130,7 +130,7 @@
     </url>
     @endforeach
 
-    {{-- 6. Blog Posts --}}
+    {{-- 7. Blog Posts --}}
     @foreach($blogs as $blog)
     <url>
         <loc>{{ route('blog.show', $blog->slug) }}</loc>
@@ -140,7 +140,7 @@
     </url>
     @endforeach
 
-    {{-- 7. Builder Profiles --}}
+    {{-- 8. Builder Profiles --}}
     @foreach($builders as $builder)
     <url>
         <loc>{{ route('builders.show', $builder->slug) }}</loc>
@@ -150,13 +150,44 @@
     </url>
     @endforeach
 
-    {{-- 8. Dealer/Agent Profiles --}}
+    {{-- 9. Dealer/Agent Profiles --}}
     @foreach($dealers as $dealer)
     <url>
         <loc>{{ route('agent-profile', $dealer->slug) }}</loc>
         <lastmod>{{ $dealer->updated_at->tz('UTC')->toAtomString() }}</lastmod>
         <changefreq>monthly</changefreq>
         <priority>0.5</priority>
+    </url>
+    @endforeach
+
+    {{-- 10. Service Provider Hub + Category Pages --}}
+    <url>
+        <loc>{{ route('services') }}</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
+    @foreach($serviceCategories as $cat)
+    <url>
+        <loc>{{ route('services.category', $cat) }}</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.7</priority>
+    </url>
+    @foreach($serviceCities as $citySlug => $cityLabel)
+    <url>
+        <loc>{{ route('services.category.city', ['category' => $cat, 'city' => $citySlug]) }}</loc>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
+    @endforeach
+    @endforeach
+
+    {{-- 11. Service Provider Public Profiles --}}
+    @foreach($serviceProviders as $provider)
+    <url>
+        <loc>{{ route('services.profile', $provider->slug) }}</loc>
+        <lastmod>{{ $provider->updated_at->tz('UTC')->toAtomString() }}</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.6</priority>
     </url>
     @endforeach
 </urlset>

@@ -1,0 +1,15 @@
+APP_NAME=NSE Stock Analyzer
+APP_SECRET=change_this_random_string
+DEMO_USER=admin
+DEMO_PASS=stockpass123
+TIMEZONE=Asia/Kolkata
+
+# Primary data provider — Twelve Data (free tier: 800 requests/day, NSE supported)
+DATA_API_PROVIDER=twelvedata
+DATA_API_KEY=e6156728afd44c3ea519f3a9de1104f8
+
+# Backup provider — EODHD (used automatically if Twelve Data quota is exceeded)
+EODHD_API_KEY=6a433a2012d816.01667128
+
+# Protects /api/cron from public access if you set up a server cron job
+CRON_KEY=changeme

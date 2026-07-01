@@ -27,10 +27,16 @@ Disallow: /register
 Disallow: /forgot-password
 Disallow: /reset-password
 
-# Allow crawling of property parameters to ensure filtered pages can be indexed
-Allow: /properties?*
+# Block crawling of search result pages with parameters to avoid index bloat/duplicate content
+# This ensures Google prioritizes the clean hyperlocal URLs defined in your sitemap.
+Disallow: /*?*property_type=
+Disallow: /*?*looking_for=
+Disallow: /*?*city=
+Disallow: /*?*sort=
+Disallow: /*?*page=
+Disallow: /*?*keyword=
 
-# Crawl-delay for well-behaved bots
+# Crawl-delay for well-behaved bots (ignored by Googlebot, respected by Bing/Yandex)
 Crawl-delay: 1
 
 # Sitemaps

@@ -2,8 +2,8 @@
 @extends('frontend.layout')
 
 {{-- ════════════════════════ SEO META ════════════════════════ --}}
-@section('title', config('app.name') . ' – Real Estate in Chandigarh, Mohali, Zirakpur | Buy, Sell, Rent')
-@section('meta_description', config('app.name') . ' – Find verified flats, villas, plots & new projects for sale & rent in Chandigarh, Mohali, Zirakpur, Panchkula & Tricity. Connect with top agents and builders. Trusted real estate portal.')
+@section('title', config('app.name') . ' – Property in Chandigarh, Mohali, Zirakpur')
+@section('meta_description', 'Find verified flats, villas & plots for sale and rent in Chandigarh, Mohali, Zirakpur & Panchkula. Browse 2,000+ listings from trusted dealers & builders.')
 @section('meta_keywords', 'property in chandigarh, flats in mohali, property in zirakpur, real estate tricity, buy flat chandigarh, rent flat mohali, new projects zirakpur, 3bhk flats mohali, villas chandigarh, plots panchkula')
 @section('canonical', url('/'))
 @section('og_title', config('app.name') . ' – Chandigarh Tricity\'s #1 Real Estate Portal')
@@ -348,7 +348,7 @@
     <div class="hs-section-title">
       <span class="hs-badge">Browse by Category</span>
       <h2>What Are You Looking For?</h2>
-      <p>Find properties by type across India's top cities</p>
+      <p>Find properties by type across Chandigarh Tricity</p>
     </div>
     <div class="prop-type-grid">
       @php
@@ -416,7 +416,7 @@
     <div class="hs-section-title">
       <span class="hs-badge">Top Picks</span>
       <h2>Featured Properties</h2>
-      <p>Handpicked premium listings across India's top cities</p>
+      <p>Handpicked premium listings across Chandigarh, Mohali &amp; Zirakpur</p>
     </div>
     <div class="row g-4">
 
@@ -591,7 +591,7 @@
     <div class="hs-section-title">
       <span class="hs-badge">Location</span>
       <h2>Browse by City</h2>
-      <p>Find properties in India's most sought-after cities</p>
+      <p>Find properties in Tricity's most sought-after locations</p>
     </div>
     @php
       $cityImages = [
@@ -755,7 +755,7 @@
       <div class="col-lg-5">
         <span class="hs-badge">Why Us</span>
         <h2 class="fw-800 mt-2 mb-4" style="font-size:2rem;color:var(--text-dark);font-weight:800;">Why Choose <span style="color:#0078d4;">{{ config('app.name') }}?</span></h2>
-        <p style="color:#64748b;line-height:1.8;margin-bottom:24px;">We're India's fastest-growing real estate platform, connecting millions of home seekers with verified dealers and top builders. Our commitment to transparency and quality ensures you make informed decisions.</p>
+        <p style="color:#64748b;line-height:1.8;margin-bottom:24px;">We're Chandigarh Tricity's dedicated real estate platform, connecting local home seekers with verified dealers and top builders across Chandigarh, Mohali, Zirakpur & Panchkula. Our commitment to transparency and quality ensures you make informed decisions.</p>
         <div class="d-flex gap-4 flex-wrap" style="margin-bottom:28px;">
           <div class="text-center">
             <div style="font-size:1.8rem;font-weight:900;color:#0078d4;">{{ number_format($totalProperties) }}+</div>
@@ -780,7 +780,7 @@
               ['icon'=>'bi-shield-lock','color'=>'#dcfce7','text'=>'#15803d','title'=>'Secure Transactions','desc'=>'Your data and transactions are protected with bank-grade security and RERA compliance.'],
               ['icon'=>'bi-headset','color'=>'#fce7f3','text'=>'#be185d','title'=>'24/7 Expert Support','desc'=>'Our dedicated team is always available to guide you through the entire buying/renting process.'],
               ['icon'=>'bi-graph-up-arrow','color'=>'#fef3c7','text'=>'#b45309','title'=>'Best Price Guarantee','desc'=>'We help you get the best deal with transparent pricing, market insights, and negotiation support.'],
-              ['icon'=>'bi-building-check','color'=>'#ede9fe','text'=>'#7c3aed','title'=>'Top Builders Network','desc'=>'Access to {{ $totalBuilders ?? 6 }}+ verified builders and their exclusive new launch projects.'],
+              ['icon'=>'bi-building-check','color'=>'#ede9fe','text'=>'#7c3aed','title'=>'Top Builders Network','desc'=>'Access to '.($totalBuilders ?? 6).'+ verified builders and their exclusive new launch projects.'],
               ['icon'=>'bi-phone','color'=>'#ecfdf5','text'=>'#065f46','title'=>'Easy Mobile Access','desc'=>'Find, save and compare properties on the go. Our platform works seamlessly on all devices.'],
             ];
           @endphp
@@ -810,7 +810,7 @@
     <div class="hs-section-title">
       <span class="hs-badge">Trusted Partners</span>
       <h2>Top Builders & Developers</h2>
-      <p>India's leading real estate developers with verified projects</p>
+      <p>Leading real estate developers building in Chandigarh Tricity</p>
     </div>
     <div class="row g-3">
       @foreach($topBuilders as $builder)
@@ -855,15 +855,16 @@
     </div>
     <div class="row g-4">
       @php
+        $appName = config('app.name');
         $testimonials = [
-          ['name'=>'Priya Sharma','role'=>'Homebuyer, Bengaluru','avatar'=>'person/person-f-5.webp',
-           'text'=>"Found our dream 3BHK apartment through {{ config('app.name') }} in just 2 weeks! The verified listings and responsive agents made the process completely stress-free.",
+          ['name'=>'Priya Sharma','role'=>'Homebuyer, Zirakpur','avatar'=>'person/person-f-5.webp',
+           'text'=>"Found our dream 3BHK apartment through {$appName} in just 2 weeks! The verified listings and responsive agents made the process completely stress-free.",
            'stars'=>5],
-          ['name'=>'Rahul Mehta','role'=>'Investor, Mumbai','avatar'=>'person/person-f-9.webp',
-           'text'=>"The new projects section is brilliant. I connected with a top builder and invested in a pre-launch project at the best price. Highly recommend {{ config('app.name') }}!",
+          ['name'=>'Rahul Mehta','role'=>'Investor, Mohali','avatar'=>'person/person-f-9.webp',
+           'text'=>"The new projects section is brilliant. I connected with a top builder and invested in a pre-launch project at the best price. Highly recommend {$appName}!",
            'stars'=>5],
-          ['name'=>'Anita Reddy','role'=>'Renter, Gurugram','avatar'=>'person/person-f-7.webp',
-           'text'=>"Used {{ config('app.name') }} to find a furnished 2BHK near my office. The filter options are incredible and I got exactly what I was looking for within my budget.",
+          ['name'=>'Anita Reddy','role'=>'Renter, Chandigarh','avatar'=>'person/person-f-7.webp',
+           'text'=>"Used {$appName} to find a furnished 2BHK near my office. The filter options are incredible and I got exactly what I was looking for within my budget.",
            'stars'=>5],
         ];
       @endphp

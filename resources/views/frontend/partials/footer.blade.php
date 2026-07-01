@@ -152,7 +152,7 @@
       <div class="brand-name">
         <i class="bi bi-buildings"></i> {{ config('app.name') }}
       </div>
-      <p class="tagline">India's trusted real estate platform — Buy, Rent &amp; Invest</p>
+      <p class="tagline">Chandigarh Tricity's trusted real estate platform — Buy, Rent &amp; Invest</p>
     </div>
   </div>
 
@@ -468,8 +468,8 @@
       <div class="col-lg-4 col-md-12 footer-about">
         <p class="mt-1">
           {{ config('app.name') }} connects buyers, sellers and renters with verified property listings
-          across India. Find your dream home from thousands of flats, villas, plots, and
-          commercial spaces.
+          across Chandigarh, Mohali, Zirakpur, Panchkula and the wider Tricity region. Find your dream home
+          from thousands of flats, villas, plots, and commercial spaces.
         </p>
         <div class="social-links d-flex mt-4">
           @if(env('SOCIAL_TWITTER_URL'))
@@ -493,6 +493,7 @@
         <h4>Quick Links</h4>
         <ul>
           <li><i class="bi bi-chevron-right"></i><a href="{{ url('/') }}">Home</a></li>
+          <li><i class="bi bi-chevron-right"></i><a href="{{ route('about') }}">About Us</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties') }}">Properties</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ url('/agents') }}">Agents</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ route('builders.index') }}">Builders</a></li>
@@ -524,6 +525,8 @@
           <li><i class="bi bi-shield-check"></i><a href="#" onclick="event.preventDefault(); openInsuranceModal(null, null, 'footer');">Property Insurance</a></li>
           <li><i class="bi bi-calculator"></i><a href="#" onclick="event.preventDefault(); openLoanModal(null, null, 'footer');">EMI Calculator</a></li>
           <li><i class="bi bi-balance-scale"></i><a href="#" onclick="event.preventDefault(); openLegalModal(null, null, 'footer');" style="color:#c084fc!important;">Legal Help</a></li>
+          <li><i class="bi bi-file-earmark-lock"></i><a href="{{ route('privacy') }}">Privacy Policy</a></li>
+          <li><i class="bi bi-file-earmark-text"></i><a href="{{ route('terms') }}">Terms &amp; Conditions</a></li>
         </ul>
       </div>
 

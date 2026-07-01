@@ -87,6 +87,14 @@ class SeoController extends Controller
         $locations    = self::getSeoLocations();
         $landingCities = self::getSeoLandingCities();
 
+        // Service marketplace (electricians, interior designers, loan providers, etc.)
+        $serviceCategories = \App\Models\ServiceCategory::where('is_active', true)->get();
+        $serviceCities     = \App\Http\Controllers\Frontend\ServicePublicController::getCityMap();
+        $serviceProviders  = \App\Models\ServiceProvider::where('status', 'approved')
+            ->whereNotNull('slug')
+            ->select('slug', 'updated_at')
+            ->get();
+
         // Essential static pages for SEO discovery
         $staticPages = [
             'home', 'about', 'properties', 'agents', 'builders.index', 'blog', 'services', 
@@ -95,7 +103,8 @@ class SeoController extends Controller
 
 $content = view('frontend.seo.sitemap', compact(
             'properties', 'dealers', 'builders', 'projects',
-            'blogs', 'locations', 'landingCities', 'staticPages'
+            'blogs', 'locations', 'landingCities', 'staticPages',
+            'serviceCategories', 'serviceCities', 'serviceProviders'
         ))->with('baseUrl', rtrim(config('app.url', url('/')), '/'))
           ->render();
 
