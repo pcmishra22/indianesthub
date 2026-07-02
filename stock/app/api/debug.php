@@ -435,32 +435,44 @@ if ($uri === '/api/debug/apikeys') {
     $out = [
         'eodhd_key_set'      => !empty($key),
         'twelvedata_key_set' => !empty(DATA_API_KEY),
-        'note'               => 'Testing what EODHD free plan actually provides for NSE India.',
+        'verdict'            => 'EODHD free plan does NOT support NSE/BSE symbols. Twelve Data free plan does NOT support NSE. App is using legacy fallbacks (Stooq/NSE direct scraping).',
     ];
 
-    // Test 1: EODHD real-time (known to return NA during market hours on free plan)
-    $ch = curl_init('https://eodhd.com/api/real-time/TCS.NS?api_token=' . urlencode($key) . '&fmt=json');
-    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>10, CURLOPT_SSL_VERIFYPEER=>false]);
-    $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
-    $out['realtime_TCS_NS'] = ['http_code'=>$code, 'raw'=>$raw ? json_decode($raw,true) : substr($raw,0,200)];
+    // Test what source is actually working right now
+    $testSymbols = ['INFY.NS', 'TCS.NS', 'RELIANCE.NS', 'HDFCBANK.NS', 'ICICIBANK.NS'];
+    foreach ($testSymbols as $sym) {
+        $q = yahooQuote($sym);
+        $out['actual_working_source'][$sym] = [
+            'price'  => $q['regularMarketPrice'] ?? null,
+            'source' => $q['_source'] ?? null,
+            'ok'     => ($q['regularMarketPrice'] ?? 0) > 0,
+        ];
+    }
 
-    // Test 2: EODHD EOD historical (this should work on free plan)
-    $ch = curl_init('https://eodhd.com/api/eod/TCS.NS?api_token=' . urlencode($key) . '&fmt=json&order=d&limit=5');
-    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>10, CURLOPT_SSL_VERIFYPEER=>false]);
-    $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
-    $out['eod_history_TCS_NS'] = ['http_code'=>$code, 'rows'=>is_array(json_decode($raw,true)) ? count(json_decode($raw,true)) : 0, 'sample'=>json_decode($raw,true)[0] ?? null, 'raw_preview'=>substr($raw,0,300)];
+    // Test Stooq directly (the one that's actually working)
+    $stooq = stooqQuoteFallback('INFY.NS');
+    $out['stooq_direct_test'] = [
+        'price'  => $stooq['regularMarketPrice'] ?? null,
+        'source' => $stooq['_source'] ?? null,
+        'ok'     => ($stooq['regularMarketPrice'] ?? 0) > 0,
+    ];
 
-    // Test 3: Try BSE symbol too
-    $ch = curl_init('https://eodhd.com/api/eod/TCS.BO?api_token=' . urlencode($key) . '&fmt=json&order=d&limit=3');
-    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>10, CURLOPT_SSL_VERIFYPEER=>false]);
-    $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
-    $out['eod_history_TCS_BO'] = ['http_code'=>$code, 'rows'=>is_array(json_decode($raw,true)) ? count(json_decode($raw,true)) : 0, 'sample'=>json_decode($raw,true)[0] ?? null, 'raw_preview'=>substr($raw,0,300)];
+    // Test NSE direct
+    $nse = nseQuoteFallback('INFY.NS');
+    $out['nse_direct_test'] = [
+        'price'  => $nse['regularMarketPrice'] ?? null,
+        'source' => $nse['_source'] ?? null,
+        'ok'     => ($nse['regularMarketPrice'] ?? 0) > 0,
+    ];
 
-    // Test 4: Check user subscription details
-    $ch = curl_init('https://eodhd.com/api/user?api_token=' . urlencode($key) . '&fmt=json');
-    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER=>true, CURLOPT_TIMEOUT=>10, CURLOPT_SSL_VERIFYPEER=>false]);
-    $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
-    $out['user_subscription'] = ['http_code'=>$code, 'raw'=>$raw ? json_decode($raw,true) : substr($raw,0,300)];
+    // Test history source
+    $hist = yahooHistory('INFY.NS', 10);
+    $out['history_source'] = [
+        'rows'   => count($hist),
+        'source' => ($hist[0]['_source'] ?? null) ?: 'unknown',
+        'sample' => $hist[count($hist)-1] ?? null,
+        'ok'     => count($hist) > 0,
+    ];
 
     echo json_encode($out, JSON_PRETTY_PRINT);
     exit;

@@ -268,7 +268,7 @@ if ($uri === '/api/quotes/bulk' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         'quotes'       => array_values($quotes),
         'count'        => count($quotes),
         'sources_tried'=> $sources_tried,
-        'error'        => empty($quotes) ? (DATA_API_KEY ? 'All sources failed — check your DATA_API_KEY is valid and has remaining quota.' : 'No DATA_API_KEY configured, and legacy fallback sources (Stooq, NSE, Yahoo) are unavailable. Add a Twelve Data API key to .env.') : null,
+        'error'        => empty($quotes) ? ('All quote sources failed (Stooq, NSE, Groww, BSE). Market may be closed or sources temporarily unavailable.') : null,
     ]);
     exit;
 }

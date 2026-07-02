@@ -799,7 +799,7 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
         'ts'              => time(),
         'quotes_fetched'  => count($allQuotes),
         'skipped_no_quote'=> $skippedNoQuote ?? 0,
-        'warning'         => empty($allQuotes) ? (DATA_API_KEY ? 'Could not fetch quotes — check your DATA_API_KEY is valid and has remaining quota. Visit /api/debug/datasource to diagnose.' : 'No DATA_API_KEY configured yet, and legacy fallback sources (NSE/Stooq) are unavailable from this server. Add your Twelve Data API key to .env as DATA_API_KEY to enable live quotes.') : (count($allQuotes) < 10 ? 'Partial data: only ' . count($allQuotes) . ' quotes fetched. Some stocks may be missing.' : null),
+        'warning'         => empty($allQuotes) ? ('Could not fetch live quotes. Sources tried: Stooq, NSE India, Groww, BSE. Market may be closed or sources temporarily unavailable. Try refreshing in a few minutes.') : (count($allQuotes) < 10 ? 'Partial data: only ' . count($allQuotes) . ' quotes fetched. Some stocks may be missing.' : null),
     ];
 }
 

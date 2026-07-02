@@ -470,47 +470,32 @@ function eodhdHistory(string $symbol, int $days = 90): array
  */
 function yahooQuote(string $symbol): ?array
 {
-    // Bulk cache populated by getQuoteBulk() — check first, cheapest path
+    // Check bulk cache first (populated by yahooQuoteBulk)
     $bulkCache = STORAGE . '/bulk_quotes.json';
     if (file_exists($bulkCache) && (time() - filemtime($bulkCache)) < 300) {
         $all = json_decode(file_get_contents($bulkCache), true) ?? [];
         if (!empty($all) && isset($all[$symbol])) return $all[$symbol];
     }
 
-    // Priority 1: EODHD (primary — has NSE India on free plan, real API key)
-    $eodhd = eodhdQuote($symbol);
-    if ($eodhd && ($eodhd['regularMarketPrice'] ?? 0) > 0) return $eodhd;
-
-    // Priority 2: Twelve Data (NSE requires paid plan, kept as fallback)
-    $primary = twelveDataQuote($symbol);
-    if ($primary) return $primary;
-
-    // Priority 3: NSE India (legacy fallback, frequently 403s on shared hosting)
-    $nse = nseQuoteFallback($symbol);
-    if ($nse && ($nse['regularMarketPrice'] ?? 0) > 0) return $nse;
-
-    // Priority 3: Stooq (legacy fallback, thin NSE coverage)
+    // Priority 1: Stooq (working, no auth needed)
     $stooq = stooqQuoteFallback($symbol);
     if ($stooq && ($stooq['regularMarketPrice'] ?? 0) > 0) return $stooq;
 
-    // Priority 4: Yahoo — verified dead for crumb/auth flow, kept only in case
-    // Yahoo re-opens access in the future. Do not expect this to work.
-    $fields = 'regularMarketPrice,regularMarketChange,regularMarketChangePercent,'
-            . 'regularMarketVolume,averageDailyVolume3Month,fiftyTwoWeekHigh,fiftyTwoWeekLow,'
-            . 'trailingPE,priceToBook,marketCap,shortName,longName,sector,industry,'
-            . 'returnOnEquity,debtToEquity,regularMarketDayHigh,regularMarketDayLow,'
-            . 'regularMarketPreviousClose,regularMarketOpen';
-    $url = 'https://query2.finance.yahoo.com/v8/finance/quote?symbols=' . urlencode($symbol)
-         . '&fields=' . $fields . '&lang=en-US&region=IN';
-    $raw = httpGet($url);
-    if ($raw) {
-        $data = json_decode($raw, true);
-        $result = $data['quoteResponse']['result'][0] ?? null;
-        if ($result && ($result['regularMarketPrice'] ?? 0) > 0) {
-            $result['_source'] = 'yahoo_v8';
-            return $result;
-        }
-    }
+    // Priority 2: NSE India direct
+    $nse = nseQuoteFallback($symbol);
+    if ($nse && ($nse['regularMarketPrice'] ?? 0) > 0) return $nse;
+
+    // Priority 3: NSE market fetch (different session approach)
+    $nse2 = nseMarketFetch($symbol);
+    if ($nse2 && ($nse2['regularMarketPrice'] ?? 0) > 0) return $nse2;
+
+    // Priority 4: Groww
+    $gw = growwQuoteFetch($symbol);
+    if ($gw && ($gw['regularMarketPrice'] ?? 0) > 0) return $gw;
+
+    // Priority 5: BSE
+    $bse = bseQuoteFetch($symbol);
+    if ($bse && ($bse['regularMarketPrice'] ?? 0) > 0) return $bse;
 
     return null;
 }
@@ -528,55 +513,34 @@ function yahooQuoteBulk(array $symbols): array
         if (!empty($cached)) return $cached;
     }
 
-    // Priority 1: EODHD bulk (primary — NSE supported on free plan)
-    $all = eodhdQuoteBulk($symbols);
+    // Priority 1: Stooq bulk parallel fetch (fastest, no auth)
+    $all = stooqBulkFetch($symbols);
 
-    // Priority 2: Twelve Data (NSE requires paid plan, try as fallback)
-    if (empty($all)) {
-        $all = twelveDataQuoteBulk($symbols);
-    }
-
-    // Priority 3: Stooq parallel fetch (legacy fallback)
-    if (empty($all)) {
-        $all = stooqBulkFetch($symbols);
-    }
-
-    // Priority 3: Yahoo v7 — verified to 401 on auth, kept as last-ditch fallback only
-    if (empty($all)) {
-        $all = yahooV7BulkFetch($symbols);
-    }
-
-    // Priority 4: NSE India (legacy, frequently 403s on shared hosting)
+    // Priority 2: NSE India (per-symbol, rate limited)
     if (empty($all)) {
         foreach (array_slice($symbols, 0, 20) as $sym) {
-            $nse = nseMarketFetch($sym);
-            if ($nse && ($nse['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $nse;
-            usleep(300000);
-        }
-    }
-    if (empty($all)) {
-        foreach (array_slice($symbols, 0, 20) as $sym) {
-            $nse = nseQuoteFallback($sym);
-            if ($nse && ($nse['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $nse;
-            usleep(200000);
+            $q = nseMarketFetch($sym);
+            if (!$q) $q = nseQuoteFallback($sym);
+            if ($q && ($q['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $q;
+            usleep(250000);
         }
     }
 
-    // Priority 5: Groww (legacy, unverified reliability)
-    if (empty($all)) {
-        foreach (array_slice($symbols, 0, 30) as $sym) {
-            $gw = growwQuoteFetch($sym);
-            if ($gw && ($gw['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $gw;
-            usleep(100000);
-        }
-    }
-
-    // Priority 6: BSE (legacy, unverified reliability)
+    // Priority 3: Groww
     if (empty($all)) {
         foreach (array_slice($symbols, 0, 20) as $sym) {
-            $bse = bseQuoteFetch($sym);
-            if ($bse && ($bse['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $bse;
+            $q = growwQuoteFetch($sym);
+            if ($q && ($q['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $q;
             usleep(150000);
+        }
+    }
+
+    // Priority 4: BSE
+    if (empty($all)) {
+        foreach (array_slice($symbols, 0, 20) as $sym) {
+            $q = bseQuoteFetch($sym);
+            if ($q && ($q['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $q;
+            usleep(200000);
         }
     }
 
@@ -596,15 +560,11 @@ function yahooHistory(string $symbol, int $days = 90): array
         if (!empty($cached)) return $cached;
     }
 
-    // Priority 1: EODHD historical data (primary — NSE supported on free plan)
-    $eodhdRows = eodhdHistory($symbol, $days);
-    if (!empty($eodhdRows)) return $eodhdRows;
+    // Priority 1: Stooq historical CSV (working, no auth)
+    $rows = stooqHistoryFallback($symbol, $days);
+    if (!empty($rows)) return $rows;
 
-    // Priority 2: Twelve Data (NSE requires paid plan, try as fallback)
-    $primary = twelveDataHistory($symbol, $days);
-    if (!empty($primary)) return $primary;
-
-    // Priority 3: Yahoo chart endpoint — verified unreliable, kept as attempt
+    // Priority 2: Yahoo chart (mostly dead but worth trying)
     $period2 = time();
     $period1 = $period2 - ($days * 86400);
     $url = 'https://query2.finance.yahoo.com/v8/finance/chart/' . urlencode($symbol)
@@ -637,8 +597,7 @@ function yahooHistory(string $symbol, int $days = 90): array
         }
     }
 
-    // Priority 3: Stooq history fallback (legacy)
-    return stooqHistoryFallback($symbol, $days);
+    return [];
 }
 
 // ══════════════════════════════════════════════════════════════
