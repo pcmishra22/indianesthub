@@ -17,6 +17,156 @@
 }
 </style>
 
+
+<style>
+/* ── Top announcement bar ── */
+.top-bar {
+  background: linear-gradient(90deg, #0a2d5e 0%, #0078d4 50%, #0a2d5e 100%);
+  color: #fff;
+  font-size: .88rem;
+  font-weight: 500;
+  padding: 0;
+  position: relative;
+  z-index: 1001;
+  overflow: hidden;
+}
+.top-bar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 0 20px;
+}
+.top-bar-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.top-bar-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 20px;
+  border-radius: 6px;
+  font-size: .85rem;
+  font-weight: 700;
+  text-decoration: none;
+  letter-spacing: .3px;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.top-bar-cta.post {
+  background: rgba(255,255,255,.18);
+  color: #fff;
+  border: 1.5px solid rgba(255,255,255,.35);
+}
+.top-bar-cta.service {
+  background: #ffcc00;
+  color: #0a2d5e;
+  border: 1.5px solid #ffcc00;
+}
+.top-bar-cta.post:hover    { background: rgba(255,255,255,.30); color: #fff; text-decoration: none; }
+.top-bar-cta.service:hover { background: #ffe033; color: #0a2d5e; text-decoration: none; }
+.top-bar-cta i { font-size: 1rem; }
+.top-bar-ticker {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  height: 48px;
+  display: flex;
+  align-items: center;
+}
+.top-bar-ticker span {
+  display: inline-block;
+  white-space: nowrap;
+  animation: tickerScroll 28s linear infinite;
+  color: rgba(255,255,255,.88);
+  font-size: .82rem;
+}
+@keyframes tickerScroll {
+  0%   { transform: translateX(40vw); }
+  100% { transform: translateX(-100%); }
+}
+.top-bar-close {
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.2);
+  border-radius: 50%;
+  color: rgba(255,255,255,.8);
+  font-size: .85rem;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.top-bar-close:hover { background: rgba(255,255,255,.25); color: #fff; }
+@media (max-width: 767px) {
+  .top-bar-ticker { display: none; }
+  .top-bar-cta    { padding: 7px 14px; font-size: .78rem; }
+  .top-bar-inner  { min-height: 44px; padding: 0 12px; gap: 8px; }
+}
+@media (max-width: 400px) {
+  .top-bar-cta span { display: none; }
+  .top-bar-cta i    { font-size: 1.1rem; }
+  .top-bar-cta      { padding: 8px 12px; }
+}
+
+/* ── Tighten nav at XL (1200-1399px) so auth buttons don't overflow ── */
+@media (min-width: 1200px) and (max-width: 1399px) {
+  .navmenu a,
+  .navmenu a:focus {
+    padding: 18px 9px;
+    font-size: 13.5px;
+  }
+  .header .logo .sitename {
+    font-size: 1.1rem;
+  }
+  #header .d-xl-flex .btn {
+    padding: 6px 10px !important;
+    font-size: 12px !important;
+  }
+}
+</style>
+
+{{-- TOP ANNOUNCEMENT BAR --}}
+<div class="top-bar" id="topBar">
+  <div class="top-bar-inner">
+
+    {{-- Left CTAs --}}
+    <div class="top-bar-links">
+      <a href="{{ route('dealer.register') }}" class="top-bar-cta post">
+        <i class="bi bi-plus-circle-fill"></i>
+        <span>Post Property Free</span>
+      </a>
+      <a href="{{ route('service-provider.register') }}" class="top-bar-cta service">
+        <i class="bi bi-tools"></i>
+        <span>Offer a Service Free</span>
+      </a>
+    </div>
+
+    {{-- Scrolling ticker --}}
+    <div class="top-bar-ticker">
+      <span>
+        🏠 &nbsp; 323+ verified properties in Tricity &nbsp;•&nbsp;
+        ⚡ Electricians, Plumbers, Interior Designers & more available in Zirakpur, Mohali, Chandigarh &nbsp;•&nbsp;
+        🏗️ New launches from top builders &nbsp;•&nbsp;
+        💰 Home Loan assistance available &nbsp;•&nbsp;
+        ✅ 100% verified listings &nbsp;•&nbsp;
+        📍 Serving Chandigarh · Mohali · Zirakpur · Panchkula · Kharar
+      </span>
+    </div>
+
+    {{-- Dismiss --}}
+    <div class="top-bar-close" onclick="document.getElementById('topBar').style.display='none'" title="Close">✕</div>
+
+  </div>
+</div>
+
   <header id="header" class="header d-flex align-items-center sticky-top" style="overflow: visible;">
     <div class="container-fluid container-xl position-relative d-flex align-items-center justify-content-between">
 
@@ -85,17 +235,6 @@
             <a href="#" onclick="event.preventDefault(); openLegalModal(null, null, 'header');" style="color:#7c3aed!important;"><i class="bi bi-briefcase me-1"></i> Legal Help</a>
           </li>
 
-          {{-- Post Property link (visible to everyone) --}}
-          <li class="d-xl-none">
-            <a href="{{ route('dealer.login') }}"><i class="bi bi-plus-circle me-1"></i> Post Property</a>
-          </li>
-          <li class="d-xl-none">
-            <a href="{{ route('builder.login') }}"><i class="bi bi-buildings me-1"></i> Builder Login</a>
-          </li>
-          <li class="d-xl-none">
-            <a href="{{ route('service-provider.register') }}" style="color:#0078d4!important;"><i class="bi bi-tools me-1"></i> Offer a Service</a>
-          </li>
-
           {{-- Mobile-only auth links --}}
           @guest
             <li class="d-xl-none"><a href="{{ route('login') }}"><i class="bi bi-box-arrow-in-right me-1"></i> Login</a></li>
@@ -119,36 +258,7 @@
       {{-- Desktop auth buttons --}}
       <div class="d-none d-xl-flex align-items-center gap-2">
 
-        {{-- Post Property dropdown --}}
-        <div class="dropdown">
-          <a href="{{ route('dealer.login') }}" class="btn btn-sm px-3 py-2 dropdown-toggle" data-bs-toggle="dropdown"
-             style="background:linear-gradient(135deg,#0a2d5e,#0078d4);color:#fff;border-radius:8px;font-weight:600;font-size:13px;border:none;">
-            <i class="bi bi-plus-circle me-1"></i> Post Property
-          </a>
-          <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius:10px;min-width:200px;">
-            <li><h6 class="dropdown-header text-muted small">Post as...</h6></li>
-            <li>
-              <a class="dropdown-item py-2" href="{{ route('dealer.login') }}">
-                <i class="bi bi-building me-2 text-primary"></i> Property Dealer
-              </a>
-            </li>
-            <li>
-              <a class="dropdown-item py-2" href="{{ route('builder.login') }}">
-                <i class="bi bi-buildings me-2 text-success"></i> Builder
-              </a>
-            </li>
-          </ul>
-        </div>
-
-        {{-- Register as Service Provider button --}}
-        <a href="{{ route('service-provider.register') }}" class="btn btn-sm px-3 py-2"
-           style="background:#fff;color:#0078d4;border:1.5px solid #0078d4;border-radius:8px;font-weight:600;font-size:13px;">
-          <i class="bi bi-tools me-1"></i> Offer a Service
-        </a>
-
         @guest
-          {{-- Divider --}}
-          <span style="width:1px;height:28px;background:#e2e8f0;display:inline-block;"></span>
           <a href="{{ route('login') }}" class="btn btn-sm btn-outline-secondary px-3 py-2" style="border-radius:8px;font-weight:600;font-size:13px;">
             <i class="bi bi-box-arrow-in-right me-1"></i> Login
           </a>

@@ -1,84 +1,65 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Builder Login – {{ config('app.name') }}</title>
-    <link href="{{ asset('adminkit/css/app.css') }}" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-</head>
-<body>
-<main class="d-flex w-100 h-100 min-vh-100">
-    <div class="container d-flex flex-column">
-        <div class="row vh-100">
-            <div class="col-sm-10 col-md-8 col-lg-5 col-xl-4 mx-auto d-table h-100">
-                <div class="d-table-cell align-middle">
+@extends('layouts.auth')
+@section('title', 'Builder Login | ' . config('app.name'))
 
-                    <div class="text-center mt-4">
-                        <h1 class="h2">Builder Portal</h1>
-                        <p class="lead">Sign in to manage your projects & properties</p>
-                    </div>
+@section('auth-content')
+<div class="auth-card" style="max-width:900px;margin:0 auto;">
+  <div class="row g-0">
 
-                    @include('partials.partner-role-switcher', ['activeRole' => 'builder', 'mode' => 'login'])
-
-                    <div class="card">
-                        <div class="card-body">
-                            <div class="m-sm-3">
-                                <div class="text-center mb-4">
-                                    <i data-feather="layers" style="width:48px;height:48px;color:#0d6efd;"></i>
-                                    <h4 class="mt-2 mb-0">Welcome back!</h4>
-                                    <small class="text-muted">Builder sign in</small>
-                                </div>
-
-                                @if($errors->any())
-                                <div class="alert alert-danger">
-                                    @foreach($errors->all() as $error)
-                                        <div>{{ $error }}</div>
-                                    @endforeach
-                                </div>
-                                @endif
-
-                                <form method="POST" action="{{ route('builder.login') }}">
-                                    @csrf
-                                    <div class="mb-3">
-                                        <label class="form-label">Email</label>
-                                        <input class="form-control form-control-lg @error('email') is-invalid @enderror"
-                                               type="email" name="email" value="{{ old('email') }}"
-                                               placeholder="Enter your email" required autofocus>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">Password</label>
-                                        <input class="form-control form-control-lg @error('password') is-invalid @enderror"
-                                               type="password" name="password"
-                                               placeholder="Enter your password" required>
-                                    </div>
-                                    <div class="mb-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" name="remember" id="remember">
-                                            <label class="form-check-label" for="remember">Remember me</label>
-                                        </div>
-                                    </div>
-                                    <div class="d-grid">
-                                        <button type="submit" class="btn btn-lg btn-primary">Sign In</button>
-                                    </div>
-                                </form>
-
-                                <div class="text-center mt-3">
-                                    <small>Don't have an account?
-                                        <a href="{{ route('builder.register') }}">Register here</a>
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-            </div>
+    <div class="col-md-5 auth-accent d-none d-md-flex" style="background:linear-gradient(160deg,#064e3b 0%,#059669 60%,#10b981 100%);">
+      <div>
+        <div style="width:52px;height:52px;background:rgba(255,255,255,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:24px;">
+          <i class="bi bi-buildings" style="font-size:1.6rem;"></i>
         </div>
+        <h2>Builder Portal</h2>
+        <p>Showcase your projects, manage units and connect with serious buyers across Tricity.</p>
+        <ul>
+          <li><i class="bi bi-check-circle-fill"></i> List new launch projects</li>
+          <li><i class="bi bi-check-circle-fill"></i> Manage floor plans & units</li>
+          <li><i class="bi bi-check-circle-fill"></i> Track project leads</li>
+          <li><i class="bi bi-check-circle-fill"></i> RERA project showcase</li>
+        </ul>
+        <div class="mt-4" style="border-top:1px solid rgba(255,255,255,.2);padding-top:20px;font-size:.8rem;opacity:.8;">
+          New builder? <a href="{{ route('builder.register') }}" style="color:#6ee7b7;font-weight:700;">Register free →</a>
+        </div>
+      </div>
     </div>
-</main>
 
-<script src="{{ asset('adminkit/js/app.js') }}"></script>
-</body>
-</html>
+    <div class="col-md-7 auth-form-panel">
+      <div class="auth-title">Welcome back</div>
+      <div class="auth-sub">Sign in to your builder account</div>
+
+      @include('partials.partner-role-switcher', ['activeRole'=>'builder','mode'=>'login'])
+
+      @if($errors->any())
+        <div class="alert alert-danger py-2 small mb-3">
+          @foreach($errors->all() as $e) {{ $e }}<br> @endforeach
+        </div>
+      @endif
+
+      <form method="POST" action="{{ route('builder.login') }}" class="auth-form">
+        @csrf
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input class="form-control @error('email') is-invalid @enderror" type="email" name="email"
+                 value="{{ old('email') }}" placeholder="company@example.com" required autofocus>
+          @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Password</label>
+          <input class="form-control" type="password" name="password" placeholder="Your password" required>
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" name="remember" id="remb">
+          <label class="form-check-label small text-muted" for="remb">Remember me</label>
+        </div>
+        <button type="submit" class="auth-btn" style="background:linear-gradient(135deg,#064e3b,#059669);">Sign In to Builder Portal</button>
+      </form>
+
+      <div class="auth-switch">
+        Don't have an account? <a href="{{ route('builder.register') }}">Register as a Builder</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+@endsection

@@ -1,145 +1,113 @@
-<!DOCTYPE html>
-<html lang="en">
+@extends('layouts.auth')
+@section('title', 'Register as Service Provider | ' . config('app.name'))
 
-<head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Register as Service Provider | {{ config('app.name') }}</title>
-    <link rel="shortcut icon" href="/backend/img/icons/icon-48x48.png" />
-    <link href="/backend/css/app.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-    <style>
-        .category-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
-        .category-pick { position:relative; }
-        .category-pick input { position:absolute; opacity:0; inset:0; cursor:pointer; margin:0; }
-        .category-pick label {
-            display:flex; align-items:center; gap:8px; padding:12px 14px;
-            border:1.5px solid #e4e8f0; border-radius:10px; cursor:pointer;
-            font-size:.85rem; font-weight:600; color:#475569; transition:all .15s;
-        }
-        .category-pick input:checked + label {
-            border-color:#0078d4; background:#f0f7ff; color:#0a2d5e;
-        }
-        .category-pick label i { color:#0078d4; }
-    </style>
-</head>
+@section('auth-content')
+<div class="auth-card" style="max-width:1040px;margin:0 auto;">
+  <div class="row g-0">
 
-<body>
-<main class="d-flex w-100">
-    <div class="container d-flex flex-column">
-        <div class="row py-5">
-            <div class="col-sm-11 col-md-9 col-lg-7 mx-auto">
-
-                <div class="text-center mt-4 mb-3">
-                    <h1 class="h2">Register as a Service Provider</h1>
-                    <p class="text-muted">One signup for every home service — Electricians, Plumbers, Interior Designers, Loan Providers and more.</p>
-                </div>
-
-                @include('partials.partner-role-switcher', ['activeRole' => 'service_provider', 'mode' => 'register'])
-
-                @if($errors->any())
-                <div class="alert alert-danger" role="alert">
-                    <i class="fas fa-exclamation-circle me-2"></i>
-                    @foreach($errors->all() as $error)
-                        {{ $error }}<br>
-                    @endforeach
-                </div>
-                @endif
-
-                <div class="card shadow-sm border-0">
-                    <div class="card-body p-4">
-                        <form method="POST" action="{{ route('service-provider.register') }}">
-                            @csrf
-
-                            <div class="row g-3 mb-1">
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold">Full Name *</label>
-                                    <input class="form-control form-control-lg" type="text" name="full_name"
-                                           value="{{ old('full_name') }}" placeholder="Your name" required>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold">Business / Shop Name</label>
-                                    <input class="form-control form-control-lg" type="text" name="business_name"
-                                           value="{{ old('business_name') }}" placeholder="e.g. Sharma Electrical Works (optional)">
-                                </div>
-                            </div>
-
-                            <div class="row g-3 mb-1 mt-1">
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold">Email Address *</label>
-                                    <input class="form-control form-control-lg" type="email" name="email"
-                                           value="{{ old('email') }}" placeholder="you@example.com" required>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold">Phone Number *</label>
-                                    <input class="form-control form-control-lg" type="text" name="phone"
-                                           value="{{ old('phone') }}" placeholder="10-digit mobile number" required>
-                                </div>
-                            </div>
-
-                            <div class="row g-3 mb-1 mt-1">
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold">City *</label>
-                                    <input class="form-control form-control-lg" type="text" name="city"
-                                           value="{{ old('city') }}" placeholder="e.g. Zirakpur" required>
-                                </div>
-                            </div>
-
-                            <div class="row g-3 mb-1 mt-1">
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold">Password *</label>
-                                    <input class="form-control form-control-lg" type="password" name="password"
-                                           placeholder="Minimum 8 characters" required>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label fw-semibold">Confirm Password *</label>
-                                    <input class="form-control form-control-lg" type="password" name="password_confirmation"
-                                           placeholder="Re-enter password" required>
-                                </div>
-                            </div>
-
-                            <hr class="my-4">
-
-                            <label class="form-label fw-semibold mb-2">
-                                I want to sign up as <span class="text-danger">*</span>
-                                <span class="d-block fw-normal text-muted small">Select one or more services you provide. You can update this anytime from your dashboard.</span>
-                            </label>
-                            <div class="category-grid mb-2">
-                                @foreach($categories as $category)
-                                    <div class="category-pick">
-                                        <input type="checkbox" id="cat-{{ $category->id }}" name="categories[]"
-                                               value="{{ $category->id }}"
-                                               {{ in_array($category->id, old('categories', [])) ? 'checked' : '' }}>
-                                        <label for="cat-{{ $category->id }}">
-                                            <i class="bi {{ $category->icon ?? 'bi-tools' }}"></i> {{ $category->name }}
-                                        </label>
-                                    </div>
-                                @endforeach
-                            </div>
-                            @error('categories')
-                                <div class="text-danger small mb-3">{{ $message }}</div>
-                            @enderror
-
-                            <div class="d-grid mt-4">
-                                <button type="submit" class="btn btn-lg btn-primary fw-semibold">
-                                    Create My Service Provider Account
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <div class="text-center mt-3 mb-4 small text-muted">
-                    Already registered?
-                    <a href="{{ route('service-provider.login') }}" class="text-primary fw-semibold">Sign in here</a>
-                </div>
-
-            </div>
+    <div class="col-md-4 auth-accent d-none d-md-flex" style="background:linear-gradient(160deg,#4c1d95 0%,#7c3aed 60%,#a78bfa 100%);">
+      <div>
+        <div style="width:52px;height:52px;background:rgba(255,255,255,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:24px;">
+          <i class="bi bi-tools" style="font-size:1.6rem;"></i>
         </div>
+        <h2>One Signup. All Services.</h2>
+        <p>Register once and offer any home service — electrician, plumber, interior designer, loan provider and more.</p>
+        <ul>
+          <li><i class="bi bi-check-circle-fill"></i> 100% free to register</li>
+          <li><i class="bi bi-check-circle-fill"></i> Choose your own service category</li>
+          <li><i class="bi bi-check-circle-fill"></i> Get leads from property buyers</li>
+          <li><i class="bi bi-check-circle-fill"></i> Verified badge after approval</li>
+        </ul>
+        <div class="mt-4" style="border-top:1px solid rgba(255,255,255,.2);padding-top:20px;font-size:.8rem;opacity:.8;">
+          Already registered? <a href="{{ route('service-provider.login') }}" style="color:#c4b5fd;font-weight:700;">Sign in →</a>
+        </div>
+      </div>
     </div>
-</main>
 
-<script src="/backend/js/app.js"></script>
-</body>
-</html>
+    <div class="col-md-8 auth-form-panel">
+      <div class="auth-title">Register as Service Provider</div>
+      <div class="auth-sub">Electricians, plumbers, interior designers, loan providers & more</div>
+
+      @include('partials.partner-role-switcher', ['activeRole'=>'service_provider','mode'=>'register'])
+
+      @if($errors->any())
+        <div class="alert alert-danger py-2 small mb-3">
+          @foreach($errors->all() as $e) {{ $e }}<br> @endforeach
+        </div>
+      @endif
+
+      <form method="POST" action="{{ route('service-provider.register') }}" class="auth-form">
+        @csrf
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label">Full Name *</label>
+            <input class="form-control @error('full_name') is-invalid @enderror" type="text" name="full_name"
+                   value="{{ old('full_name') }}" placeholder="Your full name" required autofocus>
+            @error('full_name')<div class="invalid-feedback">{{ $message }}</div>@enderror
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">Business / Shop Name</label>
+            <input class="form-control" type="text" name="business_name"
+                   value="{{ old('business_name') }}" placeholder="Optional — e.g. Sharma Electricals">
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label">Email *</label>
+            <input class="form-control @error('email') is-invalid @enderror" type="email" name="email"
+                   value="{{ old('email') }}" placeholder="you@example.com" required>
+            @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">Phone *</label>
+            <input class="form-control @error('phone') is-invalid @enderror" type="text" name="phone"
+                   value="{{ old('phone') }}" placeholder="10-digit mobile" required>
+            @error('phone')<div class="invalid-feedback">{{ $message }}</div>@enderror
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label class="form-label">City *</label>
+            <input class="form-control @error('city') is-invalid @enderror" type="text" name="city"
+                   value="{{ old('city') }}" placeholder="e.g. Zirakpur" required>
+            @error('city')<div class="invalid-feedback">{{ $message }}</div>@enderror
+          </div>
+        </div>
+        <div class="row g-3 mb-4">
+          <div class="col-sm-6">
+            <label class="form-label">Password *</label>
+            <input class="form-control @error('password') is-invalid @enderror" type="password" name="password"
+                   placeholder="Min 8 characters" required>
+            @error('password')<div class="invalid-feedback">{{ $message }}</div>@enderror
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label">Confirm Password *</label>
+            <input class="form-control" type="password" name="password_confirmation" placeholder="Re-enter" required>
+          </div>
+        </div>
+
+        <label class="form-label fw-semibold mb-1">I want to sign up as * <span class="fw-normal text-muted" style="font-size:.78rem;">(select one or more)</span></label>
+        @error('categories')<div class="text-danger small mb-1">{{ $message }}</div>@enderror
+        <div class="cat-grid mb-4">
+          @foreach($categories as $cat)
+            <div class="cat-tile">
+              <input type="checkbox" id="cat-{{ $cat->id }}" name="categories[]" value="{{ $cat->id }}"
+                     {{ in_array($cat->id, old('categories', [])) ? 'checked' : '' }}>
+              <label for="cat-{{ $cat->id }}">
+                <i class="bi {{ $cat->icon ?? 'bi-tools' }}"></i>{{ $cat->name }}
+              </label>
+            </div>
+          @endforeach
+        </div>
+
+        <button type="submit" class="auth-btn" style="background:linear-gradient(135deg,#4c1d95,#7c3aed);">Create Service Provider Account — Free</button>
+      </form>
+
+      <div class="auth-switch">
+        Already registered? <a href="{{ route('service-provider.login') }}">Sign in</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+@endsection

@@ -1,97 +1,70 @@
-<!DOCTYPE html>
-<html lang="en">
+@extends('layouts.auth')
+@section('title', 'Service Provider Login | ' . config('app.name'))
 
-<head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title>Service Provider Login | {{ config('app.name') }}</title>
-    <link rel="shortcut icon" href="/backend/img/icons/icon-48x48.png" />
-    <link href="/backend/css/app.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-</head>
+@section('auth-content')
+<div class="auth-card" style="max-width:900px;margin:0 auto;">
+  <div class="row g-0">
 
-<body>
-<main class="d-flex w-100">
-    <div class="container d-flex flex-column">
-        <div class="row vh-100">
-            <div class="col-sm-10 col-md-8 col-lg-5 col-xl-4 mx-auto d-table h-100">
-                <div class="d-table-cell align-middle">
-
-                    <div class="text-center mt-4 mb-3">
-                        <h1 class="h2">Partner Login</h1>
-                        <p class="text-muted">Electricians, Interior Designers, Loan Providers & more</p>
-                    </div>
-
-                    @include('partials.partner-role-switcher', ['activeRole' => 'service_provider', 'mode' => 'login'])
-
-                    @if(session('status'))
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        <i class="fas fa-check-circle me-2"></i>{{ session('status') }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                    @endif
-
-                    @if($errors->any())
-                    <div class="alert alert-danger" role="alert">
-                        <i class="fas fa-exclamation-circle me-2"></i>
-                        @foreach($errors->all() as $error)
-                            {{ $error }}
-                        @endforeach
-                    </div>
-                    @endif
-
-                    <div class="card shadow-sm border-0">
-                        <div class="card-body p-4">
-                            <form method="POST" action="{{ route('service-provider.login') }}">
-                                @csrf
-                                <div class="mb-3">
-                                    <label class="form-label fw-semibold">Email Address</label>
-                                    <input class="form-control form-control-lg @error('email') is-invalid @enderror"
-                                           type="email" name="email"
-                                           value="{{ old('email') }}"
-                                           placeholder="you@example.com"
-                                           required autofocus>
-                                    @error('email')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label fw-semibold">Password</label>
-                                    <input class="form-control form-control-lg"
-                                           type="password" name="password"
-                                           placeholder="Enter your password"
-                                           required>
-                                </div>
-                                <div class="mb-3">
-                                    <div class="form-check">
-                                        <input id="remember" type="checkbox" class="form-check-input"
-                                               name="remember" {{ old('remember') ? 'checked' : '' }}>
-                                        <label class="form-check-label text-muted small" for="remember">
-                                            Remember me
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="d-grid mt-3">
-                                    <button type="submit" class="btn btn-lg btn-primary fw-semibold">
-                                        Sign In
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-
-                    <div class="text-center mt-3 mb-4 small text-muted">
-                        Don't have an account?
-                        <a href="{{ route('service-provider.register') }}" class="text-primary fw-semibold">Register as a Service Provider</a>
-                    </div>
-
-                </div>
-            </div>
+    <div class="col-md-5 auth-accent d-none d-md-flex" style="background:linear-gradient(160deg,#4c1d95 0%,#7c3aed 60%,#a78bfa 100%);">
+      <div>
+        <div style="width:52px;height:52px;background:rgba(255,255,255,.15);border-radius:12px;display:flex;align-items:center;justify-content:center;margin-bottom:24px;">
+          <i class="bi bi-tools" style="font-size:1.6rem;"></i>
         </div>
+        <h2>Service Provider Portal</h2>
+        <p>Electricians, plumbers, interior designers, loan providers — manage your profile and get leads.</p>
+        <ul>
+          <li><i class="bi bi-check-circle-fill"></i> Free provider profile</li>
+          <li><i class="bi bi-check-circle-fill"></i> Get leads from homebuyers</li>
+          <li><i class="bi bi-check-circle-fill"></i> Verified badge for credibility</li>
+          <li><i class="bi bi-check-circle-fill"></i> WhatsApp & call leads instantly</li>
+        </ul>
+        <div class="mt-4" style="border-top:1px solid rgba(255,255,255,.2);padding-top:20px;font-size:.8rem;opacity:.8;">
+          New provider? <a href="{{ route('service-provider.register') }}" style="color:#c4b5fd;font-weight:700;">Register free →</a>
+        </div>
+      </div>
     </div>
-</main>
 
-<script src="/backend/js/app.js"></script>
-</body>
-</html>
+    <div class="col-md-7 auth-form-panel">
+      <div class="auth-title">Welcome back</div>
+      <div class="auth-sub">Sign in to your service provider account</div>
+
+      @include('partials.partner-role-switcher', ['activeRole'=>'service_provider','mode'=>'login'])
+
+      @if(session('status'))
+        <div class="alert alert-success py-2 small alert-dismissible fade show">
+          {{ session('status') }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      @endif
+      @if($errors->any())
+        <div class="alert alert-danger py-2 small">
+          @foreach($errors->all() as $e) {{ $e }}<br> @endforeach
+        </div>
+      @endif
+
+      <form method="POST" action="{{ route('service-provider.login') }}" class="auth-form">
+        @csrf
+        <div class="mb-3">
+          <label class="form-label">Email Address</label>
+          <input class="form-control @error('email') is-invalid @enderror" type="email" name="email"
+                 value="{{ old('email') }}" placeholder="you@example.com" required autofocus>
+          @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Password</label>
+          <input class="form-control" type="password" name="password" placeholder="Your password" required>
+        </div>
+        <div class="form-check mb-3">
+          <input type="checkbox" class="form-check-input" name="remember" id="remsp" {{ old('remember') ? 'checked':'' }}>
+          <label class="form-check-label small text-muted" for="remsp">Remember me</label>
+        </div>
+        <button type="submit" class="auth-btn" style="background:linear-gradient(135deg,#4c1d95,#7c3aed);">Sign In to Provider Portal</button>
+      </form>
+
+      <div class="auth-switch">
+        Don't have an account? <a href="{{ route('service-provider.register') }}">Register as a Service Provider</a>
+      </div>
+    </div>
+
+  </div>
+</div>
+@endsection
