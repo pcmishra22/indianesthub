@@ -24,13 +24,13 @@ class WhatsAppNotificationService
     {
         $this->apiUrl = config('app.whatsapp_api_url', env('WHATSAPP_API_URL', 'https://api.callmebot.com/whatsapp.php'));
         $this->apiKey = config('app.whatsapp_api_key', env('WHATSAPP_API_KEY', ''));
-        $this->defaultNumber = config('app.whatsapp_number', env('WHATSAPP_NUMBER', '9876543210'));
+        $this->defaultNumber = config('app.whatsapp_number', env('WHATSAPP_NUMBER', '7340753780'));
     }
     
     /**
      * Send WhatsApp message to a phone number
      * 
-     * @param string $phoneNumber Receiver's WhatsApp number (with country code, e.g., 919876543210)
+     * @param string $phoneNumber Receiver's WhatsApp number (with country code, e.g., 917340753780)
      * @param string $message Message to send
      * @return bool Success status
      */

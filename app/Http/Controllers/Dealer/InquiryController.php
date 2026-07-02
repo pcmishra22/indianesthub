@@ -41,7 +41,7 @@ class InquiryController extends Controller
 
         // 1. Notification to Dealer/Owner
         $owner = $property ? $property->dealer : null;
-        $fromAddress = config('mail.from.address', 'support@indianesthub.com');
+        $fromAddress = config('mail.from.address', 'admin@indianesthub.com');
         $fromName = config('mail.from.name', 'India Nest Hub');
 
         Log::info("Starting notification process for Inquiry ID: {$inquiry->id}");

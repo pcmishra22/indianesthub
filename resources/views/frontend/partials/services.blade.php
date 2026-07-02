@@ -428,7 +428,7 @@
               </div>
               <div>
                 <div style="font-size:.78rem;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.5px;">Call Us</div>
-                <a href="tel:+919876543210" style="color:#fff;font-weight:600;text-decoration:none;">+91 98765 43210</a>
+                <a href="tel:+91{{ config('app.contact_phone','7340753780') }}" style="color:#fff;font-weight:600;text-decoration:none;">+91 {{ config('app.contact_phone','7340753780') }}</a>
               </div>
             </div>
             <div class="d-flex align-items-center gap-3">
@@ -437,7 +437,7 @@
               </div>
               <div>
                 <div style="font-size:.78rem;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.5px;">Email Us</div>
-                <a href="mailto:hello@indianesthub.in" style="color:#fff;font-weight:600;text-decoration:none;">hello@indianesthub.in</a>
+                <a href="mailto:{{ config('app.contact_email','admin@indianesthub.com') }}" style="color:#fff;font-weight:600;text-decoration:none;">{{ config('app.contact_email','admin@indianesthub.com') }}</a>
               </div>
             </div>
           </div>

@@ -62,7 +62,7 @@
           <div class="col-sm-6">
             <label class="form-label">Phone *</label>
             <input class="form-control @error('phone') is-invalid @enderror" type="text" name="phone"
-                   value="{{ old('phone') }}" placeholder="9876543210" required>
+                   value="{{ old('phone') }}" placeholder="7340753780" required>
             @error('phone')<div class="invalid-feedback">{{ $message }}</div>@enderror
           </div>
         </div>

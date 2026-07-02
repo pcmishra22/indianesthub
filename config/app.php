@@ -21,9 +21,9 @@ return [
     |--------------------------------------------------------------------------
     */
     'ga_id'           => env('GA_ID', ''),
-    'contact_phone'   => env('CONTACT_PHONE', '9876543210'),
-    'whatsapp_number' => env('WHATSAPP_NUMBER', '9876543210'),
-    'contact_email'   => env('CONTACT_EMAIL', 'support@indianesthub.com'),
+    'contact_phone'   => env('CONTACT_PHONE', '7340753780'),
+    'whatsapp_number' => env('WHATSAPP_NUMBER', '7340753780'),
+    'contact_email'   => env('CONTACT_EMAIL', 'admin@indianesthub.com'),
     'contact_address' => env('CONTACT_ADDRESS', 'SCO 123, Sector 17, Chandigarh - 160017'),
 
     /*

@@ -183,7 +183,7 @@ class PropertyDetailsController extends Controller
         $inquiry->save();
 
         // ── Fire queued emails ────────────────────────────────────────────────
-        $fromAddress = config('mail.from.address', 'support@indianesthub.com');
+        $fromAddress = config('mail.from.address', 'admin@indianesthub.com');
         $fromName = config('mail.from.name', 'India Nest Hub');
 
         // 1) Notify the dealer about the new inquiry

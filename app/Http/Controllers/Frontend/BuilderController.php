@@ -184,7 +184,7 @@ class BuilderController extends Controller
 
         Log::info("Processing lead notifications for Lead ID: {$lead->id}");
 
-        $fromAddress = config('mail.from.address', 'support@indianesthub.com');
+        $fromAddress = config('mail.from.address', 'admin@indianesthub.com');
         $fromName = config('mail.from.name', 'India Nest Hub');
 
         // 1. Notify Builder (CC admin emails)
@@ -212,7 +212,7 @@ class BuilderController extends Controller
                     ->subject('New Builder Lead Notification');
         });
 
-        $adminWhatsApp = config('app.whatsapp_number', '9876543210');
+        $adminWhatsApp = config('app.whatsapp_number', '7340753780');
         $this->sendWhatsAppNotification($adminWhatsApp, "New lead for project {$project->name}: {$lead->name}");
     }
 
@@ -258,7 +258,7 @@ class BuilderController extends Controller
 
         // Send notifications
         try {
-            $fromAddress = config('mail.from.address', 'support@indianesthub.com');
+            $fromAddress = config('mail.from.address', 'admin@indianesthub.com');
             $fromName    = config('mail.from.name', 'India Nest Hub');
             $adminEmails = ['admin@indianesthub.com', 'pcmishra22@gmail.com'];
 

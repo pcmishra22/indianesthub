@@ -15,7 +15,7 @@ class AgentSeeder extends Seeder
                         'first_name' => 'Agent',
                         'last_name' => $i == 1 ? 'One' : 'Two',
                         'email' => 'agent' . $i . '@example.com',
-                        'phone' => '9876543210',
+                        'phone' => '7340753780',
                         'company_name' => 'Company ' . $i,
                         'password' => bcrypt('password'),
                         'created_at' => now(),

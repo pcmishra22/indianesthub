@@ -126,7 +126,7 @@
           <h2>Contact Us</h2>
           <p>If you have any questions about this Privacy Policy or our practices, please contact us:</p>
           <div class="contact-details">
-            <p><strong>Email:</strong> <a href="mailto:support@indianesthub.com">support@indianesthub.com</a></p>
+            <p><strong>Email:</strong> <a href="mailto:admin@indianesthub.com">admin@indianesthub.com</a></p>
             <p><strong>Phone:</strong> <a href="tel:+917340753780">+91 73407 53780</a></p>
             <p><strong>Address:</strong> {{ config('app.contact_address', 'SCO 123, Sector 17, Chandigarh - 160017') }}</p>
           </div>

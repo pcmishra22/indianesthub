@@ -143,7 +143,7 @@
             </div>
             <div class="contact-content">
               <h4>Questions About Terms?</h4>
-              <p>If you have any questions about these Terms, please contact us at <a href="mailto:support@indianesthub.com">support@indianesthub.com</a> or call <a href="tel:+917340753780">+91 73407 53780</a>.</p>
+              <p>If you have any questions about these Terms, please contact us at <a href="mailto:admin@indianesthub.com">admin@indianesthub.com</a> or call <a href="tel:+917340753780">+91 73407 53780</a>.</p>
               <a href="{{ url('/contact') }}" class="contact-link">Contact Support</a>
             </div>
           </div>

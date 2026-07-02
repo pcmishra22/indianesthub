@@ -45,7 +45,7 @@
               <div class="info-content">
                 <h4>Phone &amp; Email</h4>
                 <p>+91 7340753780</p>
-                <p>support@indianesthub.com</p>
+                <p>admin@indianesthub.com</p>
               </div>
             </div>
           </div>

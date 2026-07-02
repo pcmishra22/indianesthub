@@ -16,7 +16,7 @@ class BuilderSeeder extends Seeder
             [
                 'name'             => 'Rajesh Kumar',
                 'company_name'     => 'Demo Builders Pvt. Ltd.',
-                'phone'            => '9876543210',
+                'phone'            => '7340753780',
                 'website'          => 'https://demobuilders.com',
                 'city'             => 'Mumbai',
                 'established_year' => '2008',

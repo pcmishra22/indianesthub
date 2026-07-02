@@ -153,7 +153,7 @@
       <p>
         <strong>{{ config('app.name') }}</strong> · Chandigarh Tricity<br>
         📞 +91 {{ config('app.contact_phone','7340753780') }} &nbsp;·&nbsp;
-        ✉ {{ config('app.contact_email','support@indianesthub.com') }}
+        ✉ {{ config('app.contact_email','admin@indianesthub.com') }}
       </p>
       <p>© {{ date('Y') }} {{ config('app.name') }}. All rights reserved.</p>
       @yield('unsubscribe')

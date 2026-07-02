@@ -106,14 +106,44 @@
 }
 .top-bar-close:hover { background: rgba(255,255,255,.25); color: #fff; }
 @media (max-width: 767px) {
-  .top-bar-ticker { display: none; }
-  .top-bar-cta    { padding: 7px 14px; font-size: .78rem; }
-  .top-bar-inner  { min-height: 44px; padding: 0 12px; gap: 8px; }
-}
-@media (max-width: 400px) {
-  .top-bar-cta span { display: none; }
-  .top-bar-cta i    { font-size: 1.1rem; }
-  .top-bar-cta      { padding: 8px 12px; }
+  .top-bar-inner {
+    flex-wrap: wrap;
+    min-height: auto;
+    padding: 8px 12px;
+    gap: 6px;
+  }
+  .top-bar-links {
+    width: 100%;
+    justify-content: center;
+    gap: 8px;
+  }
+  .top-bar-cta {
+    padding: 7px 14px;
+    font-size: .78rem;
+    flex: 1;
+    justify-content: center;
+  }
+  .top-bar-ticker {
+    width: 100%;
+    height: 28px;
+    order: 3;
+    border-top: 1px solid rgba(255,255,255,.12);
+    padding-top: 4px;
+  }
+  .top-bar-ticker span {
+    font-size: .7rem;
+  }
+  .top-bar-close {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+  }
+  .top-bar-inner {
+    position: relative;
+  }
+  /* Always show text — never icon-only on mobile */
+  .top-bar-cta span { display: inline !important; }
+  .top-bar-cta i    { font-size: .9rem; }
 }
 
 /* ── Tighten nav at XL (1200-1399px) so auth buttons don't overflow ── */

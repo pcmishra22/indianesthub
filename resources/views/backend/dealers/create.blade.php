@@ -56,7 +56,7 @@
                 <div class="col-md-6">
                     <label class="form-label fw-semibold">Phone <span class="text-danger">*</span></label>
                     <input type="text" name="phone" class="form-control @error('phone') is-invalid @enderror"
-                           value="{{ old('phone') }}" placeholder="9876543210" required>
+                           value="{{ old('phone') }}" placeholder="7340753780" required>
                     @error('phone')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
                 <div class="col-md-6">

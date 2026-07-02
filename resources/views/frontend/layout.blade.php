@@ -58,8 +58,8 @@
       },
       "image": "{{ asset('assets/img/og-default.jpg') }}",
       "description": "{{ config("app.name") }} is India's most trusted real estate portal for Chandigarh Tricity – buy, sell and rent verified properties in Chandigarh, Mohali, Zirakpur and Panchkula.",
-      "email": "support@indianesthub.com",
-      "telephone": "+91-{{ config('app.contact_phone','9876543210') }}",
+      "email": "admin@indianesthub.com",
+      "telephone": "+91-{{ config('app.contact_phone','7340753780') }}",
       "address": {
         "@type": "PostalAddress",
         "addressLocality": "Chandigarh",
@@ -235,7 +235,7 @@
     <div class="floating-cta-wrap">
       {{-- WhatsApp --}}
       <div class="fcta-item">
-        <a href="https://wa.me/91{{ config('app.whatsapp_number','9876543210') }}?text=Hi%2C%20I%20found%20you%20on%20{{ urlencode(config('app.name')) }}.%20I%20need%20help%20finding%20a%20property."
+        <a href="https://wa.me/91{{ config('app.whatsapp_number','7340753780') }}?text=Hi%2C%20I%20found%20you%20on%20{{ urlencode(config('app.name')) }}.%20I%20need%20help%20finding%20a%20property."
            class="fcta-btn fcta-whatsapp fcta-pulse"
            target="_blank" rel="noopener"
            title="Chat on WhatsApp">
@@ -246,7 +246,7 @@
 
       {{-- Call Button --}}
       <div class="fcta-item">
-        <a href="tel:+91{{ config('app.contact_phone','9876543210') }}"
+        <a href="tel:+91{{ config('app.contact_phone','7340753780') }}"
            class="fcta-btn fcta-call"
            title="Call Us Now">
           <i class="bi bi-telephone-fill"></i>
@@ -297,11 +297,11 @@
     </style>
 
     <div class="sticky-bottom-bar d-md-none">
-      <a href="tel:+91{{ config('app.contact_phone','9876543210') }}" class="sbb-btn sbb-call">
+      <a href="tel:+91{{ config('app.contact_phone','7340753780') }}" class="sbb-btn sbb-call">
         <i class="bi bi-telephone-fill"></i>Call
       </a>
       <div class="sbb-divider"></div>
-      <a href="https://wa.me/91{{ config('app.whatsapp_number','9876543210') }}?text=Hi%2C%20I%20need%20property%20help." class="sbb-btn sbb-wa" target="_blank" rel="noopener">
+      <a href="https://wa.me/91{{ config('app.whatsapp_number','7340753780') }}?text=Hi%2C%20I%20need%20property%20help." class="sbb-btn sbb-wa" target="_blank" rel="noopener">
         <i class="bi bi-whatsapp"></i>WhatsApp
       </a>
       <div class="sbb-divider"></div>

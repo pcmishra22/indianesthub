@@ -442,13 +442,13 @@
         <p class="mb-0"><i class="bi bi-geo-alt me-2" style="color:#50e6ff;"></i>{{ config('app.contact_address', 'SCO 123, Sector 17, Chandigarh - 160017') }}</p>
       </div>
       <div class="col-md-auto">
-        <a href="tel:+91{{ config('app.contact_phone','9876543210') }}" style="color:rgba(255,255,255,0.7); text-decoration:none;">
-          <p class="mb-0"><i class="bi bi-telephone me-2" style="color:#50e6ff;"></i>+91 {{ config('app.contact_phone','9876543210') }}</p>
+        <a href="tel:+91{{ config('app.contact_phone','7340753780') }}" style="color:rgba(255,255,255,0.7); text-decoration:none;">
+          <p class="mb-0"><i class="bi bi-telephone me-2" style="color:#50e6ff;"></i>+91 {{ config('app.contact_phone','7340753780') }}</p>
         </a>
       </div>
       <div class="col-md-auto">
-        <a href="mailto:{{ config('app.contact_email','support@indianesthub.com') }}" style="color:rgba(255,255,255,0.7); text-decoration:none;">
-          <p class="mb-0"><i class="bi bi-envelope me-2" style="color:#50e6ff;"></i>{{ config('app.contact_email','support@indianesthub.com') }}</p>
+        <a href="mailto:{{ config('app.contact_email','admin@indianesthub.com') }}" style="color:rgba(255,255,255,0.7); text-decoration:none;">
+          <p class="mb-0"><i class="bi bi-envelope me-2" style="color:#50e6ff;"></i>{{ config('app.contact_email','admin@indianesthub.com') }}</p>
         </a>
       </div>
       <div class="col-md-auto ms-md-auto">
@@ -484,7 +484,7 @@
           @if(env('SOCIAL_LINKEDIN_URL'))
           <a href="{{ env('SOCIAL_LINKEDIN_URL') }}" target="_blank" rel="noopener" title="LinkedIn"><i class="bi bi-linkedin"></i></a>
           @endif
-          <a href="https://wa.me/91{{ config('app.whatsapp_number','9876543210') }}" target="_blank" rel="noopener" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
+          <a href="https://wa.me/91{{ config('app.whatsapp_number','7340753780') }}" target="_blank" rel="noopener" title="WhatsApp"><i class="bi bi-whatsapp"></i></a>
         </div>
       </div>
 
