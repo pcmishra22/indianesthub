@@ -1056,16 +1056,54 @@ function nseMarketFetch(string $symbol): ?array
 /**
  * Fetch quote from BSE India public API (no auth, Indian datacenter-friendly).
  */
+// Common BSE scrip codes for major NSE stocks
+// BSE uses numeric codes, not symbol names — we maintain a map of the most common ones
+function bseScripCode(string $sym): string {
+    $map = [
+        'RELIANCE'=>'500325','TCS'=>'532540','HDFCBANK'=>'500180','BHARTIARTL'=>'532454',
+        'ICICIBANK'=>'532174','INFY'=>'500209','SBIN'=>'500112','HINDUNILVR'=>'500696',
+        'ITC'=>'500875','LT'=>'500510','KOTAKBANK'=>'500247','AXISBANK'=>'532215',
+        'BAJFINANCE'=>'500034','MARUTI'=>'532500','TITAN'=>'500114','SUNPHARMA'=>'524715',
+        'NTPC'=>'532555','POWERGRID'=>'532898','ONGC'=>'500312','HCLTECH'=>'532281',
+        'ADANIENT'=>'512599','ADANIPORTS'=>'532921','COALINDIA'=>'533278','JSWSTEEL'=>'500228',
+        'TATASTEEL'=>'500470','TATACONSUM'=>'500800','TECHM'=>'532755','WIPRO'=>'507685',
+        'DIVISLAB'=>'532488','DRREDDY'=>'500124','CIPLA'=>'500087','APOLLOHOSP'=>'508869',
+        'BAJAJFINSV'=>'532978','BAJAJ-AUTO'=>'532977','EICHERMOT'=>'505200','HEROMOTOCO'=>'500182',
+        'TATAMOTORS'=>'500570','M&M'=>'500520','NESTLEIND'=>'500790','BRITANNIA'=>'500825',
+        'ULTRACEMCO'=>'532538','GRASIM'=>'500300','INDUSINDBK'=>'532187','HINDALCO'=>'500440',
+        'VEDL'=>'500295','BPCL'=>'500547','IOC'=>'530965','HDFCLIFE'=>'540777',
+        'SBILIFE'=>'540719','SHRIRAMFIN'=>'511218','SIEMENS'=>'500550','ABB'=>'500002',
+        'PIDILITIND'=>'500331','HAVELLS'=>'517354','MUTHOOTFIN'=>'533398','DMART'=>'540376',
+        'TRENT'=>'500251','DLF'=>'532868','ZOMATO'=>'543320','NYKAA'=>'543384',
+        'BEL'=>'500049','HAL'=>'541154','BHEL'=>'500103','IRFC'=>'543257',
+        'PFC'=>'532810','RECLTD'=>'532955','IREDA'=>'544097','NHPC'=>'533098',
+        'TATAPOWER'=>'500400','ADANIGREEN'=>'541450','SUZLON'=>'532667','BANKBARODA'=>'532134',
+        'CANBK'=>'532483','PNB'=>'532461','UNIONBANK'=>'532477','IDFCFIRSTB'=>'539437',
+        'FEDERALBNK'=>'500469','BANDHANBNK'=>'541153','LTIM'=>'540005','MPHASIS'=>'526299',
+        'PERSISTENT'=>'533179','COFORGE'=>'532541','OFSS'=>'532755','KPITTECH'=>'542651',
+        'TATAELXSI'=>'500408','AUROPHARMA'=>'524804','ALKEM'=>'539523','IPCALAB'=>'544155',
+        'LUPIN'=>'500257','TORNTPHARM'=>'500420','MAXHEALTH'=>'543220','FORTIS'=>'532843',
+        'TVSMOTOR'=>'532343','ASHOKLEY'=>'500477','BHARATFORG'=>'500493','BOSCHLTD'=>'500530',
+        'EXIDEIND'=>'500086','MRF'=>'500290','APOLLOTYRE'=>'500877','CONCOR'=>'531344',
+        'BLUEDART'=>'526612','SRF'=>'503806','DEEPAKNITR'=>'506401','PIDILITIND'=>'500331',
+        'GODREJCP'=>'532424','MARICO'=>'531642','DABUR'=>'500096','COLPAL'=>'500830',
+        'EMAMILTD'=>'531162','JUBLFOOD'=>'533155','ICICIPRULI'=>'540133','CHOLAFIN'=>'511243',
+    ];
+    return $map[strtoupper($sym)] ?? '';
+}
+
 function bseQuoteFetch(string $nseSymbol): ?array
 {
-    // BSE uses scrip codes, but their search API accepts symbol names
-    $sym = strtoupper(str_replace('.NS', '', $nseSymbol));
-    // BSE search to find scrip code
-    $searchUrl = 'https://api.bseindia.com/BseIndiaAPI/api/ComHeader/w?quotetype=EQ&scripcode=&companyname=' . urlencode($sym);
-    $ch = curl_init($searchUrl);
+    $sym  = strtoupper(str_replace('.NS', '', $nseSymbol));
+    $code = bseScripCode($sym);
+    if (!$code) return null;
+
+    // BSE real-time quote API
+    $url = 'https://api.bseindia.com/BseIndiaAPI/api/getScripHeaderData/w?Debtflag=&scripcode=' . $code . '&seriesid=';
+    $ch  = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_TIMEOUT => 8, CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_ENCODING => 'gzip',
         CURLOPT_HTTPHEADER => [
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
@@ -1075,33 +1113,109 @@ function bseQuoteFetch(string $nseSymbol): ?array
         ],
     ]);
     $raw  = curl_exec($ch);
-    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $code2 = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    if (!$raw || $code !== 200) return null;
+    if (!$raw || $code2 !== 200) return null;
     $d = json_decode($raw, true);
-    $price = (float)($d['CurrRate'] ?? $d['Curr_Rate'] ?? 0);
+    if (!is_array($d)) return null;
+
+    // BSE returns nested structure — try multiple field paths
+    $price = (float)($d['CurrRate'] ?? $d['Curr_Rate'] ?? $d['LTP'] ?? $d['ltp'] ?? 0);
+    if ($price <= 0) {
+        // Try nested wrapper
+        $d = $d[0] ?? $d['Table'][0] ?? $d['Table1'][0] ?? $d;
+        $price = (float)($d['CurrRate'] ?? $d['Curr_Rate'] ?? $d['LTP'] ?? $d['ltp'] ?? 0);
+    }
     if ($price <= 0) return null;
 
     return [
         'symbol'                     => $sym . '.NS',
-        'shortName'                  => $d['CompanyName'] ?? $sym,
-        'longName'                   => $d['CompanyName'] ?? $sym,
+        'shortName'                  => $d['CompanyName'] ?? $d['SCRIP_NAME'] ?? $sym,
+        'longName'                   => $d['CompanyName'] ?? $d['SCRIP_NAME'] ?? $sym,
         'regularMarketPrice'         => $price,
-        'regularMarketChange'        => (float)($d['Chg'] ?? 0),
-        'regularMarketChangePercent' => (float)($d['PcChg'] ?? 0),
-        'regularMarketPreviousClose' => (float)($d['PrevClose'] ?? $price),
-        'regularMarketOpen'          => (float)($d['Open'] ?? $price),
-        'regularMarketDayHigh'       => (float)($d['High'] ?? $price),
-        'regularMarketDayLow'        => (float)($d['Low'] ?? $price),
-        'regularMarketVolume'        => (int)($d['TotalTradedQty'] ?? 0),
-        'averageDailyVolume3Month'   => (int)($d['TotalTradedQty'] ?? 0),
-        'fiftyTwoWeekHigh'           => (float)($d['WeekHigh52'] ?? $price),
-        'fiftyTwoWeekLow'            => (float)($d['WeekLow52'] ?? $price),
-        'trailingPE' => null, 'priceToBook' => null, 'marketCap' => null,
+        'regularMarketChange'        => (float)($d['Chg'] ?? $d['NetChange'] ?? 0),
+        'regularMarketChangePercent' => (float)($d['PcChg'] ?? $d['PerChange'] ?? 0),
+        'regularMarketPreviousClose' => (float)($d['PrevClose'] ?? $d['prevclose'] ?? $price),
+        'regularMarketOpen'          => (float)($d['Open'] ?? $d['open'] ?? $price),
+        'regularMarketDayHigh'       => (float)($d['High'] ?? $d['high'] ?? $price),
+        'regularMarketDayLow'        => (float)($d['Low'] ?? $d['low'] ?? $price),
+        'regularMarketVolume'        => (int)($d['TotalTradedQty'] ?? $d['Volume'] ?? 0),
+        'averageDailyVolume3Month'   => (int)($d['TotalTradedQty'] ?? $d['Volume'] ?? 0),
+        'fiftyTwoWeekHigh'           => (float)($d['WeekHigh52'] ?? $d['High52Week'] ?? $price),
+        'fiftyTwoWeekLow'            => (float)($d['WeekLow52']  ?? $d['Low52Week']  ?? $price),
+        'trailingPE' => isset($d['PE']) ? (float)$d['PE'] : null,
+        'priceToBook' => null, 'marketCap' => null,
         'sector' => null, 'industry' => null, 'returnOnEquity' => null, 'debtToEquity' => null,
         '_source' => 'bse',
     ];
+}
+
+function bseQuoteBulk(array $symbols): array
+{
+    $all = [];
+    foreach ($symbols as $sym) {
+        $q = bseQuoteFetch($sym);
+        if ($q && ($q['regularMarketPrice'] ?? 0) > 0) {
+            $all[$sym] = $q;
+        }
+        usleep(100000); // 100ms between calls
+    }
+    return $all;
+}
+
+function bseHistory(string $nseSymbol, int $days = 90): array
+{
+    $sym   = strtoupper(str_replace('.NS', '', $nseSymbol));
+    $code  = bseScripCode($sym);
+    if (!$code) return [];
+
+    $toDate   = date('d%2Fm%2FY');  // BSE date format: DD/MM/YYYY URL-encoded
+    $fromDate = date('d%2Fm%2FY', strtotime("-{$days} days -10 days"));
+    $url = "https://api.bseindia.com/BseIndiaAPI/api/StockPriceCSVDownload/w?scripcode={$code}&seriesid=EQ&fromdate={$fromDate}&todate={$toDate}&marketcap=&MarketCapFull=&myowner=&segment=";
+
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 15, CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_HTTPHEADER => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Referer: https://www.bseindia.com/',
+            'Accept: text/csv,*/*',
+        ],
+    ]);
+    $raw  = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if (!$raw || $httpCode !== 200) return [];
+
+    $lines = array_values(array_filter(explode("\n", trim($raw))));
+    if (count($lines) < 2) return [];
+
+    $rows = [];
+    // BSE CSV: Date,Open,High,Low,Close,Volume (skip header)
+    for ($i = 1; $i < count($lines); $i++) {
+        $col   = str_getcsv(trim($lines[$i]));
+        if (count($col) < 5) continue;
+        $close = (float)str_replace(',', '', $col[4] ?? 0);
+        if ($close <= 0) continue;
+        $rows[] = [
+            'date'   => date('Y-m-d', strtotime(str_replace('/', '-', $col[0] ?? ''))),
+            'open'   => round((float)str_replace(',', '', $col[1] ?? $close), 2),
+            'high'   => round((float)str_replace(',', '', $col[2] ?? $close), 2),
+            'low'    => round((float)str_replace(',', '', $col[3] ?? $close), 2),
+            'close'  => round($close, 2),
+            'volume' => (int)str_replace(',', '', $col[5] ?? 0),
+        ];
+    }
+    $rows = array_reverse($rows); // BSE returns newest first
+    $rows = array_slice($rows, -$days);
+    if (!empty($rows)) {
+        $cacheFile = STORAGE . '/hist_' . preg_replace('/[^A-Z0-9]/', '_', strtoupper($nseSymbol)) . '.json';
+        file_put_contents($cacheFile, json_encode($rows));
+    }
+    return $rows;
 }
 
 

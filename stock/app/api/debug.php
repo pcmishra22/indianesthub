@@ -433,33 +433,72 @@ if ($uri === '/api/debug/apikeys') {
     header('Content-Type: application/json');
     $out = [];
 
-    $tests = [
-        'stooq_quote'   => 'https://stooq.com/q/l/?s=infy.in&f=sd2t2ohlcv&e=csv',
-        'stooq_history' => 'https://stooq.com/q/d/l/?s=infy.in&d1=20260601&d2=20260701&i=d',
-        'nse_home'      => 'https://www.nseindia.com/',
-        'nse_api'       => 'https://www.nseindia.com/api/quote-equity?symbol=INFY',
-        'groww'         => 'https://groww.in/v1/api/stocks_data/v1/company/search?q=INFY&page=0&size=1',
-        'bse'           => 'https://api.bseindia.com/BseIndiaAPI/api/getScripHeaderData/w?Debtflag=&scripcode=500209&seriesid=',
+    // Test 1: BSE getScripHeaderData with INFY scrip code 500209
+    $ch = curl_init('https://api.bseindia.com/BseIndiaAPI/api/getScripHeaderData/w?Debtflag=&scripcode=500209&seriesid=');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_ENCODING => 'gzip',
+        CURLOPT_HTTPHEADER => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept: application/json', 'Referer: https://www.bseindia.com/',
+            'Origin: https://www.bseindia.com',
+        ],
+    ]);
+    $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+    $out['bse_getScripHeaderData_500209'] = [
+        'http_code' => $code, 'curl_error' => $err ?: null,
+        'raw_full'  => $raw ? json_decode($raw, true) ?? $raw : null,
     ];
 
-    foreach ($tests as $name => $url) {
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_TIMEOUT => 8, CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_HTTPHEADER => ['User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'],
-        ]);
-        $raw  = curl_exec($ch);
-        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $err  = curl_error($ch);
-        curl_close($ch);
-        $out[$name] = [
-            'http_code'   => $code,
-            'curl_error'  => $err ?: null,
-            'body_preview'=> $raw ? substr($raw, 0, 150) : null,
-            'reachable'   => $code === 200,
-        ];
-    }
+    // Test 2: BSE MarketWatch API
+    $ch = curl_init('https://api.bseindia.com/BseIndiaAPI/api/StockReachGraph/w?scripcode=500209&seriesid=EQ&flag=0');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_ENCODING => 'gzip',
+        CURLOPT_HTTPHEADER => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept: application/json', 'Referer: https://www.bseindia.com/',
+            'Origin: https://www.bseindia.com',
+        ],
+    ]);
+    $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    $out['bse_StockReachGraph_500209'] = [
+        'http_code' => $code,
+        'raw_full'  => $raw ? json_decode($raw, true) ?? substr($raw,0,500) : null,
+    ];
+
+    // Test 3: BSE Quote API
+    $ch = curl_init('https://api.bseindia.com/BseIndiaAPI/api/ComHeader/w?quotetype=EQ&scripcode=500209&seriesid=EQ');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_ENCODING => 'gzip',
+        CURLOPT_HTTPHEADER => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept: application/json', 'Referer: https://www.bseindia.com/',
+            'Origin: https://www.bseindia.com',
+        ],
+    ]);
+    $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    $out['bse_ComHeader_500209'] = [
+        'http_code' => $code,
+        'raw_full'  => $raw ? json_decode($raw, true) ?? substr($raw,0,500) : null,
+    ];
+
+    // Test 4: BSE live quote via different endpoint
+    $ch = curl_init('https://api.bseindia.com/BseIndiaAPI/api/SensexView/w?flag=0&scripcode=500209');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_ENCODING => 'gzip',
+        CURLOPT_HTTPHEADER => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept: application/json', 'Referer: https://www.bseindia.com/',
+        ],
+    ]);
+    $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    $out['bse_SensexView_500209'] = [
+        'http_code' => $code,
+        'raw_full'  => $raw ? json_decode($raw, true) ?? substr($raw,0,500) : null,
+    ];
 
     echo json_encode($out, JSON_PRETTY_PRINT);
     exit;
