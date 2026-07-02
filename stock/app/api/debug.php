@@ -431,48 +431,35 @@ if ($uri === '/api/debug/yahoo') {
 // ── Debug: test EODHD + Twelve Data API keys ─────────────────
 if ($uri === '/api/debug/apikeys') {
     header('Content-Type: application/json');
-    $key = getenv('EODHD_API_KEY') ?: '';
-    $out = [
-        'eodhd_key_set'      => !empty($key),
-        'twelvedata_key_set' => !empty(DATA_API_KEY),
-        'verdict'            => 'EODHD free plan does NOT support NSE/BSE symbols. Twelve Data free plan does NOT support NSE. App is using legacy fallbacks (Stooq/NSE direct scraping).',
+    $out = [];
+
+    $tests = [
+        'stooq_quote'   => 'https://stooq.com/q/l/?s=infy.in&f=sd2t2ohlcv&e=csv',
+        'stooq_history' => 'https://stooq.com/q/d/l/?s=infy.in&d1=20260601&d2=20260701&i=d',
+        'nse_home'      => 'https://www.nseindia.com/',
+        'nse_api'       => 'https://www.nseindia.com/api/quote-equity?symbol=INFY',
+        'groww'         => 'https://groww.in/v1/api/stocks_data/v1/company/search?q=INFY&page=0&size=1',
+        'bse'           => 'https://api.bseindia.com/BseIndiaAPI/api/getScripHeaderData/w?Debtflag=&scripcode=500209&seriesid=',
     ];
 
-    // Test what source is actually working right now
-    $testSymbols = ['INFY.NS', 'TCS.NS', 'RELIANCE.NS', 'HDFCBANK.NS', 'ICICIBANK.NS'];
-    foreach ($testSymbols as $sym) {
-        $q = yahooQuote($sym);
-        $out['actual_working_source'][$sym] = [
-            'price'  => $q['regularMarketPrice'] ?? null,
-            'source' => $q['_source'] ?? null,
-            'ok'     => ($q['regularMarketPrice'] ?? 0) > 0,
+    foreach ($tests as $name => $url) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => 8, CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_HTTPHEADER => ['User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'],
+        ]);
+        $raw  = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err  = curl_error($ch);
+        curl_close($ch);
+        $out[$name] = [
+            'http_code'   => $code,
+            'curl_error'  => $err ?: null,
+            'body_preview'=> $raw ? substr($raw, 0, 150) : null,
+            'reachable'   => $code === 200,
         ];
     }
-
-    // Test Stooq directly (the one that's actually working)
-    $stooq = stooqQuoteFallback('INFY.NS');
-    $out['stooq_direct_test'] = [
-        'price'  => $stooq['regularMarketPrice'] ?? null,
-        'source' => $stooq['_source'] ?? null,
-        'ok'     => ($stooq['regularMarketPrice'] ?? 0) > 0,
-    ];
-
-    // Test NSE direct
-    $nse = nseQuoteFallback('INFY.NS');
-    $out['nse_direct_test'] = [
-        'price'  => $nse['regularMarketPrice'] ?? null,
-        'source' => $nse['_source'] ?? null,
-        'ok'     => ($nse['regularMarketPrice'] ?? 0) > 0,
-    ];
-
-    // Test history source
-    $hist = yahooHistory('INFY.NS', 10);
-    $out['history_source'] = [
-        'rows'   => count($hist),
-        'source' => ($hist[0]['_source'] ?? null) ?: 'unknown',
-        'sample' => $hist[count($hist)-1] ?? null,
-        'ok'     => count($hist) > 0,
-    ];
 
     echo json_encode($out, JSON_PRETTY_PRINT);
     exit;
