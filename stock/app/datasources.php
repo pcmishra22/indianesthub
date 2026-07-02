@@ -477,25 +477,25 @@ function yahooQuote(string $symbol): ?array
         if (!empty($all) && isset($all[$symbol])) return $all[$symbol];
     }
 
-    // Priority 1: Stooq (working, no auth needed)
+    // Priority 1: BSE (confirmed working — getScripHeaderData API returns live prices)
+    $bse = bseQuoteFetch($symbol);
+    if ($bse && ($bse['regularMarketPrice'] ?? 0) > 0) return $bse;
+
+    // Priority 2: Stooq
     $stooq = stooqQuoteFallback($symbol);
     if ($stooq && ($stooq['regularMarketPrice'] ?? 0) > 0) return $stooq;
 
-    // Priority 2: NSE India direct
+    // Priority 3: NSE India direct
     $nse = nseQuoteFallback($symbol);
     if ($nse && ($nse['regularMarketPrice'] ?? 0) > 0) return $nse;
 
-    // Priority 3: NSE market fetch (different session approach)
+    // Priority 4: NSE market fetch
     $nse2 = nseMarketFetch($symbol);
     if ($nse2 && ($nse2['regularMarketPrice'] ?? 0) > 0) return $nse2;
 
-    // Priority 4: Groww
+    // Priority 5: Groww
     $gw = growwQuoteFetch($symbol);
     if ($gw && ($gw['regularMarketPrice'] ?? 0) > 0) return $gw;
-
-    // Priority 5: BSE
-    $bse = bseQuoteFetch($symbol);
-    if ($bse && ($bse['regularMarketPrice'] ?? 0) > 0) return $bse;
 
     return null;
 }
@@ -513,10 +513,15 @@ function yahooQuoteBulk(array $symbols): array
         if (!empty($cached)) return $cached;
     }
 
-    // Priority 1: Stooq bulk parallel fetch (fastest, no auth)
-    $all = stooqBulkFetch($symbols);
+    // Priority 1: BSE bulk (confirmed working API)
+    $all = bseQuoteBulk($symbols);
 
-    // Priority 2: NSE India (per-symbol, rate limited)
+    // Priority 2: Stooq bulk parallel
+    if (empty($all)) {
+        $all = stooqBulkFetch($symbols);
+    }
+
+    // Priority 3: NSE per-symbol
     if (empty($all)) {
         foreach (array_slice($symbols, 0, 20) as $sym) {
             $q = nseMarketFetch($sym);
@@ -526,21 +531,12 @@ function yahooQuoteBulk(array $symbols): array
         }
     }
 
-    // Priority 3: Groww
+    // Priority 4: Groww
     if (empty($all)) {
         foreach (array_slice($symbols, 0, 20) as $sym) {
             $q = growwQuoteFetch($sym);
             if ($q && ($q['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $q;
             usleep(150000);
-        }
-    }
-
-    // Priority 4: BSE
-    if (empty($all)) {
-        foreach (array_slice($symbols, 0, 20) as $sym) {
-            $q = bseQuoteFetch($sym);
-            if ($q && ($q['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $q;
-            usleep(200000);
         }
     }
 
@@ -560,7 +556,11 @@ function yahooHistory(string $symbol, int $days = 90): array
         if (!empty($cached)) return $cached;
     }
 
-    // Priority 1: Stooq historical CSV (working, no auth)
+    // Priority 1: BSE historical CSV
+    $bseRows = bseHistory($symbol, $days);
+    if (!empty($bseRows)) return $bseRows;
+
+    // Priority 2: Stooq historical CSV
     $rows = stooqHistoryFallback($symbol, $days);
     if (!empty($rows)) return $rows;
 
@@ -1120,32 +1120,38 @@ function bseQuoteFetch(string $nseSymbol): ?array
     $d = json_decode($raw, true);
     if (!is_array($d)) return null;
 
-    // BSE returns nested structure — try multiple field paths
-    $price = (float)($d['CurrRate'] ?? $d['Curr_Rate'] ?? $d['LTP'] ?? $d['ltp'] ?? 0);
-    if ($price <= 0) {
-        // Try nested wrapper
-        $d = $d[0] ?? $d['Table'][0] ?? $d['Table1'][0] ?? $d;
-        $price = (float)($d['CurrRate'] ?? $d['Curr_Rate'] ?? $d['LTP'] ?? $d['ltp'] ?? 0);
-    }
+    // Real BSE response structure (verified 2026-07-02):
+    // $d['CurrRate']['LTP']     = live price
+    // $d['CurrRate']['Chg']     = change (e.g. "+50.85")
+    // $d['CurrRate']['PcChg']   = change % (e.g. "+5.16")
+    // $d['Header']['PrevClose'] = previous close
+    // $d['Header']['Open']      = open
+    // $d['Header']['High']      = day high
+    // $d['Header']['Low']       = day low
+    // $d['Cmpname']['FullN']    = full company name
+    $cr = $d['CurrRate'] ?? [];
+    $hd = $d['Header']   ?? [];
+    $cn = $d['Cmpname']  ?? [];
+
+    $price = (float)($cr['LTP'] ?? 0);
     if ($price <= 0) return null;
 
     return [
         'symbol'                     => $sym . '.NS',
-        'shortName'                  => $d['CompanyName'] ?? $d['SCRIP_NAME'] ?? $sym,
-        'longName'                   => $d['CompanyName'] ?? $d['SCRIP_NAME'] ?? $sym,
+        'shortName'                  => $cn['ShortN'] ?? $sym,
+        'longName'                   => $cn['FullN']  ?? $sym,
         'regularMarketPrice'         => $price,
-        'regularMarketChange'        => (float)($d['Chg'] ?? $d['NetChange'] ?? 0),
-        'regularMarketChangePercent' => (float)($d['PcChg'] ?? $d['PerChange'] ?? 0),
-        'regularMarketPreviousClose' => (float)($d['PrevClose'] ?? $d['prevclose'] ?? $price),
-        'regularMarketOpen'          => (float)($d['Open'] ?? $d['open'] ?? $price),
-        'regularMarketDayHigh'       => (float)($d['High'] ?? $d['high'] ?? $price),
-        'regularMarketDayLow'        => (float)($d['Low'] ?? $d['low'] ?? $price),
-        'regularMarketVolume'        => (int)($d['TotalTradedQty'] ?? $d['Volume'] ?? 0),
-        'averageDailyVolume3Month'   => (int)($d['TotalTradedQty'] ?? $d['Volume'] ?? 0),
-        'fiftyTwoWeekHigh'           => (float)($d['WeekHigh52'] ?? $d['High52Week'] ?? $price),
-        'fiftyTwoWeekLow'            => (float)($d['WeekLow52']  ?? $d['Low52Week']  ?? $price),
-        'trailingPE' => isset($d['PE']) ? (float)$d['PE'] : null,
-        'priceToBook' => null, 'marketCap' => null,
+        'regularMarketChange'        => (float)($cr['Chg']   ?? 0),
+        'regularMarketChangePercent' => (float)($cr['PcChg'] ?? 0),
+        'regularMarketPreviousClose' => (float)($hd['PrevClose'] ?? $price),
+        'regularMarketOpen'          => (float)($hd['Open']      ?? $price),
+        'regularMarketDayHigh'       => (float)($hd['High']      ?? $price),
+        'regularMarketDayLow'        => (float)($hd['Low']       ?? $price),
+        'regularMarketVolume'        => 0,
+        'averageDailyVolume3Month'   => 0,
+        'fiftyTwoWeekHigh'           => (float)($hd['High'] ?? $price),
+        'fiftyTwoWeekLow'            => (float)($hd['Low']  ?? $price),
+        'trailingPE' => null, 'priceToBook' => null, 'marketCap' => null,
         'sector' => null, 'industry' => null, 'returnOnEquity' => null, 'debtToEquity' => null,
         '_source' => 'bse',
     ];
