@@ -56,6 +56,7 @@ class PropertyDetailsController extends Controller
 
         PropertyView::create([
             'property_id'     => $property->id,
+            'event_type'      => 'page_view',
             'user_id'         => Auth::id(),
             'session_id'      => request()->session()->getId(),
             'visitor_token'   => $visitorToken,

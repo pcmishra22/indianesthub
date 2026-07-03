@@ -20,16 +20,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Every admin page (and several frontend pages) calls the bare
-        // ->links() helper, which without this falls back to Laravel's raw
-        // "pagination::default" view. That view renders the prev/next
-        // arrows as plain, unstyled <a> tags with NO Bootstrap classes
-        // (no `page-item` / `page-link`), so the ‹ › glyphs render at the
-        // browser's default font-size — much bigger than the rest of the
-        // compact admin UI. Switching the app-wide default to Bootstrap 5
-        // makes every ->links() call use the properly classed & sized
-        // pagination::bootstrap-5 view instead, without having to touch
-        // every individual blade file.
-        Paginator::useBootstrapFive();
+        // The whole app (admin/AdminKit, builder panel, dealer panel, frontend)
+        // is styled with Bootstrap, not Tailwind. Laravel's built-in default
+        // pagination view is "tailwind", which renders <svg class="w-5 h-5">
+        // previous/next arrows sized purely by Tailwind utility classes.
+        // Since Tailwind CSS isn't loaded anywhere in this app, those classes
+        // do nothing and the SVGs fall back to their native (huge) size —
+        // that's the "big pagination arrow" bug across the admin panel.
+        // Bootstrap 5's pagination view uses plain text chevrons + standard
+        // .page-link classes, so it renders correctly everywhere ->links()
+        // is called without touching every single blade file.
+        Paginator::defaultView('vendor.pagination.bootstrap-5');
+        Paginator::defaultSimpleView('vendor.pagination.simple-bootstrap-5');
     }
 }

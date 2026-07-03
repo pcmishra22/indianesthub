@@ -26,6 +26,14 @@ class AuthController extends Controller
             'password' => ['required'],
         ]);
 
+        // Block login before attempting auth if admin has blocked this builder.
+        $builder = Builder::where('email', $credentials['email'])->first();
+        if ($builder && $builder->status === 'blocked') {
+            return back()
+                ->withErrors(['email' => 'Your account has been blocked. Please contact admin.'])
+                ->onlyInput('email');
+        }
+
         if (Auth::guard('builder')->attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
             return redirect()->intended(route('builder.dashboard'));

@@ -1919,6 +1919,39 @@
 </div>
 
 <script>
+// ─── Visitor interaction tracking (call / WhatsApp clicks) ──────────────────
+// Uses event delegation so it works for every tel:/wa.me link on this page
+// without needing to edit each button individually. Fire-and-forget beacon
+// that never blocks the actual call/chat navigation.
+document.addEventListener('click', function (e) {
+  const link = e.target.closest('a[href^="tel:"], a[href*="wa.me"]');
+  if (!link) return;
+
+  const eventType = link.href.indexOf('wa.me') !== -1 ? 'whatsapp_click' : 'call_click';
+  const payload = JSON.stringify({
+    entity_type: 'property',
+    entity_id: {{ $property->id }},
+    event_type: eventType,
+    _token: '{{ csrf_token() }}'
+  });
+
+  try {
+    if (navigator.sendBeacon) {
+      const blob = new Blob([payload], { type: 'application/json' });
+      navigator.sendBeacon('{{ route('track.interaction') }}', blob);
+    } else {
+      fetch('{{ route('track.interaction') }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+        keepalive: true
+      });
+    }
+  } catch (err) { /* tracking must never break the click */ }
+}, true);
+</script>
+
+<script>
 function toggleDesc() {
   const el = document.getElementById('descClamp');
   const btn = document.getElementById('descToggle');

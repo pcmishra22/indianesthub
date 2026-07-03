@@ -360,6 +360,9 @@ Route::get('/pricing', function () {
 Route::post('/property/inquiry/submit', [PropertyDetailsController::class, 'submitInquiry'])->name('property.inquiry.submit');
 Route::post('/property/schedule-viewing', [ScheduleViewingController::class, 'submit'])->name('property.schedule.viewing');
 
+// Visitor interaction tracking (public, fire-and-forget beacon from call/whatsapp buttons)
+Route::post('/track/interaction', [\App\Http\Controllers\Frontend\InteractionTrackingController::class, 'track'])->name('track.interaction');
+
 // Property comparison (session-based, no login required)
 Route::get('/compare', [CompareController::class, 'index'])->name('compare');
 Route::get('/property/compare', [CompareController::class, 'compare'])->name('property.compare');
@@ -643,7 +646,13 @@ require __DIR__ . '/admin_properties.php';
         // Builder Projects
         Route::resource('builder-projects', AdminBuilderProjectController::class)->only(['index', 'show', 'destroy']);
         Route::post('/builder-projects/{project}/toggle-featured', [AdminBuilderProjectController::class, 'toggleFeatured'])->name('builder-projects.toggle-featured');
-        Route::post('/builder-projects/{project}/toggle-active', [AdminBuilderProjectController::class, 'toggleActive'])->name('builder-projects.toggle-active');
+        Route::post('/builder-projects/{project}/toggle-status', [AdminBuilderProjectController::class, 'toggleStatus'])->name('builder-projects.toggle-status');
+
+        // Traffic / viewers (guest token based tracking) — mirrors properties.viewers.index
+        Route::get('/builders/{builder}/viewers', [\App\Http\Controllers\Admin\BuilderViewersController::class, 'index'])
+            ->name('builders.viewers.index');
+        Route::get('/builder-projects/{project}/viewers', [\App\Http\Controllers\Admin\ProjectViewersController::class, 'index'])
+            ->name('builder-projects.viewers.index');
 
         // Builder Leads
         Route::resource('builder-leads', AdminBuilderLeadController::class)->only(['index', 'show', 'destroy']);

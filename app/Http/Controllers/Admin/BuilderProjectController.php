@@ -61,13 +61,17 @@ class BuilderProjectController extends Controller
         return back()->with('success', "Project marked as {$label}.");
     }
 
-    public function toggleActive($id)
+    /**
+     * Enable / disable a project's public visibility (hides it from the
+     * public site regardless of its construction status).
+     */
+    public function toggleStatus($id)
     {
         $project = BuilderProject::findOrFail($id);
         $project->is_active = !$project->is_active;
         $project->save();
 
         $label = $project->is_active ? 'Enabled' : 'Disabled';
-        return back()->with('success', "Project {$label}.");
+        return back()->with('success', "Project {$label} successfully.");
     }
 }

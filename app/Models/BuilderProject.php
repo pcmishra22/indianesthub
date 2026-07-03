@@ -10,12 +10,12 @@ class BuilderProject extends Model
     protected $table = 'builder_projects';
 
     protected $fillable = [
-        'builder_id', 'title', 'slug', 'description', 'project_type', 'status',
+        'builder_id', 'title', 'slug', 'description', 'project_type', 'status', 'is_active',
         'address', 'city', 'state',
         'total_units', 'available_units', 'total_towers', 'floors_per_tower',
         'price_from', 'price_to', 'possession_date',
         'cover_image', 'gallery_images', 'master_plan', 'brochure', 'video_url', 'virtual_tour_url',
-        'amenities', 'rera_id', 'is_featured', 'is_active',
+        'amenities', 'rera_id', 'is_featured',
         'latitude', 'longitude',
         'nearby_schools', 'nearby_hospitals', 'metro_distance', 'connectivity_score', 'future_infra',
         'views_count', 'leads_count',
@@ -125,5 +125,13 @@ class BuilderProject extends Model
     public static function projectStatuses(): array
     {
         return ['Upcoming', 'Under Construction', 'Ready to Move', 'Completed'];
+    }
+
+    /**
+     * Only projects the admin has left enabled (visible on the public site).
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 }

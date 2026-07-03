@@ -13,7 +13,7 @@ class BuilderLead extends Model
         'name', 'email', 'phone', 'message',
         'lead_type', 'source', 'status',
         'notes', 'follow_up_at', 'hot_score',
-        'ip_address', 'user_agent', 'call_log',
+        'ip_address', 'user_agent', 'visitor_token', 'call_log',
     ];
 
     protected $casts = [

@@ -16,6 +16,30 @@
     </div>
 @endif
 
+{{-- Traffic summary + link to viewer list --}}
+@php
+    $projectViewsTotal = \App\Models\ProjectView::where('builder_project_id', $project->id)->where('event_type', 'page_view')->count();
+@endphp
+<div class="row g-2 mb-3">
+    <div class="col-12 col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">Project Page Views</div>
+                <div class="fs-4 fw-bold text-primary">{{ number_format($projectViewsTotal) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-lg-4 d-flex align-items-stretch">
+        <div class="card shadow-sm w-100">
+            <div class="card-body d-flex align-items-center">
+                <a href="{{ route('admin.builder-projects.viewers.index', $project->id) }}" class="btn btn-sm btn-outline-primary">
+                    View all viewers
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row g-3">
     {{-- Main Details --}}
     <div class="col-lg-8">
@@ -32,10 +56,30 @@
                     </div>
                     <div class="d-flex gap-2">
                         <span class="badge {{ $project->status_badge_class }} fs-6">{{ $project->status }}</span>
+                        @if($project->is_active)
+                            <span class="badge bg-success">Enabled</span>
+                        @else
+                            <span class="badge bg-danger">Disabled</span>
+                        @endif
                         @if($project->is_featured)
                             <span class="badge bg-warning text-dark">⭐ Featured</span>
                         @endif
                     </div>
+                </div>
+
+                <div class="mb-3">
+                    <form action="{{ route('admin.builder-projects.toggle-status', $project->id) }}" method="POST" class="d-inline">
+                        @csrf
+                        <button type="submit" class="btn btn-sm {{ $project->is_active ? 'btn-outline-warning' : 'btn-outline-success' }}">
+                            {{ $project->is_active ? 'Disable Project' : 'Enable Project' }}
+                        </button>
+                    </form>
+                    <form action="{{ route('admin.builder-projects.toggle-featured', $project->id) }}" method="POST" class="d-inline">
+                        @csrf
+                        <button type="submit" class="btn btn-sm {{ $project->is_featured ? 'btn-outline-secondary' : 'btn-outline-warning' }}">
+                            {{ $project->is_featured ? 'Unfeature' : 'Feature' }}
+                        </button>
+                    </form>
                 </div>
 
                 <table class="table table-bordered table-sm mb-3">

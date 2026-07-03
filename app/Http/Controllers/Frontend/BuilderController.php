@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Builder;
 use App\Models\BuilderProject;
 use App\Models\BuilderLead;
+use App\Models\BuilderView;
+use App\Models\ProjectView;
 use App\Services\WhatsAppNotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
 
@@ -66,21 +69,27 @@ class BuilderController extends Controller
         $builder->loadCount('projects');
 
         $projects = $builder->projects()
-            ->where('is_active', true)
+            ->active()
             ->withCount('properties')
             ->latest()
             ->paginate(6);
 
-        $totalUnits = $builder->projects()->where('is_active', true)->sum('total_units');
+        $totalUnits = $builder->projects()->active()->sum('total_units');
 
         $citiesServed = $builder->projects()
-            ->where('is_active', true)
+            ->active()
             ->whereNotNull('city')
             ->distinct()
             ->pluck('city')
             ->filter()
             ->unique()
             ->values();
+
+        // Track this visit (who visited the builder page, guest or logged-in)
+        BuilderView::create([
+            'builder_id'    => $builder->id,
+            'event_type'    => 'page_view',
+        ] + $this->visitContext());
 
         return view('frontend.builder-profile', compact('builder', 'projects', 'totalUnits', 'citiesServed'));
     }
@@ -106,6 +115,12 @@ class BuilderController extends Controller
         // Increment views
         $project->increment('views_count');
 
+        // Track this visit (who visited the project page, guest or logged-in)
+        ProjectView::create([
+            'builder_project_id' => $project->id,
+            'event_type'         => 'page_view',
+        ] + $this->visitContext());
+
         // Grouped amenities
         $amenitiesByCategory = $project->amenityItems->groupBy('category');
 
@@ -116,7 +131,6 @@ class BuilderController extends Controller
         // Other projects by same builder (exclude current)
         $relatedProjects = BuilderProject::where('builder_id', $project->builder_id)
             ->where('id', '!=', $project->id)
-            ->where('is_active', true)
             ->withCount('properties')
             ->latest()
             ->limit(3)
@@ -152,6 +166,7 @@ class BuilderController extends Controller
             'status'             => 'new',
             'ip_address'         => $request->ip(),
             'user_agent'         => $request->userAgent(),
+            'visitor_token'      => $request->cookie('visitor_token'),
         ]);
 
         // Compute initial hot score
@@ -245,6 +260,7 @@ class BuilderController extends Controller
             'status'             => 'new',
             'ip_address'         => $request->ip(),
             'user_agent'         => $request->userAgent(),
+            'visitor_token'      => $request->cookie('visitor_token'),
         ]);
 
         $lead->recomputeHotScore();
@@ -287,5 +303,59 @@ class BuilderController extends Controller
         }
 
         return back()->with('success', 'Your enquiry has been submitted. We will contact you shortly!');
+    }
+
+    /**
+     * Common visitor tracking fields (guest fingerprint, device, browser,
+     * referrer...) shared by BuilderView and ProjectView inserts. Reuses
+     * the same "visitor_token" cookie already used for property tracking
+     * so admin can follow one visitor across properties/builders/projects.
+     */
+    private function visitContext(): array
+    {
+        $request = request();
+        $userAgent = $request->userAgent() ?? '';
+
+        $visitorToken = $request->cookie('visitor_token');
+        if (empty($visitorToken)) {
+            $visitorToken = (string) \Illuminate\Support\Str::uuid();
+            Cookie::queue('visitor_token', $visitorToken, 60 * 24 * 30); // ~30 days
+        }
+
+        return [
+            'user_id'       => Auth::id(),
+            'session_id'    => $request->session()->getId(),
+            'visitor_token' => $visitorToken,
+            'ip_address'    => $request->ip(),
+            'device'        => $this->detectDevice($userAgent),
+            'browser'       => $this->detectBrowser($userAgent),
+            'referrer'      => $request->headers->get('referer'),
+            'page_url'      => $request->fullUrl(),
+            'viewed_at'     => now(),
+        ];
+    }
+
+    private function detectDevice(string $ua): string
+    {
+        $ua = strtolower($ua);
+        if (str_contains($ua, 'mobile') || str_contains($ua, 'android') || str_contains($ua, 'iphone')) {
+            return 'mobile';
+        }
+        if (str_contains($ua, 'tablet') || str_contains($ua, 'ipad')) {
+            return 'tablet';
+        }
+        return 'desktop';
+    }
+
+    private function detectBrowser(string $ua): string
+    {
+        $ua = strtolower($ua);
+        if (str_contains($ua, 'edg/'))    return 'Edge';
+        if (str_contains($ua, 'opr/') || str_contains($ua, 'opera')) return 'Opera';
+        if (str_contains($ua, 'chrome'))   return 'Chrome';
+        if (str_contains($ua, 'firefox'))  return 'Firefox';
+        if (str_contains($ua, 'safari'))   return 'Safari';
+        if (str_contains($ua, 'msie') || str_contains($ua, 'trident')) return 'IE';
+        return 'Other';
     }
 }

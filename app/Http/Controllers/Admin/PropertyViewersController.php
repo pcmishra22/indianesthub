@@ -18,6 +18,7 @@ class PropertyViewersController extends Controller
         $to   = $request->input('to');
 
         $query = PropertyView::where('property_id', $property->id)
+            ->where('event_type', 'page_view')
             ->orderByDesc('viewed_at');
 
         if ($from && $to) {
@@ -28,10 +29,14 @@ class PropertyViewersController extends Controller
 
         $propertyViews = $query
             ->paginate(200, [ // Paginate with 200 items per page, selecting specific columns
-                'id', 'property_id', 'visitor_token', 'user_id', 'session_id',
+                'id', 'property_id', 'event_type', 'visitor_token', 'user_id', 'session_id',
                 'ip_address', 'device', 'browser', 'referrer', 'page_url',
                 'viewed_at'
             ]);
+
+        // Interaction counts (call / WhatsApp clicks) for this property
+        $callClicks     = PropertyView::where('property_id', $property->id)->where('event_type', 'call_click')->count();
+        $whatsappClicks = PropertyView::where('property_id', $property->id)->where('event_type', 'whatsapp_click')->count();
 
         // The rest of your code remains the same
         $tokenList = $propertyViews
@@ -51,6 +56,8 @@ class PropertyViewersController extends Controller
             'property' => $property,
             'propertyViews' => $propertyViews,
             'inquiriesByToken' => $inquiriesByToken,
+            'callClicks' => $callClicks,
+            'whatsappClicks' => $whatsappClicks,
             'from' => $from,
             'to' => $to,
         ]);

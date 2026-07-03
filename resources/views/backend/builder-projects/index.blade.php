@@ -2,6 +2,24 @@
 @section('title', 'Builder Projects')
 @section('content')
 
+<style>
+    /* Keep the Actions column visible on screen even when the table scrolls
+       horizontally (this table has 14 columns and won't fit on most screens). */
+    .sticky-action-col {
+        position: sticky;
+        right: 0;
+        background: #fff;
+        box-shadow: -2px 0 4px rgba(0,0,0,0.06);
+    }
+    thead .sticky-action-col {
+        background: #f8f9fa;
+        z-index: 3;
+    }
+    tbody .sticky-action-col {
+        z-index: 2;
+    }
+</style>
+
 <div class="d-flex align-items-center justify-content-between mb-3">
     <h4 class="mb-0"><i data-feather="grid" class="me-2 text-primary"></i>Builder Projects</h4>
     <span class="badge bg-primary fs-6">{{ $projects->total() }} total</span>
@@ -51,13 +69,13 @@
                         <th>City</th>
                         <th>Type</th>
                         <th>Status</th>
+                        <th>Enabled</th>
                         <th>Units</th>
                         <th>Props</th>
                         <th>Leads</th>
                         <th>Featured</th>
-                        <th>Live</th>
                         <th>Date</th>
-                        <th style="width:220px;">Actions</th>
+                        <th style="width:110px;" class="text-center sticky-action-col">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -86,6 +104,13 @@
                         <td>{{ $project->city }}</td>
                         <td><span class="badge bg-secondary">{{ $project->project_type }}</span></td>
                         <td><span class="badge {{ $project->status_badge_class }}">{{ $project->status }}</span></td>
+                        <td>
+                            @if($project->is_active)
+                                <span class="badge bg-success">Enabled</span>
+                            @else
+                                <span class="badge bg-danger">Disabled</span>
+                            @endif
+                        </td>
                         <td class="text-center">
                             <small>{{ $project->available_units ?? '?' }}/{{ $project->total_units ?? '?' }}</small>
                         </td>
@@ -98,41 +123,56 @@
                                 <span class="text-muted small">No</span>
                             @endif
                         </td>
-                        <td class="text-center">
-                            @if($project->is_active)
-                                <span class="badge bg-success">Live</span>
-                            @else
-                                <span class="badge bg-secondary">Hidden</span>
-                            @endif
-                        </td>
                         <td class="text-muted small">{{ $project->created_at?->format('d M Y') }}</td>
-                        <td>
-                            <div class="d-flex gap-1">
-                                <a href="{{ route('admin.builder-projects.show', $project->id) }}"
-                                   class="btn btn-sm btn-outline-primary">View</a>
-
-                                <form action="{{ route('admin.builder-projects.toggle-featured', $project->id) }}" method="POST" class="d-inline">
-                                    @csrf
-                                    <button type="submit" class="btn btn-sm {{ $project->is_featured ? 'btn-outline-secondary' : 'btn-outline-warning' }}">
-                                        {{ $project->is_featured ? 'Unfeature' : 'Feature' }}
-                                    </button>
-                                </form>
-
-                                <form action="{{ route('admin.builder-projects.toggle-active', $project->id) }}" method="POST" class="d-inline">
-                                    @csrf
-                                    <button type="submit" class="btn btn-sm {{ $project->is_active ? 'btn-outline-warning' : 'btn-outline-success' }}"
-                                            onclick="return confirm('{{ $project->is_active ? 'Disable' : 'Enable' }} this project on the public site?')">
-                                        {{ $project->is_active ? 'Disable' : 'Enable' }}
-                                    </button>
-                                </form>
-
-                                <form action="{{ route('admin.builder-projects.destroy', $project->id) }}" method="POST" class="d-inline">
-                                    @csrf @method('DELETE')
-                                    <button type="submit" class="btn btn-sm btn-outline-danger"
-                                            onclick="return confirm('Delete this project? Properties and leads will be removed.')">
-                                        Del
-                                    </button>
-                                </form>
+                        <td class="text-center sticky-action-col">
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                        data-bs-toggle="dropdown" aria-expanded="false">
+                                    Actions
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li>
+                                        <a class="dropdown-item" href="{{ route('admin.builder-projects.show', $project->id) }}">
+                                            <i data-feather="eye" style="width:14px;height:14px;" class="me-1"></i> View
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{{ route('admin.builder-projects.viewers.index', $project->id) }}">
+                                            <i data-feather="users" style="width:14px;height:14px;" class="me-1"></i> Viewers
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <form action="{{ route('admin.builder-projects.toggle-status', $project->id) }}" method="POST">
+                                            @csrf
+                                            <button type="submit" class="dropdown-item">
+                                                @if($project->is_active)
+                                                    <i data-feather="slash" style="width:14px;height:14px;" class="me-1"></i> Disable (Block)
+                                                @else
+                                                    <i data-feather="check-circle" style="width:14px;height:14px;" class="me-1"></i> Enable (Unblock)
+                                                @endif
+                                            </button>
+                                        </form>
+                                    </li>
+                                    <li>
+                                        <form action="{{ route('admin.builder-projects.toggle-featured', $project->id) }}" method="POST">
+                                            @csrf
+                                            <button type="submit" class="dropdown-item">
+                                                <i data-feather="star" style="width:14px;height:14px;" class="me-1"></i>
+                                                {{ $project->is_featured ? 'Unfeature' : 'Feature' }}
+                                            </button>
+                                        </form>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <form action="{{ route('admin.builder-projects.destroy', $project->id) }}" method="POST"
+                                              onsubmit="return confirm('Delete this project? Properties and leads will be removed.')">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="dropdown-item text-danger">
+                                                <i data-feather="trash-2" style="width:14px;height:14px;" class="me-1"></i> Delete
+                                            </button>
+                                        </form>
+                                    </li>
+                                </ul>
                             </div>
                         </td>
                     </tr>

@@ -26,10 +26,12 @@ class LeadReportController extends Controller
             'inquiries_today'     => Inquiry::whereDate('created_at', today())->count(),
             'builder_leads_total' => BuilderLead::whereBetween('created_at', [$from, $to])->count(),
             'builder_leads_today' => BuilderLead::whereDate('created_at', today())->count(),
-            'property_views'      => PropertyView::whereBetween('viewed_at', [$from, $to])->count(),
-            'property_views_today'=> PropertyView::whereDate('viewed_at', today())->count(),
-            'unique_visitors'     => PropertyView::whereBetween('viewed_at', [$from, $to])
+            'property_views'      => PropertyView::where('event_type', 'page_view')->whereBetween('viewed_at', [$from, $to])->count(),
+            'property_views_today'=> PropertyView::where('event_type', 'page_view')->whereDate('viewed_at', today())->count(),
+            'unique_visitors'     => PropertyView::where('event_type', 'page_view')->whereBetween('viewed_at', [$from, $to])
                                         ->distinct('session_id')->count('session_id'),
+            'call_clicks'         => PropertyView::where('event_type', 'call_click')->whereBetween('viewed_at', [$from, $to])->count(),
+            'whatsapp_clicks'     => PropertyView::where('event_type', 'whatsapp_click')->whereBetween('viewed_at', [$from, $to])->count(),
         ];
 
         // ── Inquiries (paginated) ─────────────────────────────────────────────
@@ -58,6 +60,7 @@ class LeadReportController extends Controller
                 DB::raw('COUNT(property_views.id) as view_count'),
             ])
             ->join('property_views', 'properties.id', '=', 'property_views.property_id')
+            ->where('property_views.event_type', 'page_view')
             ->whereBetween('property_views.viewed_at', [$from, $to])
             ->groupBy([
                 'properties.id',
@@ -74,26 +77,30 @@ class LeadReportController extends Controller
 
         // ── Recent Visitor Log ────────────────────────────────────────────────
         $recentVisits = PropertyView::with('property')
+            ->where('event_type', 'page_view')
             ->whereBetween('viewed_at', [$from, $to])
             ->latest('viewed_at')
             ->limit(50)
             ->get();
 
         // ── Device Breakdown ─────────────────────────────────────────────────
-        $deviceBreakdown = PropertyView::whereBetween('viewed_at', [$from, $to])
+        $deviceBreakdown = PropertyView::where('event_type', 'page_view')
+            ->whereBetween('viewed_at', [$from, $to])
             ->selectRaw('device, COUNT(*) as total')
             ->groupBy('device')
             ->pluck('total', 'device');
 
         // ── Browser Breakdown ─────────────────────────────────────────────────
-        $browserBreakdown = PropertyView::whereBetween('viewed_at', [$from, $to])
+        $browserBreakdown = PropertyView::where('event_type', 'page_view')
+            ->whereBetween('viewed_at', [$from, $to])
             ->selectRaw('browser, COUNT(*) as total')
             ->groupBy('browser')
             ->orderByDesc('total')
             ->pluck('total', 'browser');
 
         // ── Daily Views (last 14 days) for sparkline chart ───────────────────
-        $dailyViews = PropertyView::selectRaw('DATE(viewed_at) as date, COUNT(*) as total')
+        $dailyViews = PropertyView::where('event_type', 'page_view')
+            ->selectRaw('DATE(viewed_at) as date, COUNT(*) as total')
             ->whereBetween('viewed_at', [now()->subDays(13)->startOfDay(), now()->endOfDay()])
             ->groupBy('date')
             ->orderBy('date')

@@ -2,6 +2,22 @@
 @section('title', 'Builders')
 @section('content')
 
+<style>
+    .sticky-action-col {
+        position: sticky;
+        right: 0;
+        background: #fff;
+        box-shadow: -2px 0 4px rgba(0,0,0,0.06);
+    }
+    thead .sticky-action-col {
+        background: #f8f9fa;
+        z-index: 3;
+    }
+    tbody .sticky-action-col {
+        z-index: 2;
+    }
+</style>
+
 <div class="d-flex align-items-center justify-content-between mb-3">
     <h4 class="mb-0"><i data-feather="layers" class="me-2 text-primary"></i>Builders</h4>
     <span class="badge bg-primary fs-6">{{ $builders->total() }} total</span>
@@ -53,7 +69,7 @@
                         <th>Projects</th>
                         <th>Leads</th>
                         <th>Joined</th>
-                        <th style="width:200px;">Actions</th>
+                        <th style="width:110px;" class="text-center sticky-action-col">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -93,37 +109,60 @@
                         <td><span class="badge bg-info text-dark">{{ $builder->projects_count }}</span></td>
                         <td><span class="badge bg-secondary">{{ $builder->leads_count }}</span></td>
                         <td class="text-muted small">{{ $builder->created_at?->format('d M Y') }}</td>
-                        <td>
-                            <div class="d-flex gap-1 flex-wrap">
-                                <a href="{{ route('admin.builders.show', $builder->id) }}"
-                                   class="btn btn-sm btn-outline-primary">View</a>
-
-                                {{-- Block / Unblock --}}
-                                <form action="{{ route('admin.builders.toggle-status', $builder->id) }}" method="POST" class="d-inline">
-                                    @csrf
-                                    <button type="submit" class="btn btn-sm {{ $builder->status === 'active' ? 'btn-outline-warning' : 'btn-outline-success' }}"
-                                            onclick="return confirm('Toggle status for this builder?')">
-                                        {{ $builder->status === 'active' ? 'Block' : 'Unblock' }}
-                                    </button>
-                                </form>
-
-                                {{-- Verify / Unverify --}}
-                                <form action="{{ route('admin.builders.toggle-verified', $builder->id) }}" method="POST" class="d-inline">
-                                    @csrf
-                                    <button type="submit" class="btn btn-sm {{ $builder->is_verified ? 'btn-outline-secondary' : 'btn-outline-info' }}">
-                                        {{ $builder->is_verified ? 'Unverify' : 'Verify' }}
-                                    </button>
-                                </form>
-
-                                {{-- Delete --}}
-                                <form action="{{ route('admin.builders.destroy', $builder->id) }}" method="POST" class="d-inline">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-sm btn-outline-danger"
-                                            onclick="return confirm('Delete this builder? All their projects and leads will also be deleted.')">
-                                        Delete
-                                    </button>
-                                </form>
+                        <td class="text-center sticky-action-col">
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                        data-bs-toggle="dropdown" aria-expanded="false">
+                                    Actions
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <li>
+                                        <a class="dropdown-item" href="{{ route('admin.builders.show', $builder->id) }}">
+                                            <i data-feather="eye" style="width:14px;height:14px;" class="me-1"></i> View
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="{{ route('admin.builders.viewers.index', $builder->id) }}">
+                                            <i data-feather="users" style="width:14px;height:14px;" class="me-1"></i> Viewers
+                                        </a>
+                                    </li>
+                                    <li>
+                                        {{-- Block / Unblock --}}
+                                        <form action="{{ route('admin.builders.toggle-status', $builder->id) }}" method="POST"
+                                              onsubmit="return confirm('Toggle status for this builder?')">
+                                            @csrf
+                                            <button type="submit" class="dropdown-item">
+                                                @if($builder->status === 'active')
+                                                    <i data-feather="slash" style="width:14px;height:14px;" class="me-1"></i> Block
+                                                @else
+                                                    <i data-feather="check-circle" style="width:14px;height:14px;" class="me-1"></i> Unblock
+                                                @endif
+                                            </button>
+                                        </form>
+                                    </li>
+                                    <li>
+                                        {{-- Verify / Unverify --}}
+                                        <form action="{{ route('admin.builders.toggle-verified', $builder->id) }}" method="POST">
+                                            @csrf
+                                            <button type="submit" class="dropdown-item">
+                                                <i data-feather="shield" style="width:14px;height:14px;" class="me-1"></i>
+                                                {{ $builder->is_verified ? 'Unverify' : 'Verify' }}
+                                            </button>
+                                        </form>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        {{-- Delete --}}
+                                        <form action="{{ route('admin.builders.destroy', $builder->id) }}" method="POST"
+                                              onsubmit="return confirm('Delete this builder? All their projects and leads will also be deleted.')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="dropdown-item text-danger">
+                                                <i data-feather="trash-2" style="width:14px;height:14px;" class="me-1"></i> Delete
+                                            </button>
+                                        </form>
+                                    </li>
+                                </ul>
                             </div>
                         </td>
                     </tr>

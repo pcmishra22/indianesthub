@@ -47,15 +47,6 @@ class PropertyController extends Controller
         return back()->with('success', 'Property featured status updated.');
     }
 
-    public function toggleStatus(Property $property)
-    {
-        $property->listing_status = ($property->listing_status === 'active') ? 'inactive' : 'active';
-        $property->save();
-
-        $label = ucfirst($property->listing_status);
-        return back()->with('success', "Property listing status updated to {$label}.");
-    }
-
     public function togglePublicContact(Request $request, Property $property)
     {
         $enabled = (bool) $request->input('enabled', false);
@@ -63,5 +54,27 @@ class PropertyController extends Controller
         $property->save();
 
         return back()->with('success', 'Public contact setting updated successfully.');
+    }
+
+    /**
+     * Enable / disable a property's public visibility.
+     * Disabling sets status = inactive (already excluded everywhere on the
+     * public site) while remembering the previous status so re-enabling
+     * restores it instead of always going back to "active".
+     */
+    public function toggleStatus(Property $property)
+    {
+        if ($property->status === 'inactive') {
+            $property->status = $property->previous_status ?: 'active';
+            $property->previous_status = null;
+            $label = 'Enabled';
+        } else {
+            $property->previous_status = $property->status;
+            $property->status = 'inactive';
+            $label = 'Disabled';
+        }
+        $property->save();
+
+        return back()->with('success', "Property {$label} successfully.");
     }
 }

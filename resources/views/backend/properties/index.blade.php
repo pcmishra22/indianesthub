@@ -31,6 +31,13 @@
     </div>
 </div>
 
+@if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        {{ session('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+@endif
+
 <div class="card">
 	<div class="card-body">
 		<div class="table-responsive">
@@ -56,31 +63,35 @@
 						<td>{{ $property->city }}</td>
 						<td>{{ $property->price }}</td>
 						<td>
-							@if($property->listing_status === 'active')
+							@if($property->status === 'inactive')
+								<span class="badge bg-danger">Disabled</span>
+							@elseif($property->status === 'active')
 								<span class="badge bg-success">Active</span>
-							@elseif($property->listing_status === 'inactive')
-								<span class="badge bg-secondary">Inactive</span>
 							@else
-								<span class="badge bg-warning text-dark">{{ ucfirst($property->listing_status ?? 'draft') }}</span>
+								<span class="badge bg-secondary">{{ ucfirst($property->status) }}</span>
 							@endif
 						</td>
 						<td>
 							<div class="d-flex align-items-center gap-2 flex-wrap">
+								<a href="{{ route('admin.properties.show', $property->id) }}" class="btn btn-sm btn-primary">View</a>
+								<a href="{{ route('admin.properties.viewers.index', $property->id) }}" class="btn btn-sm btn-outline-info">Viewers</a>
+
 								<form method="POST" action="{{ route('admin.properties.toggle-status', $property->id) }}" class="d-inline">
 									@csrf
-									<button type="submit" class="btn btn-sm {{ $property->listing_status === 'active' ? 'btn-outline-warning' : 'btn-outline-success' }}"
-											onclick="return confirm('{{ $property->listing_status === 'active' ? 'Disable' : 'Enable' }} this property listing?')">
-										{{ $property->listing_status === 'active' ? 'Disable' : 'Enable' }}
+									<button type="submit" class="btn btn-sm {{ $property->status === 'inactive' ? 'btn-outline-success' : 'btn-outline-warning' }}"
+											onclick="return confirm('{{ $property->status === 'inactive' ? 'Enable' : 'Disable' }} this property?')">
+										{{ $property->status === 'inactive' ? 'Enable' : 'Disable' }}
 									</button>
 								</form>
-								<form method="POST" action="{{ route('admin.properties.togglePublicContact', $property->id) }}">
+
+								<form method="POST" action="{{ route('admin.properties.togglePublicContact', $property->id) }}" class="d-inline">
 									@csrf
 									<input type="hidden" name="enabled" value="0">
-									<label class="form-check-label mb-0" style="cursor:pointer;" title="Guest users will see dealer phone & enquiry when enabled">
+									<label class="form-check-label mb-0 small" style="cursor:pointer;" title="Guest users will see dealer phone & enquiry when enabled">
 										<input class="form-check-input" type="checkbox" name="enabled" value="1" {{ $property->public_contact_enabled ? 'checked' : '' }} onchange="this.form.submit()">
+										Public contact
 									</label>
 								</form>
-								<a href="{{ route('admin.properties.show', $property->id) }}" class="btn btn-sm btn-primary">View</a>
 							</div>
 						</td>
 					</tr>

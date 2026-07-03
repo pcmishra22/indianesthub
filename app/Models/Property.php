@@ -22,7 +22,7 @@ protected $fillable = [
         'ownership_type', 'property_approval', 'rera_id', 'rera_verified', 'occupancy_certificate', 'completion_certificate', 'legal_clearance_status',
         'cover_image', 'gallery_images', 'floor_plan_images', 'video_url', 'virtual_tour_url', 'brochure_pdf',
         'user_id', 'contact_name', 'contact_phone', 'contact_email', 'company_name', 'license_number', 'verified_user',
-        'status', 'listing_status', 'isreal', 'possession_date', 'price_range', 'floor_plan', 'floor_plan_details',
+        'status', 'previous_status', 'listing_status', 'isreal', 'possession_date', 'price_range', 'floor_plan', 'floor_plan_details',
         // Location fields
         'country', 'locality', 'sub_locality', 'society_name', 'landmark', 'pincode',
         // Pricing & Transaction fields

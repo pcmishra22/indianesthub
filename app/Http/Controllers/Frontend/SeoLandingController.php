@@ -488,8 +488,8 @@ class SeoLandingController extends Controller
                 ? ['Upcoming']
                 : ['Upcoming', 'Under Construction', 'Ready to Move'];
 
-            $newProjects = BuilderProject::whereIn('status', $statuses)
-                ->where('is_active', true)
+            $newProjects = BuilderProject::where('is_active', true)
+                ->whereIn('status', $statuses)
                 ->where(function ($q) use ($cityLabel) {
                     $q->where('city', 'like', "%{$cityLabel}%")
                       ->orWhere('address', 'like', "%{$cityLabel}%");

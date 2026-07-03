@@ -16,6 +16,30 @@
     </div>
 @endif
 
+{{-- Traffic summary + link to viewer list --}}
+@php
+    $builderViewsTotal = \App\Models\BuilderView::where('builder_id', $builder->id)->where('event_type', 'page_view')->count();
+@endphp
+<div class="row g-2 mb-3">
+    <div class="col-12 col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">Profile Page Views</div>
+                <div class="fs-4 fw-bold text-primary">{{ number_format($builderViewsTotal) }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-lg-4 d-flex align-items-stretch">
+        <div class="card shadow-sm w-100">
+            <div class="card-body d-flex align-items-center">
+                <a href="{{ route('admin.builders.viewers.index', $builder->id) }}" class="btn btn-sm btn-outline-primary">
+                    View all viewers
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="row g-3">
     {{-- Left: Builder Profile --}}
     <div class="col-lg-8">

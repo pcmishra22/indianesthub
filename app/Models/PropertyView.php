@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 class PropertyView extends Model
 {
     protected $fillable = [
-        'property_id', 'user_id', 'session_id', 'visitor_token',
+        'property_id', 'event_type', 'user_id', 'session_id', 'visitor_token',
         'ip_address', 'device', 'browser',
         'referrer', 'page_url', 'viewed_at',
     ];

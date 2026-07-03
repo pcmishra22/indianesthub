@@ -69,8 +69,8 @@ class SeoController extends Controller
             ->get();
 
         // All builder projects
-        $projects = BuilderProject::where('is_active', true)
-            ->select('id', 'updated_at')
+        $projects = BuilderProject::select('id', 'updated_at')
+            ->where('is_active', true)
             ->orderBy('updated_at', 'desc')
             ->get();
 
