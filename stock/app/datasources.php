@@ -1176,46 +1176,95 @@ function bseHistory(string $nseSymbol, int $days = 90): array
     $code  = bseScripCode($sym);
     if (!$code) return [];
 
-    $toDate   = date('d%2Fm%2FY');  // BSE date format: DD/MM/YYYY URL-encoded
-    $fromDate = date('d%2Fm%2FY', strtotime("-{$days} days -10 days"));
-    $url = "https://api.bseindia.com/BseIndiaAPI/api/StockPriceCSVDownload/w?scripcode={$code}&seriesid=EQ&fromdate={$fromDate}&todate={$toDate}&marketcap=&MarketCapFull=&myowner=&segment=";
+    // BSE history via their JSON API (more reliable than CSV download)
+    $toDate   = date('Ymd');
+    $fromDate = date('Ymd', strtotime('-' . ($days + 30) . ' days'));
 
-    $ch = curl_init($url);
+    // Try BSE chart data API first (returns JSON with OHLCV)
+    $url = "https://api.bseindia.com/BseIndiaAPI/api/getScripHeaderData/w?Debtflag=&scripcode={$code}&seriesid=";
+    // We use the stock price history endpoint
+    $histUrl = "https://api.bseindia.com/BseIndiaAPI/api/StockPriceHistData/w?scripcode={$code}&seriesid=EQ&fromdate={$fromDate}&todate={$toDate}";
+
+    $ch = curl_init($histUrl);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_TIMEOUT => 15, CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_ENCODING => 'gzip',
         CURLOPT_HTTPHEADER => [
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept: application/json',
             'Referer: https://www.bseindia.com/',
-            'Accept: text/csv,*/*',
+            'Origin: https://www.bseindia.com',
         ],
     ]);
-    $raw  = curl_exec($ch);
+    $raw      = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    if (!$raw || $httpCode !== 200) return [];
-
-    $lines = array_values(array_filter(explode("\n", trim($raw))));
-    if (count($lines) < 2) return [];
-
     $rows = [];
-    // BSE CSV: Date,Open,High,Low,Close,Volume (skip header)
-    for ($i = 1; $i < count($lines); $i++) {
-        $col   = str_getcsv(trim($lines[$i]));
-        if (count($col) < 5) continue;
-        $close = (float)str_replace(',', '', $col[4] ?? 0);
-        if ($close <= 0) continue;
-        $rows[] = [
-            'date'   => date('Y-m-d', strtotime(str_replace('/', '-', $col[0] ?? ''))),
-            'open'   => round((float)str_replace(',', '', $col[1] ?? $close), 2),
-            'high'   => round((float)str_replace(',', '', $col[2] ?? $close), 2),
-            'low'    => round((float)str_replace(',', '', $col[3] ?? $close), 2),
-            'close'  => round($close, 2),
-            'volume' => (int)str_replace(',', '', $col[5] ?? 0),
-        ];
+    if ($raw && $httpCode === 200) {
+        $d = json_decode($raw, true);
+        // BSE StockPriceHistData returns array of objects
+        $items = $d['Table'] ?? $d ?? [];
+        if (is_array($items)) {
+            foreach ($items as $v) {
+                $close = (float)($v['CLOSE_PRICE'] ?? $v['Close'] ?? $v['close'] ?? 0);
+                if ($close <= 0) continue;
+                $dateStr = $v['TIMESTAMP'] ?? $v['Date'] ?? $v['date'] ?? '';
+                $date    = date('Y-m-d', strtotime($dateStr));
+                if (!$date || $date === '1970-01-01') continue;
+                $rows[] = [
+                    'date'   => $date,
+                    'open'   => round((float)($v['OPEN_PRICE']  ?? $v['Open']   ?? $close), 2),
+                    'high'   => round((float)($v['HIGH_PRICE']  ?? $v['High']   ?? $close), 2),
+                    'low'    => round((float)($v['LOW_PRICE']   ?? $v['Low']    ?? $close), 2),
+                    'close'  => round($close, 2),
+                    'volume' => (int)($v['NO_OF_SHRS'] ?? $v['Volume'] ?? $v['volume'] ?? 0),
+                ];
+            }
+        }
     }
-    $rows = array_reverse($rows); // BSE returns newest first
+
+    // If JSON API fails, fall back to CSV download
+    if (empty($rows)) {
+        $from = date('d/m/Y', strtotime('-' . ($days + 30) . ' days'));
+        $to   = date('d/m/Y');
+        $csvUrl = 'https://api.bseindia.com/BseIndiaAPI/api/StockPriceCSVDownload/w?scripcode=' . $code
+                . '&seriesid=EQ&fromdate=' . urlencode($from) . '&todate=' . urlencode($to)
+                . '&marketcap=&MarketCapFull=&myowner=&segment=';
+        $ch = curl_init($csvUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => 15, CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_HTTPHEADER => [
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Referer: https://www.bseindia.com/', 'Accept: text/csv,*/*',
+            ],
+        ]);
+        $raw      = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($raw && $httpCode === 200 && str_contains($raw, ',')) {
+            $lines = array_values(array_filter(explode("\n", trim($raw))));
+            for ($i = 1; $i < count($lines); $i++) {
+                $col   = str_getcsv(trim($lines[$i]));
+                if (count($col) < 5) continue;
+                $close = (float)str_replace(',', '', $col[4] ?? 0);
+                if ($close <= 0) continue;
+                $rows[] = [
+                    'date'   => date('Y-m-d', strtotime(str_replace('/', '-', $col[0]))),
+                    'open'   => round((float)str_replace(',', '', $col[1] ?? $close), 2),
+                    'high'   => round((float)str_replace(',', '', $col[2] ?? $close), 2),
+                    'low'    => round((float)str_replace(',', '', $col[3] ?? $close), 2),
+                    'close'  => round($close, 2),
+                    'volume' => (int)str_replace(',', '', $col[5] ?? 0),
+                ];
+            }
+            $rows = array_reverse($rows); // CSV is newest-first
+        }
+    }
+
     $rows = array_slice($rows, -$days);
     if (!empty($rows)) {
         $cacheFile = STORAGE . '/hist_' . preg_replace('/[^A-Z0-9]/', '_', strtoupper($nseSymbol)) . '.json';
