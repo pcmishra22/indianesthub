@@ -185,19 +185,15 @@
             </div>
           </div>
           <div class="bp-hero-ctas">
-            @if($builder->phone)
-            <a href="tel:{{ $builder->phone }}" class="btn btn-light">
-              <i class="bi bi-telephone-fill"></i> {{ $builder->phone }}
+            <a href="tel:+91{{ config('app.contact_phone','7340753780') }}" class="btn btn-light">
+              <i class="bi bi-telephone-fill"></i> +91 {{ config('app.contact_phone','7340753780') }}
             </a>
-            <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $builder->phone) }}" target="_blank" class="btn btn-wa-hero">
+            <a href="https://wa.me/91{{ config('app.contact_phone','7340753780') }}" target="_blank" class="btn btn-wa-hero">
               <i class="bi bi-whatsapp"></i> WhatsApp
             </a>
-            @endif
-            @if($builder->email)
-            <a href="mailto:{{ $builder->email }}" class="btn btn-outline-light">
+            <a href="mailto:{{ config('app.contact_email','admin@indianesthub.com') }}" class="btn btn-outline-light">
               <i class="bi bi-envelope"></i> Email
             </a>
-            @endif
           </div>
         </div>
       </div>
@@ -379,33 +375,27 @@
             </button>
           </form>
 
-          @if($builder->phone)
-          <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $builder->phone) }}"
+          <a href="https://wa.me/91{{ config('app.contact_phone','7340753780') }}"
              target="_blank"
              style="display:block;margin-top:10px;text-align:center;background:#25d366;color:#fff;border-radius:8px;padding:10px;font-size:.85rem;font-weight:600;text-decoration:none;">
             <i class="bi bi-whatsapp me-2"></i>Chat on WhatsApp
           </a>
-          @endif
         </div>
 
         {{-- Quick Contact --}}
         <div class="bp-card mb-4">
           <div class="bp-section-title"><i class="bi bi-chat-dots-fill"></i> Quick Contact</div>
-          @if($builder->phone)
-          <a href="tel:{{ $builder->phone }}" class="btn w-100 mb-2"
+          <a href="tel:+91{{ config('app.contact_phone','7340753780') }}" class="btn w-100 mb-2"
              style="background:#0078d4;color:#fff;border-radius:8px;font-weight:600;">
-            <i class="bi bi-telephone-fill me-2"></i>{{ $builder->phone }}
+            <i class="bi bi-telephone-fill me-2"></i>+91 {{ config('app.contact_phone','7340753780') }}
           </a>
-          <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $builder->phone) }}" target="_blank"
+          <a href="https://wa.me/91{{ config('app.contact_phone','7340753780') }}" target="_blank"
              class="btn w-100 mb-2" style="background:#25d366;color:#fff;border-radius:8px;font-weight:600;">
             <i class="bi bi-whatsapp me-2"></i>WhatsApp
           </a>
-          @endif
-          @if($builder->email)
-          <a href="mailto:{{ $builder->email }}" class="btn w-100 btn-outline-secondary mb-2" style="border-radius:8px;">
-            <i class="bi bi-envelope me-2"></i>{{ $builder->email }}
+          <a href="mailto:{{ config('app.contact_email','admin@indianesthub.com') }}" class="btn w-100 btn-outline-secondary mb-2" style="border-radius:8px;">
+            <i class="bi bi-envelope me-2"></i>{{ config('app.contact_email','admin@indianesthub.com') }}
           </a>
-          @endif
           @if($builder->website)
           <a href="{{ $builder->website }}" target="_blank" class="btn w-100 btn-outline-secondary" style="border-radius:8px;">
             <i class="bi bi-globe2 me-2"></i>Visit Website

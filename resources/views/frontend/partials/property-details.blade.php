@@ -1468,20 +1468,15 @@
 
             <div class="pc-cta-row">
               @auth
-              @if($property->dealer && $property->dealer->phone)
-              <a href="tel:{{ $property->dealer->phone }}" class="btn btn-light text-primary">
+              <a href="tel:+91{{ config('app.contact_phone','7340753780') }}" class="btn btn-light text-primary">
                 <i class="bi bi-telephone-fill me-1"></i>Call
               </a>
-              @if($property->dealer->whatsapp_number ?? $property->dealer->phone)
-              <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $property->dealer->whatsapp_number ?? $property->dealer->phone) }}?text=Hi, I'm interested in {{ urlencode($property->title) }}" target="_blank" class="btn btn-whatsapp">
+              <a href="https://wa.me/91{{ config('app.contact_phone','7340753780') }}?text=Hi, I'm interested in {{ urlencode($property->title) }}" target="_blank" class="btn btn-whatsapp">
                 <i class="bi bi-whatsapp me-1"></i>WhatsApp
               </a>
-              @endif
-              @else
               <button class="btn btn-light text-primary" onclick="document.getElementById('inquiry-form-sidebar').scrollIntoView({behavior:'smooth'})">
                 <i class="bi bi-chat-dots-fill me-1"></i>Enquire
               </button>
-              @endif
               @endauth
               @guest
               <a href="{{ route('login') }}" class="btn btn-light text-primary w-100">
@@ -1513,29 +1508,23 @@
 
             @if($canViewContact)
             <div class="pd-contact-row">
-              @if($property->dealer->phone)
               <div class="pd-contact-detail">
                 <i class="bi bi-telephone-fill"></i>
-                <span>{{ $property->dealer->phone }}</span>
+                <span>+91 {{ config('app.contact_phone','7340753780') }}</span>
               </div>
-              @endif
-              @if($property->dealer->email)
               <div class="pd-contact-detail">
                 <i class="bi bi-envelope-fill"></i>
-                <span>{{ $property->dealer->email }}</span>
+                <span>{{ config('app.contact_email','admin@indianesthub.com') }}</span>
               </div>
-              @endif
             </div>
 
             <div class="pd-dealer-btns">
-              @if($property->dealer->phone)
-              <a href="tel:{{ $property->dealer->phone }}" class="btn btn-success">
+              <a href="tel:+91{{ config('app.contact_phone','7340753780') }}" class="btn btn-success">
                 <i class="bi bi-telephone-fill"></i> Call Now
               </a>
-              <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $property->dealer->whatsapp_number ?? $property->dealer->phone) }}?text=Hi, I'm interested in {{ urlencode($property->title) }}" target="_blank" class="btn btn-whatsapp">
+              <a href="https://wa.me/91{{ config('app.contact_phone','7340753780') }}?text=Hi, I'm interested in {{ urlencode($property->title) }}" target="_blank" class="btn btn-whatsapp">
                 <i class="bi bi-whatsapp"></i> WhatsApp
               </a>
-              @endif
               <button class="btn btn-outline-primary" onclick="document.getElementById('schedule-visit-card').scrollIntoView({behavior:'smooth'})">
                 <i class="bi bi-calendar2-check"></i> Request Site Visit
               </button>
@@ -2141,11 +2130,9 @@ document.getElementById('property-inquiry-form').addEventListener('submit', func
           @endif
         </div>
         <div class="sb-actions">
-          @if($property->dealer && $property->dealer->phone)
-          <a href="tel:{{ $property->dealer->phone }}" class="btn btn-success" style="border-radius:8px;font-weight:700;">
+          <a href="tel:+91{{ config('app.contact_phone','7340753780') }}" class="btn btn-success" style="border-radius:8px;font-weight:700;">
             <i class="bi bi-telephone-fill me-1"></i>Call Now
           </a>
-          @endif
           <button class="btn btn-primary" style="border-radius:8px;font-weight:700;"
                   onclick="document.getElementById('schedule-visit-card').scrollIntoView({behavior:'smooth'})">
             <i class="bi bi-calendar-check me-1"></i>Request Site Visit
@@ -2158,17 +2145,13 @@ document.getElementById('property-inquiry-form').addEventListener('submit', func
 
 {{-- Mobile floating CTA --}}
 <div id="pd-mobile-cta">
-  @if($property->dealer && $property->dealer->phone)
-  <a href="tel:{{ $property->dealer->phone }}" class="btn btn-success">
+  <a href="tel:+91{{ config('app.contact_phone','7340753780') }}" class="btn btn-success">
     <i class="bi bi-telephone-fill me-1"></i>Call
   </a>
-  @if($property->dealer->phone)
-  <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $property->dealer->whatsapp_number ?? $property->dealer->phone) }}?text=Hi, I'm interested in {{ urlencode($property->title) }}"
+  <a href="https://wa.me/91{{ config('app.contact_phone','7340753780') }}?text=Hi, I'm interested in {{ urlencode($property->title) }}"
      target="_blank" class="btn btn-whatsapp" style="background:#25d366;color:#fff;">
     <i class="bi bi-whatsapp me-1"></i>WhatsApp
   </a>
-  @endif
-  @endif
   <button class="btn btn-primary"
           onclick="document.getElementById('inquiry-form-sidebar').scrollIntoView({behavior:'smooth'})">
     <i class="bi bi-send me-1"></i>Enquire
@@ -2186,11 +2169,9 @@ document.getElementById('property-inquiry-form').addEventListener('submit', func
       <strong>{{ $property->title }}</strong>.
       No obligation. No brokerage.
     </div>
-    @if($property->dealer && $property->dealer->phone)
-    <a href="tel:{{ $property->dealer->phone }}" class="btn btn-success w-100 mb-2" style="border-radius:8px;font-weight:700;padding:13px;">
-      <i class="bi bi-telephone-fill me-2"></i>Call Now — {{ $property->dealer->phone }}
+    <a href="tel:+91{{ config('app.contact_phone','7340753780') }}" class="btn btn-success w-100 mb-2" style="border-radius:8px;font-weight:700;padding:13px;">
+      <i class="bi bi-telephone-fill me-2"></i>Call Now — +91 {{ config('app.contact_phone','7340753780') }}
     </a>
-    @endif
     <button class="btn btn-primary w-100" style="border-radius:8px;font-weight:700;padding:12px;"
             onclick="document.getElementById('pd-exit-popup').style.display='none';document.body.style.overflow='';document.getElementById('inquiry-form-sidebar').scrollIntoView({behavior:'smooth'})">
       <i class="bi bi-send me-2"></i>Send Quick Enquiry

@@ -9,6 +9,7 @@ use App\Models\LoanLead;
 use App\Models\ScheduleViewing;
 use App\Models\Property;
 use App\Models\Dealer;
+use App\Services\WhatsAppNotificationService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 
@@ -51,11 +52,20 @@ class ScheduleViewingController extends Controller
 
         // ── Fire queued emails ────────────────────────────────────────────────
         $property = Property::find($data['property_id']);
-        $dealer   = Dealer::find($data['dealer_id']);
 
-        // 1) Notify dealer about the scheduled viewing
-        if ($dealer && $dealer->email && $property) {
-            Mail::to($dealer->email)->queue(new ScheduleViewingToDealer($schedule, $property));
+        // NOTE: This is an IndianestHub lead. It must go to IndianestHub only —
+        // never to the property's dealer/builder/agent own email or WhatsApp number.
+
+        // 1) Notify IndianestHub about the scheduled viewing
+        if ($property) {
+            Mail::to(config('app.contact_email', 'admin@indianesthub.com'))
+                ->queue(new ScheduleViewingToDealer($schedule, $property));
+
+            $adminWhatsApp = config('app.whatsapp_number', '7340753780');
+            $this->sendWhatsAppNotification(
+                $adminWhatsApp,
+                "New viewing scheduled for '{$property->title}'. From: {$data['name']}, Phone: " . ($data['phone'] ?? 'N/A') . "."
+            );
         }
 
         // 2) Send confirmation to the buyer/visitor
@@ -65,5 +75,14 @@ class ScheduleViewingController extends Controller
         // ─────────────────────────────────────────────────────────────────────
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Send WhatsApp notification using the WhatsAppNotificationService.
+     */
+    private function sendWhatsAppNotification(string $recipientNumber, string $message): void
+    {
+        $whatsappService = new WhatsAppNotificationService();
+        $whatsappService->send($recipientNumber, $message);
     }
 }

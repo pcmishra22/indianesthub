@@ -186,26 +186,14 @@ class PropertyDetailsController extends Controller
         $fromAddress = config('mail.from.address', 'admin@indianesthub.com');
         $fromName = config('mail.from.name', 'India Nest Hub');
 
-        // 1) Notify the dealer about the new inquiry
-        $dealer = null;
-        if ($property && $property->property_dealer_id) {
-            $dealer = Dealer::find($property->property_dealer_id);
-            Log::info("Property Dealer ID: " . $property->property_dealer_id . " - Dealer found: " . ($dealer ? $dealer->email : 'null'));
-            if ($dealer && $dealer->email) {
-                Log::info("Sending dealer email to: " . $dealer->email);
-                Mail::to($dealer->email)->send(new PropertyInquiryToDealer($inquiry, $property));
-
-                // WhatsApp notification to dealer
-                if ($dealer->phone) {
-                    Log::info("Sending WhatsApp to dealer: " . $dealer->phone);
-                    $this->sendWhatsAppNotification(
-                        $dealer->phone,
-                        "New inquiry for your property '{$property->title}'. From: {$validated['name']}, Phone: {$validated['phone']}."
-                    );
-                }
-            }
-        } else {
-            Log::warning("Property has no property_dealer_id set. Property ID: " . ($property ? $property->id : 'null'));
+        // NOTE: This is an IndianestHub lead. It must go to IndianestHub only —
+        // never to the property's dealer/builder/agent own email or WhatsApp number.
+        // The templated "inquiry received" email is sent to IndianestHub's own inbox
+        // so the internal team has a nicely formatted copy alongside the plain-text
+        // admin alert below.
+        if ($property) {
+            Mail::to(config('app.contact_email', 'admin@indianesthub.com'))
+                ->send(new PropertyInquiryToDealer($inquiry, $property));
         }
 
         // 2) Send confirmation to the buyer

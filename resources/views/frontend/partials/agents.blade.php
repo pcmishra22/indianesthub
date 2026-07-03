@@ -369,14 +369,12 @@
               <a href="{{ route('agent-profile', $dealer) }}" class="dl-btn-profile">
                 <i class="bi bi-person-lines-fill"></i> View Profile
               </a>
-              @if($dealer->phone)
-              <a href="tel:{{ $dealer->phone }}" class="dl-btn-call" title="Call">
+              <a href="tel:+91{{ config('app.contact_phone','7340753780') }}" class="dl-btn-call" title="Call">
                 <i class="bi bi-telephone-fill"></i>
               </a>
-              <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $dealer->phone) }}" target="_blank" class="dl-btn-wa" title="WhatsApp">
+              <a href="https://wa.me/91{{ config('app.contact_phone','7340753780') }}" target="_blank" class="dl-btn-wa" title="WhatsApp">
                 <i class="bi bi-whatsapp"></i>
               </a>
-              @endif
             </div>
           </div>
 

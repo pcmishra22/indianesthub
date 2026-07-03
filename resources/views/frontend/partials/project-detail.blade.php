@@ -639,13 +639,11 @@
             </form>
 
             {{-- WhatsApp quick button --}}
-            @if($project->builder->phone)
-            <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $project->builder->phone) }}?text={{ urlencode('Hi! I am interested in ' . $project->title . '. Please share more details.') }}"
+            <a href="https://wa.me/91{{ config('app.contact_phone','7340753780') }}?text={{ urlencode('Hi! I am interested in ' . $project->title . '. Please share more details.') }}"
                target="_blank"
                style="display:block;margin-top:10px;text-align:center;background:#25d366;color:#fff;border-radius:8px;padding:10px;font-size:.85rem;font-weight:600;text-decoration:none;transition:all .2s;">
               <i class="bi bi-whatsapp me-2"></i>Chat on WhatsApp
             </a>
-            @endif
           </div>
         </div>
 
@@ -873,15 +871,13 @@ document.getElementById('leadForm').addEventListener('submit', function(e) {
       </div>
       @endif
       <div class="d-flex gap-2">
-        @if($project->builder->phone)
-        <a href="tel:{{ $project->builder->phone }}" class="btn btn-light text-primary" style="border-radius:8px;font-weight:700;font-size:.85rem;">
+        <a href="tel:+91{{ config('app.contact_phone','7340753780') }}" class="btn btn-light text-primary" style="border-radius:8px;font-weight:700;font-size:.85rem;">
           <i class="bi bi-telephone-fill me-1"></i>Call
         </a>
-        <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $project->builder->phone) }}?text={{ urlencode('Hi! I am interested in ' . $project->title . '. Please share more details.') }}"
+        <a href="https://wa.me/91{{ config('app.contact_phone','7340753780') }}?text={{ urlencode('Hi! I am interested in ' . $project->title . '. Please share more details.') }}"
            target="_blank" class="btn" style="background:#25d366;color:#fff;border-radius:8px;font-weight:700;font-size:.85rem;">
           <i class="bi bi-whatsapp me-1"></i>WhatsApp
         </a>
-        @endif
         <button class="btn btn-warning" style="border-radius:8px;font-weight:700;font-size:.85rem;color:#1e293b;"
                 onclick="document.getElementById('lead-form-section').scrollIntoView({behavior:'smooth'})">
           <i class="bi bi-calendar-check me-1"></i>Book Site Visit

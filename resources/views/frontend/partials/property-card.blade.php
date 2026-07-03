@@ -102,12 +102,10 @@
         </div>
       </a>
       <div class="agent-contact">
-        @php $contactPhone = $property->contact_phone ?? $property->dealer?->phone ?? $property->builder?->phone; @endphp
-        @if($contactPhone)
-        <a href="tel:{{ $contactPhone }}" class="contact-btn" onclick="event.stopPropagation();">
+        @php $contactPhone = config('app.contact_phone','7340753780'); @endphp
+        <a href="tel:+91{{ $contactPhone }}" class="contact-btn" onclick="event.stopPropagation();">
           <i class="bi bi-telephone"></i>
         </a>
-        @endif
       </div>
     </div>
   </div>

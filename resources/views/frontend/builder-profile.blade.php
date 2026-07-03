@@ -18,8 +18,8 @@
   "description": "{{ \Illuminate\Support\Str::limit(strip_tags($builder->description ?? ''), 200) }}",
   "url": "{{ route('builders.show', $builder->slug) }}",
   "image": "{{ $builder->logo ? asset('storage/'.$builder->logo) : asset('assets/img/og-default.jpg') }}",
-  "telephone": "{{ $builder->phone }}",
-  "email": "{{ $builder->email }}",
+  "telephone": "+91-{{ config('app.contact_phone','7340753780') }}",
+  "email": "{{ config('app.contact_email','admin@indianesthub.com') }}",
   "address": {
     "@type": "PostalAddress",
     "addressLocality": "{{ $builder->city ?? '' }}",

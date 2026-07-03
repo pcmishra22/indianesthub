@@ -311,15 +311,13 @@
               <a href="{{ route('builders.show', $builder) }}" class="bl-btn-profile">
                 <i class="bi bi-building-fill"></i> View Profile
               </a>
-              @if($builder->phone)
-              <a href="tel:{{ $builder->phone }}" class="bl-btn-call" title="Call">
+              <a href="tel:+91{{ config('app.contact_phone','7340753780') }}" class="bl-btn-call" title="Call">
                 <i class="bi bi-telephone-fill"></i>
               </a>
-              <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $builder->phone) }}"
+              <a href="https://wa.me/91{{ config('app.contact_phone','7340753780') }}"
                  target="_blank" class="bl-btn-wa" title="WhatsApp">
                 <i class="bi bi-whatsapp"></i>
               </a>
-              @endif
             </div>
           </div>
 

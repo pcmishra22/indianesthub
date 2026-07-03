@@ -296,12 +296,8 @@
               @endif
               <div class="dp-dealer-meta">
                 @auth
-                @if($dealer->phone)
-                <span><i class="bi bi-telephone-fill"></i> {{ $dealer->phone }}</span>
-                @endif
-                @if($dealer->email)
-                <span><i class="bi bi-envelope-fill"></i> {{ $dealer->email }}</span>
-                @endif
+                <span><i class="bi bi-telephone-fill"></i> +91 {{ config('app.contact_phone','7340753780') }}</span>
+                <span><i class="bi bi-envelope-fill"></i> {{ config('app.contact_email','admin@indianesthub.com') }}</span>
                 @if($dealer->operating_cities)
                 <span><i class="bi bi-geo-alt-fill"></i> {{ $dealer->operating_cities }}</span>
                 @endif
@@ -311,15 +307,13 @@
               </div>
 
               <div class="dp-hero-ctas">
-                @if($dealer->phone)
-                <a href="tel:{{ $dealer->phone }}" class="btn btn-light text-primary">
+                <a href="tel:+91{{ config('app.contact_phone','7340753780') }}" class="btn btn-light text-primary">
                   <i class="bi bi-telephone-fill"></i> Call Now
                 </a>
-                <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $dealer->phone) }}?text=Hi, I want to connect regarding your listed properties."
+                <a href="https://wa.me/91{{ config('app.contact_phone','7340753780') }}?text=Hi, I want to connect regarding your listed properties."
                    target="_blank" class="btn btn-wa-hero">
                   <i class="bi bi-whatsapp"></i> WhatsApp
                 </a>
-                @endif
                 <a href="#properties" class="btn btn-outline-light">
                   <i class="bi bi-buildings"></i> View Properties ({{ $dealer->properties_count }})
                 </a>
@@ -492,16 +486,12 @@
 
           <div class="dp-contact-row">
             @auth
-              @if($dealer->phone)
               <div class="dp-contact-item">
-                <i class="bi bi-telephone-fill"></i> {{ $dealer->phone }}
+                <i class="bi bi-telephone-fill"></i> +91 {{ config('app.contact_phone','7340753780') }}
               </div>
-              @endif
-              @if($dealer->email)
               <div class="dp-contact-item">
-                <i class="bi bi-envelope-fill"></i> {{ $dealer->email }}
+                <i class="bi bi-envelope-fill"></i> {{ config('app.contact_email','admin@indianesthub.com') }}
               </div>
-              @endif
               @if($dealer->operating_cities)
               <div class="dp-contact-item">
                 <i class="bi bi-geo-alt-fill"></i> {{ $dealer->operating_cities }}
@@ -516,15 +506,13 @@
 
           <div class="dp-contact-btn">
             @auth
-              @if($dealer->phone)
-              <a href="tel:{{ $dealer->phone }}" class="btn btn-light text-success fw-bold">
+              <a href="tel:+91{{ config('app.contact_phone','7340753780') }}" class="btn btn-light text-success fw-bold">
                 <i class="bi bi-telephone-fill"></i> Call Now
               </a>
-              <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $dealer->phone) }}?text=Hi, I want to connect regarding your listed properties."
+              <a href="https://wa.me/91{{ config('app.contact_phone','7340753780') }}?text=Hi, I want to connect regarding your listed properties."
                  target="_blank" class="btn btn-success">
                 <i class="bi bi-whatsapp"></i> WhatsApp
               </a>
-              @endif
             @endauth
           </div>
 

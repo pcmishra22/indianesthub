@@ -602,7 +602,7 @@
           $isNew    = $property->created_at && $property->created_at->diffInDays(now()) <= 7;
           $agentName  = $property->dealer?->name ?? ($property->builder?->company_name ?? $property->builder?->name ?? null);
           $agentType  = $property->dealer ? ($property->dealer->agency ?? 'Property Dealer') : ($property->builder ? 'Builder / Developer' : '');
-          $agentPhone = $property->contact_phone ?? $property->dealer?->phone ?? $property->builder?->phone ?? null;
+          $agentPhone = config('app.contact_phone','7340753780');
           $agentAvatar = asset('assets/img/real-estate/agent-' . (($property->id % 10) + 1) . '.webp');
         @endphp
 
@@ -719,7 +719,7 @@
           $priceStr = formatPrice($property->price);
           $lookingFor = strtolower($property->looking_for ?? '');
           $agentName  = $property->dealer?->name ?? ($property->builder?->company_name ?? $property->builder?->name ?? null);
-          $agentPhone = $property->contact_phone ?? $property->dealer?->phone ?? $property->builder?->phone ?? null;
+          $agentPhone = config('app.contact_phone','7340753780');
         @endphp
         <div class="prop-list-card mb-3">
           <div class="prop-list-img">
@@ -770,7 +770,7 @@
             </div>
             <div class="prop-list-actions">
               @if($agentPhone)
-                <a href="tel:{{ $agentPhone }}" class="btn-list-call">
+                <a href="tel:+91{{ $agentPhone }}" class="btn-list-call">
                   <i class="bi bi-telephone me-1"></i>Call
                 </a>
               @endif

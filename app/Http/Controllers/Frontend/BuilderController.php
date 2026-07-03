@@ -187,22 +187,10 @@ class BuilderController extends Controller
         $fromAddress = config('mail.from.address', 'admin@indianesthub.com');
         $fromName = config('mail.from.name', 'India Nest Hub');
 
-        // 1. Notify Builder (CC admin emails)
-        if ($builder && $builder->email) {
-            Log::info("Attempting to email builder: {$builder->email}");
-            Mail::raw($messageText, function ($message) use ($builder, $fromAddress, $fromName) {
-                $message->from($fromAddress, $fromName)
-                        ->to($builder->email)
-                        ->cc(['admin@indianesthub.com', 'pcmishra22@gmail.com'])
-                        ->subject('New Project Lead Received');
-            });
-            
-            if ($builder->phone) {
-                $this->sendWhatsAppNotification($builder->phone, "New lead for your project {$project->name}: {$lead->name}, {$lead->phone}");
-            }
-        }
+        // NOTE: This is an IndianestHub lead. It must go to IndianestHub only —
+        // never to the builder's own email or WhatsApp number.
 
-        // 2. Notify Admin (CC to both admin emails)
+        // 1. Notify Admin (CC to both admin emails)
         $adminEmails = ['admin@indianesthub.com', 'pcmishra22@gmail.com'];
         Log::info("Attempting to email admins: " . implode(', ', $adminEmails));
         Mail::raw("Admin Alert - New Builder Lead:\n" . $messageText, function ($message) use ($adminEmails, $fromAddress, $fromName) {
@@ -270,17 +258,10 @@ class BuilderController extends Controller
                            "Type: {$lead->lead_type}\n" .
                            "Message: {$lead->message}";
 
-            // Notify Builder (with CC to admins)
-            if ($builder->email) {
-                Mail::raw($messageText, function ($message) use ($builder, $adminEmails, $fromAddress, $fromName) {
-                    $message->from($fromAddress, $fromName)
-                            ->to($builder->email)
-                            ->cc($adminEmails)
-                            ->subject('New Enquiry Received — India Nest Hub');
-                });
-            }
+            // NOTE: This is an IndianestHub lead. It must go to IndianestHub only —
+            // never to the builder's own email or WhatsApp number.
 
-            // Notify Admins directly too
+            // Notify Admins
             Mail::raw("Admin Alert — Builder Profile Inquiry:\n" . $messageText, function ($message) use ($adminEmails, $fromAddress, $fromName) {
                 $message->from($fromAddress, $fromName)
                         ->to($adminEmails[0])
@@ -288,10 +269,9 @@ class BuilderController extends Controller
                         ->subject('New Builder Profile Inquiry');
             });
 
-            // WhatsApp to builder
-            if ($builder->phone) {
-                $this->sendWhatsAppNotification($builder->phone, "New inquiry for {$builder->company_name}: {$lead->name}, {$lead->phone}");
-            }
+            // WhatsApp to IndianestHub admin (never the builder)
+            $adminWhatsApp = config('app.whatsapp_number', '7340753780');
+            $this->sendWhatsAppNotification($adminWhatsApp, "New inquiry for builder {$builder->company_name}: {$lead->name}, {$lead->phone}");
 
         } catch (\Exception $e) {
             Log::error("Builder inquiry notification failed: " . $e->getMessage());

@@ -39,35 +39,13 @@ class InquiryController extends Controller
                           "Phone: {$data['phone']}\n" .
                           "Message: {$data['message']}";
 
-        // 1. Notification to Dealer/Owner
-        $owner = $property ? $property->dealer : null;
+        // NOTE: This is an IndianestHub lead. It must go to IndianestHub only —
+        // never to the property's dealer/builder/agent own email or WhatsApp number.
         $fromAddress = config('mail.from.address', 'admin@indianesthub.com');
         $fromName = config('mail.from.name', 'India Nest Hub');
 
         Log::info("Starting notification process for Inquiry ID: {$inquiry->id}");
         Log::debug("Mailer Driver: " . config('mail.default'));
-
-        try {
-            if ($owner && $owner->email) {
-                Log::info("Attempting to send email to dealer: {$owner->email}");
-                Mail::raw(
-                    $inquiryMessage,
-                    function ($message) use ($owner, $fromAddress, $fromName) {
-                        $message->from($fromAddress, $fromName)
-                                ->to($owner->email)
-                                ->subject('New Property Inquiry');
-                    }
-                );
-                
-                if ($owner->phone) { // Assuming 'phone' field stores a WhatsApp-capable number
-                    $this->sendWhatsAppNotification($owner->phone, "New inquiry for your property '{$property->title}'. From: {$data['name']}, Phone: {$data['phone']}.");
-                }
-            } else {
-                Log::warning("No owner or email found for property ID: {$property->id}");
-            }
-        } catch (\Exception $e) {
-            Log::error("Error sending dealer inquiry notification: " . $e->getMessage());
-        }
 
         // 2. Notification to Site Admins (Urgent Fix)
         // We include both the configured admin email and the specific ones you provided

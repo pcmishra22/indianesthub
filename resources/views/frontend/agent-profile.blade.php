@@ -18,8 +18,8 @@
   "jobTitle": "Real Estate Agent",
   "url": "{{ route('agent-profile', $dealer->slug) }}",
   "image": "{{ $dealer->profile_photo ? asset('storage/'.$dealer->profile_photo) : asset('assets/img/og-default.jpg') }}",
-  "email": "{{ $dealer->email }}",
-  "telephone": "{{ $dealer->phone }}",
+  "email": "{{ config('app.contact_email','admin@indianesthub.com') }}",
+  "telephone": "+91-{{ config('app.contact_phone','7340753780') }}",
   @if($dealer->company_name)
   "worksFor": {
     "@type": "Organization",
