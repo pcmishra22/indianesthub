@@ -8,12 +8,23 @@ use Illuminate\Http\Request;
 
 class BuilderProjectController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $projects = BuilderProject::with('builder')
-            ->withCount(['properties', 'leads'])
-            ->latest()
-            ->paginate(15);
+        $query = BuilderProject::with('builder')
+            ->withCount(['properties', 'leads']);
+
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                  ->orWhere('city',  'like', "%{$search}%")
+                  ->orWhereHas('builder', function ($bq) use ($search) {
+                      $bq->where('company_name', 'like', "%{$search}%")
+                         ->orWhere('name', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        $projects = $query->latest()->paginate(15)->withQueryString();
 
         return view('backend.builder-projects.index', compact('projects'));
     }

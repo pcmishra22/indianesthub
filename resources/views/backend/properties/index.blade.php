@@ -1,7 +1,36 @@
 @extends('backend.layout')
 @section('title', 'Properties')
 @section('content')
-<h1>Properties List</h1>
+
+<div class="d-flex align-items-center justify-content-between mb-3">
+    <h4 class="mb-0"><i data-feather="home" class="me-2 text-primary"></i>Properties</h4>
+    <span class="badge bg-primary fs-6">{{ $properties->total() }} total</span>
+</div>
+
+{{-- Search --}}
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-3">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-md-8">
+                <label class="form-label small mb-1">Search</label>
+                <div class="input-group input-group-sm">
+                    <input type="text" name="search" class="form-control"
+                           placeholder="Title, city, type, address…"
+                           value="{{ request('search') }}">
+                    <button class="btn btn-primary" type="submit"><i data-feather="search" style="width:14px;height:14px;"></i></button>
+                </div>
+            </div>
+            @if(request()->filled('search'))
+            <div class="col-md-2">
+                <a href="{{ route('admin.properties.index') }}" class="btn btn-sm btn-outline-secondary w-100">
+                    <i data-feather="x" style="width:14px;height:14px;" class="me-1"></i>Clear
+                </a>
+            </div>
+            @endif
+        </form>
+    </div>
+</div>
+
 <div class="card">
 	<div class="card-body">
 		<div class="table-responsive">
@@ -56,5 +85,11 @@
 			</table>
 		</div>
 	</div>
+	@if($properties->hasPages())
+	<div class="card-footer d-flex justify-content-between align-items-center">
+		<small class="text-muted">Showing {{ $properties->firstItem() }}–{{ $properties->lastItem() }} of {{ $properties->total() }}</small>
+		{{ $properties->links() }}
+	</div>
+	@endif
 </div>
 @endsection

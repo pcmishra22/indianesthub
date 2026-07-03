@@ -7,6 +7,30 @@
     <span class="badge bg-primary fs-6">{{ $projects->total() }} total</span>
 </div>
 
+{{-- Search --}}
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-3">
+        <form method="GET" class="row g-2 align-items-end">
+            <div class="col-md-8">
+                <label class="form-label small mb-1">Search</label>
+                <div class="input-group input-group-sm">
+                    <input type="text" name="search" class="form-control"
+                           placeholder="Project title, city, builder name…"
+                           value="{{ request('search') }}">
+                    <button class="btn btn-primary" type="submit"><i data-feather="search" style="width:14px;height:14px;"></i></button>
+                </div>
+            </div>
+            @if(request()->filled('search'))
+            <div class="col-md-2">
+                <a href="{{ route('admin.builder-projects.index') }}" class="btn btn-sm btn-outline-secondary w-100">
+                    <i data-feather="x" style="width:14px;height:14px;" class="me-1"></i>Clear
+                </a>
+            </div>
+            @endif
+        </form>
+    </div>
+</div>
+
 @if(session('success'))
     <div class="alert alert-success alert-dismissible fade show">
         {{ session('success') }}
