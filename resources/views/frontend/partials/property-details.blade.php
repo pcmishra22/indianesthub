@@ -1486,6 +1486,10 @@
             </div>
           </div>
 
+          @php
+            $canViewContact = auth()->check() || (!empty($property->public_contact_enabled));
+          @endphp
+
           {{-- Dealer / Agent Card --}}
           @if($property->dealer)
           <div class="pd-dealer-card">
@@ -1501,10 +1505,6 @@
                 <span class="pd-dealer-verified"><i class="bi bi-patch-check-fill"></i> Verified Dealer</span>
               </div>
             </div>
-
-            @php
-              $canViewContact = auth()->check() || (!empty($property->public_contact_enabled));
-            @endphp
 
             @if($canViewContact)
             <div class="pd-contact-row">
