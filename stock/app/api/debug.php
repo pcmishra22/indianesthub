@@ -433,41 +433,41 @@ if ($uri === '/api/debug/apikeys') {
     header('Content-Type: application/json');
     $out = [];
 
-    // Test BSE quote for INFY - confirmed working
-    $q = bseQuoteFetch('INFY.NS');
-    $out['bse_quote_INFY'] = ['price' => $q['regularMarketPrice'] ?? null, 'ok' => ($q['regularMarketPrice'] ?? 0) > 0];
+    // BSE quote confirmed working
+    $q = bseQuoteFetch('TCS.NS');
+    $out['bse_quote_TCS'] = ['price' => $q['regularMarketPrice'] ?? null, 'ok' => ($q['regularMarketPrice'] ?? 0) > 0];
 
-    // Test BSE history JSON API - raw response
-    $ch = curl_init('https://api.bseindia.com/BseIndiaAPI/api/StockPriceHistData/w?scripcode=500209&seriesid=EQ&fromdate=20260401&todate=20260702');
+    // Test Stooq history CSV (different URL from quote — history download works differently)
+    $urls = [
+        'stooq_hist_tcs_in'  => 'https://stooq.com/q/d/l/?s=tcs.in&d1=20260401&d2=20260703&i=d',
+        'stooq_hist_infy_in' => 'https://stooq.com/q/d/l/?s=infy.in&d1=20260401&d2=20260703&i=d',
+        'stooq_hist_tcs_ns'  => 'https://stooq.com/q/d/l/?s=tcs.ns&d1=20260401&d2=20260703&i=d',
+    ];
+    foreach ($urls as $name => $url) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_HTTPHEADER => ['User-Agent: Mozilla/5.0', 'Accept: text/csv,*/*'],
+        ]);
+        $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+        $out[$name] = ['http_code' => $code, 'body_preview' => substr((string)$raw, 0, 300)];
+    }
+
+    // Test Yahoo Finance chart (history) — sometimes works even when quote doesn't
+    $ch = curl_init('https://query2.finance.yahoo.com/v8/finance/chart/TCS.NS?period1=1743465600&period2=1751500800&interval=1d');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_TIMEOUT => 15, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_ENCODING => 'gzip',
-        CURLOPT_HTTPHEADER => [
-            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept: application/json', 'Referer: https://www.bseindia.com/', 'Origin: https://www.bseindia.com',
-        ],
+        CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_HTTPHEADER => ['User-Agent: Mozilla/5.0', 'Accept: application/json'],
     ]);
     $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
     $d = $raw ? json_decode($raw, true) : null;
-    $out['bse_history_json_raw'] = [
-        'http_code'   => $code,
-        'raw_full'    => $d ?? substr((string)$raw, 0, 500),
-    ];
-
-    // Test BSE history CSV API - raw response
-    $ch = curl_init('https://api.bseindia.com/BseIndiaAPI/api/StockPriceCSVDownload/w?scripcode=500209&seriesid=EQ&fromdate=01%2F04%2F2026&todate=02%2F07%2F2026&marketcap=&MarketCapFull=&myowner=&segment=');
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_TIMEOUT => 15, CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_HTTPHEADER => [
-            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept: text/csv,*/*', 'Referer: https://www.bseindia.com/',
-        ],
-    ]);
-    $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
-    $out['bse_history_csv_raw'] = [
-        'http_code'   => $code,
-        'body_preview'=> substr((string)$raw, 0, 500),
+    $timestamps = $d['chart']['result'][0]['timestamp'] ?? [];
+    $out['yahoo_chart_TCS'] = [
+        'http_code' => $code,
+        'bars'      => count($timestamps),
+        'preview'   => substr((string)$raw, 0, 200),
     ];
 
     echo json_encode($out, JSON_PRETTY_PRINT);
