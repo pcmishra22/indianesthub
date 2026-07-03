@@ -1290,7 +1290,7 @@
           @endif
 
           @if($property->builder->slug)
-          <a href="{{ route('builder.show', $property->builder->slug) }}" class="btn btn-outline-primary btn-sm w-100 mt-3" style="border-radius:7px;font-weight:600;">
+          <a href="{{ route('builders.show', $property->builder->slug) }}" class="btn btn-outline-primary btn-sm w-100 mt-3" style="border-radius:7px;font-weight:600;">
             <i class="bi bi-arrow-right-circle me-1"></i>View All by {{ $property->builder->display_name }}
           </a>
           @endif
