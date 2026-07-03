@@ -15,7 +15,7 @@ class BuilderProject extends Model
         'total_units', 'available_units', 'total_towers', 'floors_per_tower',
         'price_from', 'price_to', 'possession_date',
         'cover_image', 'gallery_images', 'master_plan', 'brochure', 'video_url', 'virtual_tour_url',
-        'amenities', 'rera_id', 'is_featured',
+        'amenities', 'rera_id', 'is_featured', 'is_active',
         'latitude', 'longitude',
         'nearby_schools', 'nearby_hospitals', 'metro_distance', 'connectivity_score', 'future_infra',
         'views_count', 'leads_count',
@@ -24,6 +24,7 @@ class BuilderProject extends Model
     protected $casts = [
         'gallery_images'  => 'array',
         'is_featured'     => 'boolean',
+        'is_active'       => 'boolean',
         'possession_date' => 'date',
         'price_from'      => 'decimal:2',
         'price_to'        => 'decimal:2',

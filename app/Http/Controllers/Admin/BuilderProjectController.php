@@ -60,4 +60,14 @@ class BuilderProjectController extends Controller
         $label = $project->is_featured ? 'Featured' : 'Unfeatured';
         return back()->with('success', "Project marked as {$label}.");
     }
+
+    public function toggleActive($id)
+    {
+        $project = BuilderProject::findOrFail($id);
+        $project->is_active = !$project->is_active;
+        $project->save();
+
+        $label = $project->is_active ? 'Enabled' : 'Disabled';
+        return back()->with('success', "Project {$label}.");
+    }
 }

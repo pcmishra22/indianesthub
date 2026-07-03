@@ -47,6 +47,15 @@ class PropertyController extends Controller
         return back()->with('success', 'Property featured status updated.');
     }
 
+    public function toggleStatus(Property $property)
+    {
+        $property->listing_status = ($property->listing_status === 'active') ? 'inactive' : 'active';
+        $property->save();
+
+        $label = ucfirst($property->listing_status);
+        return back()->with('success', "Property listing status updated to {$label}.");
+    }
+
     public function togglePublicContact(Request $request, Property $property)
     {
         $enabled = (bool) $request->input('enabled', false);

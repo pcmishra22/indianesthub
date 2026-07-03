@@ -56,14 +56,23 @@
 						<td>{{ $property->city }}</td>
 						<td>{{ $property->price }}</td>
 						<td>
-							@if($property->status)
+							@if($property->listing_status === 'active')
 								<span class="badge bg-success">Active</span>
-							@else
+							@elseif($property->listing_status === 'inactive')
 								<span class="badge bg-secondary">Inactive</span>
+							@else
+								<span class="badge bg-warning text-dark">{{ ucfirst($property->listing_status ?? 'draft') }}</span>
 							@endif
 						</td>
 						<td>
-							<div class="d-flex align-items-center gap-2">
+							<div class="d-flex align-items-center gap-2 flex-wrap">
+								<form method="POST" action="{{ route('admin.properties.toggle-status', $property->id) }}" class="d-inline">
+									@csrf
+									<button type="submit" class="btn btn-sm {{ $property->listing_status === 'active' ? 'btn-outline-warning' : 'btn-outline-success' }}"
+											onclick="return confirm('{{ $property->listing_status === 'active' ? 'Disable' : 'Enable' }} this property listing?')">
+										{{ $property->listing_status === 'active' ? 'Disable' : 'Enable' }}
+									</button>
+								</form>
 								<form method="POST" action="{{ route('admin.properties.togglePublicContact', $property->id) }}">
 									@csrf
 									<input type="hidden" name="enabled" value="0">

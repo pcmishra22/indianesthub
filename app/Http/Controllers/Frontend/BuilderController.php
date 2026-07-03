@@ -44,7 +44,7 @@ class BuilderController extends Controller
         $builders = $query->paginate(12)->withQueryString();
 
         $totalBuilders   = Builder::where('status', 'active')->count();
-        $totalProjects   = BuilderProject::count();
+        $totalProjects   = BuilderProject::where('is_active', true)->count();
         $verifiedCount   = Builder::where('is_verified', true)->count();
 
         return view('frontend.builders', compact('builders', 'totalBuilders', 'totalProjects', 'verifiedCount'));
@@ -66,13 +66,15 @@ class BuilderController extends Controller
         $builder->loadCount('projects');
 
         $projects = $builder->projects()
+            ->where('is_active', true)
             ->withCount('properties')
             ->latest()
             ->paginate(6);
 
-        $totalUnits = $builder->projects()->sum('total_units');
+        $totalUnits = $builder->projects()->where('is_active', true)->sum('total_units');
 
         $citiesServed = $builder->projects()
+            ->where('is_active', true)
             ->whereNotNull('city')
             ->distinct()
             ->pluck('city')
@@ -88,6 +90,8 @@ class BuilderController extends Controller
      */
     public function projectDetail(BuilderProject $project)
     {
+        abort_if(!$project->is_active, 404);
+
         $project->load(['builder', 'amenityItems', 'properties' => function ($q) {
             $q->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired'])
               ->orderBy('price');
@@ -112,6 +116,7 @@ class BuilderController extends Controller
         // Other projects by same builder (exclude current)
         $relatedProjects = BuilderProject::where('builder_id', $project->builder_id)
             ->where('id', '!=', $project->id)
+            ->where('is_active', true)
             ->withCount('properties')
             ->latest()
             ->limit(3)

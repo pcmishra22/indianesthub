@@ -589,6 +589,7 @@ Route::prefix('admin')->middleware('auth:admin')->name('admin.')->group(function
     // Manage Properties
     Route::resource('properties', AdminPropertyController::class)->only(['index', 'show', 'destroy']);
 Route::post('/properties/{property:id}/toggle-featured', [AdminPropertyController::class, 'toggleFeatured'])->name('properties.toggle-featured');
+Route::post('/properties/{property:id}/toggle-status', [AdminPropertyController::class, 'toggleStatus'])->name('properties.toggle-status');
 
 require __DIR__ . '/admin_properties.php';
 
@@ -642,6 +643,7 @@ require __DIR__ . '/admin_properties.php';
         // Builder Projects
         Route::resource('builder-projects', AdminBuilderProjectController::class)->only(['index', 'show', 'destroy']);
         Route::post('/builder-projects/{project}/toggle-featured', [AdminBuilderProjectController::class, 'toggleFeatured'])->name('builder-projects.toggle-featured');
+        Route::post('/builder-projects/{project}/toggle-active', [AdminBuilderProjectController::class, 'toggleActive'])->name('builder-projects.toggle-active');
 
         // Builder Leads
         Route::resource('builder-leads', AdminBuilderLeadController::class)->only(['index', 'show', 'destroy']);

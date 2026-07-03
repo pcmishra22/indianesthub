@@ -30,6 +30,7 @@ class HomeController extends Controller
 
         // New Launches – builder projects
         $newLaunches = BuilderProject::with('builder')
+            ->where('is_active', true)
             ->whereIn('status', ['Upcoming', 'Under Construction'])
             ->latest()
             ->limit(4)

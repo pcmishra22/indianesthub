@@ -55,8 +55,9 @@
                         <th>Props</th>
                         <th>Leads</th>
                         <th>Featured</th>
+                        <th>Live</th>
                         <th>Date</th>
-                        <th style="width:180px;">Actions</th>
+                        <th style="width:220px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -97,6 +98,13 @@
                                 <span class="text-muted small">No</span>
                             @endif
                         </td>
+                        <td class="text-center">
+                            @if($project->is_active)
+                                <span class="badge bg-success">Live</span>
+                            @else
+                                <span class="badge bg-secondary">Hidden</span>
+                            @endif
+                        </td>
                         <td class="text-muted small">{{ $project->created_at?->format('d M Y') }}</td>
                         <td>
                             <div class="d-flex gap-1">
@@ -107,6 +115,14 @@
                                     @csrf
                                     <button type="submit" class="btn btn-sm {{ $project->is_featured ? 'btn-outline-secondary' : 'btn-outline-warning' }}">
                                         {{ $project->is_featured ? 'Unfeature' : 'Feature' }}
+                                    </button>
+                                </form>
+
+                                <form action="{{ route('admin.builder-projects.toggle-active', $project->id) }}" method="POST" class="d-inline">
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm {{ $project->is_active ? 'btn-outline-warning' : 'btn-outline-success' }}"
+                                            onclick="return confirm('{{ $project->is_active ? 'Disable' : 'Enable' }} this project on the public site?')">
+                                        {{ $project->is_active ? 'Disable' : 'Enable' }}
                                     </button>
                                 </form>
 
@@ -121,7 +137,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="13" class="text-center text-muted py-4">No builder projects found.</td></tr>
+                    <tr><td colspan="14" class="text-center text-muted py-4">No builder projects found.</td></tr>
                 @endforelse
                 </tbody>
             </table>
