@@ -433,33 +433,41 @@ if ($uri === '/api/debug/apikeys') {
     header('Content-Type: application/json');
     $out = [];
 
-    // Test BSE quote for 5 stocks using our fixed bseQuoteFetch()
-    $testSymbols = ['INFY.NS', 'TCS.NS', 'RELIANCE.NS', 'HDFCBANK.NS', 'ICICIBANK.NS'];
-    foreach ($testSymbols as $sym) {
-        $q = bseQuoteFetch($sym);
-        $out['bse_quote'][$sym] = [
-            'price'  => $q['regularMarketPrice'] ?? null,
-            'change' => $q['regularMarketChangePercent'] ?? null,
-            'source' => $q['_source'] ?? null,
-            'name'   => $q['longName'] ?? null,
-            'ok'     => ($q['regularMarketPrice'] ?? 0) > 0,
-        ];
-    }
+    // Test BSE quote for INFY - confirmed working
+    $q = bseQuoteFetch('INFY.NS');
+    $out['bse_quote_INFY'] = ['price' => $q['regularMarketPrice'] ?? null, 'ok' => ($q['regularMarketPrice'] ?? 0) > 0];
 
-    // Test BSE history for INFY
-    $hist = bseHistory('INFY.NS', 10);
-    $out['bse_history_INFY'] = [
-        'rows'   => count($hist),
-        'latest' => $hist[count($hist)-1] ?? null,
-        'ok'     => count($hist) > 0,
+    // Test BSE history JSON API - raw response
+    $ch = curl_init('https://api.bseindia.com/BseIndiaAPI/api/StockPriceHistData/w?scripcode=500209&seriesid=EQ&fromdate=20260401&todate=20260702');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 15, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_ENCODING => 'gzip',
+        CURLOPT_HTTPHEADER => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept: application/json', 'Referer: https://www.bseindia.com/', 'Origin: https://www.bseindia.com',
+        ],
+    ]);
+    $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    $d = $raw ? json_decode($raw, true) : null;
+    $out['bse_history_json_raw'] = [
+        'http_code'   => $code,
+        'raw_full'    => $d ?? substr((string)$raw, 0, 500),
     ];
 
-    // Test the full yahooQuote() unified function
-    $q = yahooQuote('INFY.NS');
-    $out['unified_yahooQuote_INFY'] = [
-        'price'  => $q['regularMarketPrice'] ?? null,
-        'source' => $q['_source'] ?? null,
-        'ok'     => ($q['regularMarketPrice'] ?? 0) > 0,
+    // Test BSE history CSV API - raw response
+    $ch = curl_init('https://api.bseindia.com/BseIndiaAPI/api/StockPriceCSVDownload/w?scripcode=500209&seriesid=EQ&fromdate=01%2F04%2F2026&todate=02%2F07%2F2026&marketcap=&MarketCapFull=&myowner=&segment=');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_TIMEOUT => 15, CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_HTTPHEADER => [
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept: text/csv,*/*', 'Referer: https://www.bseindia.com/',
+        ],
+    ]);
+    $raw = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    $out['bse_history_csv_raw'] = [
+        'http_code'   => $code,
+        'body_preview'=> substr((string)$raw, 0, 500),
     ];
 
     echo json_encode($out, JSON_PRETTY_PRINT);
