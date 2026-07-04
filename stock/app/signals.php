@@ -56,9 +56,9 @@ function generateSignal(array $quote, array $history, array $indicators): array
     if ($price <= $bbL) { $bullish++; $bullFactors[] = 'Price at lower Bollinger Band — oversold zone'; }
     elseif ($price >= $bbU) { $bearish++; $bearFactors[] = 'Price at upper Bollinger Band — overbought zone'; }
 
-    // Supertrend
-    if ($st === 'Bullish') { $bullish += 2; $bullFactors[] = 'Supertrend indicator is Bullish'; }
-    else { $bearish += 2; $bearFactors[] = 'Supertrend indicator is Bearish'; }
+    // Supertrend — weighted heavily, acts as a directional veto
+    if ($st === 'Bullish') { $bullish += 3; $bullFactors[] = 'Supertrend is Bullish — uptrend confirmed'; }
+    else                   { $bearish += 3; $bearFactors[] = 'Supertrend is Bearish — downtrend confirmed'; }
 
     // VWAP
     if ($price > $vwap && $vwap > 0) { $bullish++; $bullFactors[] = 'Price above VWAP — intraday buyers in control'; }
@@ -73,15 +73,26 @@ function generateSignal(array $quote, array $history, array $indicators): array
     if ($total === 0) $total = 1;
     $confidence = (int) round(max($bullish, $bearish) / $total * 100);
 
+    // Determine signal — Supertrend acts as a veto:
+    // If Supertrend is Bullish, signal cannot be Sell (at most Hold)
+    // If Supertrend is Bearish, signal cannot be Buy (at most Hold)
     if ($bullish > $bearish + 1) {
         $signal = 'Buy';
         $trend  = 'Bullish';
-        $verdict = "The technical picture for this stock leans bullish. " . implode('. ', $bullFactors) . ". Consider entering near current levels with a stop below EMA20.";
+        $verdict = "The technical picture leans bullish. " . implode('. ', $bullFactors) . ". Consider entering near current levels with a stop below EMA20.";
     } elseif ($bearish > $bullish + 1) {
-        $signal = 'Sell';
-        $trend  = 'Bearish';
-        $verdict = "Bears are in control. " . implode('. ', $bearFactors) . ". Avoid fresh long positions; wait for RSI to reach oversold before re-entry.";
+        // Veto: Supertrend Bullish overrides Sell → Hold
+        if ($st === 'Bullish') {
+            $signal  = 'Hold';
+            $trend   = 'Sideways';
+            $verdict = "Mixed signals — Supertrend is Bullish so avoiding a Sell call. Wait for clearer direction. Bullish: " . implode(', ', $bullFactors) . ". Bearish: " . implode(', ', $bearFactors) . ".";
+        } else {
+            $signal  = 'Sell';
+            $trend   = 'Bearish';
+            $verdict = "Bears are in control. " . implode('. ', $bearFactors) . ". Avoid fresh long positions.";
+        }
     } else {
+        // Veto: Supertrend Bearish with neutral overall → lean Hold
         $signal = 'Hold';
         $trend  = 'Sideways';
         $verdict = "Mixed signals. Bullish: " . implode(', ', $bullFactors ?: ['none']) . ". Bearish: " . implode(', ', $bearFactors ?: ['none']) . ". Wait for a cleaner setup.";

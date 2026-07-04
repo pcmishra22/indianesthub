@@ -556,46 +556,52 @@ function yahooHistory(string $symbol, int $days = 90): array
         if (!empty($cached)) return $cached;
     }
 
-    // Priority 1: BSE historical CSV
-    $bseRows = bseHistory($symbol, $days);
-    if (!empty($bseRows)) return $bseRows;
-
-    // Priority 2: Stooq historical CSV
-    $rows = stooqHistoryFallback($symbol, $days);
-    if (!empty($rows)) return $rows;
-
-    // Priority 2: Yahoo chart (mostly dead but worth trying)
+    // Priority 1: Yahoo Finance chart — confirmed working (returns 63 bars for TCS.NS, HTTP 200)
     $period2 = time();
-    $period1 = $period2 - ($days * 86400);
-    $url = 'https://query2.finance.yahoo.com/v8/finance/chart/' . urlencode($symbol)
-         . '?period1=' . $period1 . '&period2=' . $period2
-         . '&interval=1d&events=history&includeAdjustedClose=true';
-    $raw = httpGet($url);
-    if ($raw) {
+    $period1 = $period2 - (($days + 30) * 86400);
+    foreach (['query2', 'query1'] as $host) {
+        $url = "https://{$host}.finance.yahoo.com/v8/finance/chart/{$symbol}?period1={$period1}&period2={$period2}&interval=1d";
+        $ch  = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => 15, CURLOPT_SSL_VERIFYPEER => false, CURLOPT_ENCODING => 'gzip',
+            CURLOPT_HTTPHEADER => [
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept: application/json', 'Referer: https://finance.yahoo.com/',
+            ],
+        ]);
+        $raw  = curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if (!$raw || $code !== 200) continue;
         $data  = json_decode($raw, true);
         $chart = $data['chart']['result'][0] ?? null;
-        if ($chart) {
-            $timestamps = $chart['timestamp'] ?? [];
-            $ohlcv      = $chart['indicators']['quote'][0] ?? [];
-            $rows = [];
-            foreach ($timestamps as $i => $ts) {
-                $close = $ohlcv['close'][$i] ?? null;
-                if ($close === null) continue;
-                $rows[] = [
-                    'date'   => date('Y-m-d', $ts),
-                    'open'   => round($ohlcv['open'][$i]   ?? $close, 2),
-                    'high'   => round($ohlcv['high'][$i]   ?? $close, 2),
-                    'low'    => round($ohlcv['low'][$i]    ?? $close, 2),
-                    'close'  => round($close, 2),
-                    'volume' => $ohlcv['volume'][$i] ?? 0,
-                ];
-            }
-            if (!empty($rows)) {
-                file_put_contents($cacheFile, json_encode($rows));
-                return $rows;
-            }
+        if (!$chart) continue;
+        $timestamps = $chart['timestamp'] ?? [];
+        $ohlcv      = $chart['indicators']['quote'][0] ?? [];
+        $rows = [];
+        foreach ($timestamps as $i => $ts) {
+            $close = $ohlcv['close'][$i] ?? null;
+            if ($close === null || $close <= 0) continue;
+            $rows[] = [
+                'date'   => date('Y-m-d', $ts),
+                'open'   => round((float)($ohlcv['open'][$i]   ?? $close), 2),
+                'high'   => round((float)($ohlcv['high'][$i]   ?? $close), 2),
+                'low'    => round((float)($ohlcv['low'][$i]    ?? $close), 2),
+                'close'  => round((float)$close, 2),
+                'volume' => (int)($ohlcv['volume'][$i] ?? 0),
+            ];
+        }
+        if (!empty($rows)) {
+            $rows = array_slice($rows, -$days);
+            file_put_contents($cacheFile, json_encode($rows));
+            return $rows;
         }
     }
+
+    // Priority 2: BSE historical (fallback)
+    $bseRows = bseHistory($symbol, $days);
+    if (!empty($bseRows)) return $bseRows;
 
     return [];
 }
@@ -1080,7 +1086,7 @@ function bseScripCode(string $sym): string {
         'TATAPOWER'=>'500400','ADANIGREEN'=>'541450','SUZLON'=>'532667','BANKBARODA'=>'532134',
         'CANBK'=>'532483','PNB'=>'532461','UNIONBANK'=>'532477','IDFCFIRSTB'=>'539437',
         'FEDERALBNK'=>'500469','BANDHANBNK'=>'541153','LTIM'=>'540005','MPHASIS'=>'526299',
-        'PERSISTENT'=>'533179','COFORGE'=>'532541','OFSS'=>'532755','KPITTECH'=>'542651',
+        'PERSISTENT'=>'533179','COFORGE'=>'532541','OFSS'=>'532756','KPITTECH'=>'542651',
         'TATAELXSI'=>'500408','AUROPHARMA'=>'524804','ALKEM'=>'539523','IPCALAB'=>'544155',
         'LUPIN'=>'500257','TORNTPHARM'=>'500420','MAXHEALTH'=>'543220','FORTIS'=>'532843',
         'TVSMOTOR'=>'532343','ASHOKLEY'=>'500477','BHARATFORG'=>'500493','BOSCHLTD'=>'500530',
@@ -1159,14 +1165,77 @@ function bseQuoteFetch(string $nseSymbol): ?array
 
 function bseQuoteBulk(array $symbols): array
 {
-    $all = [];
+    // Only fetch symbols we have a BSE scrip code for
+    $toFetch = [];
     foreach ($symbols as $sym) {
-        $q = bseQuoteFetch($sym);
-        if ($q && ($q['regularMarketPrice'] ?? 0) > 0) {
-            $all[$sym] = $q;
-        }
-        usleep(100000); // 100ms between calls
+        $base = strtoupper(str_replace('.NS', '', $sym));
+        $code = bseScripCode($base);
+        if ($code) $toFetch[$sym] = $code;
     }
+    if (empty($toFetch)) return [];
+
+    // Parallel fetch using curl_multi
+    $mh      = curl_multi_init();
+    $handles = [];
+    $headers = [
+        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept: application/json',
+        'Referer: https://www.bseindia.com/',
+        'Origin: https://www.bseindia.com',
+    ];
+
+    foreach ($toFetch as $sym => $code) {
+        $ch = curl_init("https://api.bseindia.com/BseIndiaAPI/api/getScripHeaderData/w?Debtflag=&scripcode={$code}&seriesid=");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_ENCODING => 'gzip', CURLOPT_HTTPHEADER => $headers,
+        ]);
+        curl_multi_add_handle($mh, $ch);
+        $handles[$sym] = $ch;
+    }
+
+    $running = null;
+    do { curl_multi_exec($mh, $running); curl_multi_select($mh); } while ($running > 0);
+
+    $all = [];
+    foreach ($handles as $sym => $ch) {
+        $raw  = curl_multi_getcontent($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_multi_remove_handle($mh, $ch);
+        curl_close($ch);
+
+        if (!$raw || $code !== 200) continue;
+        $d  = json_decode($raw, true);
+        if (!is_array($d)) continue;
+
+        $cr    = $d['CurrRate'] ?? [];
+        $hd    = $d['Header']   ?? [];
+        $cn    = $d['Cmpname']  ?? [];
+        $price = (float)($cr['LTP'] ?? 0);
+        if ($price <= 0) continue;
+
+        $all[$sym] = [
+            'symbol'                     => $sym,
+            'shortName'                  => $cn['ShortN'] ?? str_replace('.NS', '', $sym),
+            'longName'                   => $cn['FullN']  ?? str_replace('.NS', '', $sym),
+            'regularMarketPrice'         => $price,
+            'regularMarketChange'        => (float)($cr['Chg']   ?? 0),
+            'regularMarketChangePercent' => (float)($cr['PcChg'] ?? 0),
+            'regularMarketPreviousClose' => (float)($hd['PrevClose'] ?? $price),
+            'regularMarketOpen'          => (float)($hd['Open']      ?? $price),
+            'regularMarketDayHigh'       => (float)($hd['High']      ?? $price),
+            'regularMarketDayLow'        => (float)($hd['Low']       ?? $price),
+            'regularMarketVolume'        => 0,
+            'averageDailyVolume3Month'   => 0,
+            'fiftyTwoWeekHigh'           => (float)($hd['High'] ?? $price),
+            'fiftyTwoWeekLow'            => (float)($hd['Low']  ?? $price),
+            'trailingPE' => null, 'priceToBook' => null, 'marketCap' => null,
+            'sector' => null, 'industry' => null, 'returnOnEquity' => null, 'debtToEquity' => null,
+            '_source' => 'bse',
+        ];
+    }
+    curl_multi_close($mh);
     return $all;
 }
 

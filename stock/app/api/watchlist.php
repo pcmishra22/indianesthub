@@ -450,102 +450,104 @@ function apiTick(): array
 
 function apiLeaders(): array
 {
-    $logFile = STORAGE . '/signals_' . date('Y-m-d') . '.json';
-    if (!file_exists($logFile)) return ['error' => 'No signal data yet. Wait for first tick.'];
-
-    $log  = json_decode(file_get_contents($logFile), true);
-    $now  = time();
-    $hour = $now - 3600;
+    $logFile   = STORAGE . '/signals_' . date('Y-m-d') . '.json';
+    $wlCache   = STORAGE . '/watchlist_cache.json';
+    $now       = time();
+    $hour      = $now - 3600;
 
     $todayBuy = $todaySell = $hourBuy = $hourSell = [];
 
-    foreach ($log as $sym => $data) {
-        $ticks     = $data['ticks'] ?? [];
-        $name      = $data['name'] ?? $sym;
-        $todayTicks = $ticks; // all ticks today
-        $hourTicks  = array_values(array_filter($ticks, fn($t) => $t['ts'] >= $hour));
+    // If we have tick history, use it for leaders
+    if (file_exists($logFile)) {
+        $log  = json_decode(file_get_contents($logFile), true) ?? [];
 
-        if (!$todayTicks) continue;
+        foreach ($log as $sym => $data) {
+            $ticks      = $data['ticks'] ?? [];
+            $name       = $data['name'] ?? $sym;
+            $todayTicks = $ticks;
+            $hourTicks  = array_values(array_filter($ticks, fn($t) => $t['ts'] >= $hour));
 
-        // Today counts
-        $tBuys  = count(array_filter($todayTicks, fn($t) => $t['signal'] === 'Buy'));
-        $tSells = count(array_filter($todayTicks, fn($t) => $t['signal'] === 'Sell'));
-        $tTotal = count($todayTicks);
-        $tAvgScore = round(array_sum(array_column($todayTicks, 'score')) / $tTotal, 1);
-        $tLastPrice = end($todayTicks)['price'];
-        $tFirstPrice = $todayTicks[0]['price'];
-        $tPriceChg = $tFirstPrice > 0 ? round((($tLastPrice - $tFirstPrice) / $tFirstPrice) * 100, 2) : 0;
-        // Streak: consecutive same signals at end
-        $tStreak = 0; $tStreakSig = end($todayTicks)['signal'];
-        for ($i = count($todayTicks)-1; $i >= 0; $i--) {
-            if ($todayTicks[$i]['signal'] === $tStreakSig) $tStreak++;
-            else break;
-        }
+            if (!$todayTicks) continue;
 
-        $entry = [
-            'symbol'    => $sym,
-            'name'      => $name,
-            'price'     => $tLastPrice,
-            'price_chg' => $tPriceChg,
-            'ticks'     => $tTotal,
-            'avg_score' => $tAvgScore,
-            'streak'    => $tStreak,
-            'streak_sig'=> $tStreakSig,
-            'last_chg'  => end($todayTicks)['chg'],
-        ];
-
-        if ($tBuys > $tSells) {
-            $entry['buy_count']  = $tBuys;
-            $entry['sell_count'] = $tSells;
-            $entry['dominance']  = round($tBuys / $tTotal * 100);
-            $todayBuy[] = $entry;
-        } elseif ($tSells > $tBuys) {
-            $entry['buy_count']  = $tBuys;
-            $entry['sell_count'] = $tSells;
-            $entry['dominance']  = round($tSells / $tTotal * 100);
-            $todaySell[] = $entry;
-        }
-
-        // Hour counts
-        if ($hourTicks) {
-            $hBuys  = count(array_filter($hourTicks, fn($t) => $t['signal'] === 'Buy'));
-            $hSells = count(array_filter($hourTicks, fn($t) => $t['signal'] === 'Sell'));
-            $hTotal = count($hourTicks);
-            $hAvgScore = round(array_sum(array_column($hourTicks, 'score')) / $hTotal, 1);
-            $hStreak = 0; $hStreakSig = end($hourTicks)['signal'];
-            for ($i = count($hourTicks)-1; $i >= 0; $i--) {
-                if ($hourTicks[$i]['signal'] === $hStreakSig) $hStreak++;
-                else break;
+            $tBuys  = count(array_filter($todayTicks, fn($t) => $t['signal'] === 'Buy'));
+            $tSells = count(array_filter($todayTicks, fn($t) => $t['signal'] === 'Sell'));
+            $tTotal = count($todayTicks);
+            $tAvgScore   = round(array_sum(array_column($todayTicks, 'score')) / $tTotal, 1);
+            $tLastPrice  = end($todayTicks)['price'];
+            $tFirstPrice = $todayTicks[0]['price'];
+            $tPriceChg   = $tFirstPrice > 0 ? round((($tLastPrice - $tFirstPrice) / $tFirstPrice) * 100, 2) : 0;
+            $tStreakSig   = end($todayTicks)['signal'];
+            $tStreak      = 0;
+            for ($i = count($todayTicks)-1; $i >= 0; $i--) {
+                if ($todayTicks[$i]['signal'] === $tStreakSig) $tStreak++; else break;
             }
-            $hEntry = array_merge($entry, [
-                'buy_count'  => $hBuys,
-                'sell_count' => $hSells,
-                'avg_score'  => $hAvgScore,
-                'ticks'      => $hTotal,
-                'dominance'  => $hTotal > 0 ? round(max($hBuys,$hSells)/$hTotal*100) : 0,
-                'streak'     => $hStreak,
-                'streak_sig' => $hStreakSig,
-            ]);
-            if ($hBuys > $hSells)       $hourBuy[]  = $hEntry;
-            elseif ($hSells > $hBuys)   $hourSell[] = $hEntry;
+
+            $entry = [
+                'symbol' => $sym, 'name' => $name, 'price' => $tLastPrice,
+                'price_chg' => $tPriceChg, 'ticks' => $tTotal, 'avg_score' => $tAvgScore,
+                'streak' => $tStreak, 'streak_sig' => $tStreakSig,
+                'last_chg' => end($todayTicks)['chg'],
+                'buy_count' => $tBuys, 'sell_count' => $tSells,
+                'dominance' => $tTotal > 0 ? round(max($tBuys,$tSells)/$tTotal*100) : 0,
+            ];
+
+            if ($tBuys > $tSells) $todayBuy[] = $entry;
+            elseif ($tSells > $tBuys) $todaySell[] = $entry;
+
+            if ($hourTicks) {
+                $hBuys  = count(array_filter($hourTicks, fn($t) => $t['signal'] === 'Buy'));
+                $hSells = count(array_filter($hourTicks, fn($t) => $t['signal'] === 'Sell'));
+                $hTotal = count($hourTicks);
+                $hAvgScore  = round(array_sum(array_column($hourTicks, 'score')) / $hTotal, 1);
+                $hStreakSig = end($hourTicks)['signal'];
+                $hStreak = 0;
+                for ($i = count($hourTicks)-1; $i >= 0; $i--) {
+                    if ($hourTicks[$i]['signal'] === $hStreakSig) $hStreak++; else break;
+                }
+                $hEntry = array_merge($entry, [
+                    'buy_count' => $hBuys, 'sell_count' => $hSells,
+                    'avg_score' => $hAvgScore, 'ticks' => $hTotal,
+                    'dominance' => $hTotal > 0 ? round(max($hBuys,$hSells)/$hTotal*100) : 0,
+                    'streak' => $hStreak, 'streak_sig' => $hStreakSig,
+                ]);
+                if ($hBuys > $hSells)     $hourBuy[]  = $hEntry;
+                elseif ($hSells > $hBuys) $hourSell[] = $hEntry;
+            }
         }
     }
 
-    // Sort: primary = count of dominant signal, secondary = streak, tertiary = avg_score
-    $sorter = function($a, $b) use ($log) {
-        $aCnt = max($a['buy_count'], $a['sell_count']);
-        $bCnt = max($b['buy_count'], $b['sell_count']);
-        if ($aCnt !== $bCnt) return $bCnt - $aCnt;
-        if ($a['streak'] !== $b['streak']) return $b['streak'] - $a['streak'];
-        return $b['avg_score'] <=> $a['avg_score'];
-    };
-    usort($todayBuy,  $sorter);
-    usort($todaySell, $sorter);
-    usort($hourBuy,   $sorter);
-    usort($hourSell,  $sorter);
+    // If tick history is thin, supplement with current watchlist cache
+    if ((empty($todayBuy) && empty($todaySell)) && file_exists($wlCache)) {
+        $wl = json_decode(file_get_contents($wlCache), true) ?? [];
+        $stocks = $wl['stocks'] ?? [];
+        foreach ($stocks as $s) {
+            $sym    = $s['symbol'] ?? '';
+            $signal = $s['signal'] ?? 'Hold';
+            $score  = $s['momentum'] ?? 0;
+            $chg    = $s['day_change_pct'] ?? 0;
+            $price  = $s['price'] ?? 0;
+            $entry  = [
+                'symbol' => $sym, 'name' => $s['name'] ?? $sym,
+                'price' => $price, 'price_chg' => $chg,
+                'ticks' => 1, 'avg_score' => $score,
+                'streak' => 1, 'streak_sig' => $signal,
+                'last_chg' => $chg, 'buy_count' => $signal==='Buy'?1:0,
+                'sell_count' => $signal==='Sell'?1:0, 'dominance' => 100,
+            ];
+            if ($signal === 'Buy')       { $todayBuy[]  = $entry; $hourBuy[]  = $entry; }
+            elseif ($signal === 'Sell')  { $todaySell[] = $entry; $hourSell[] = $entry; }
+        }
+    }
 
-    // Total ticks tracked today
-    $totalTicks = array_sum(array_map(fn($d) => count($d['ticks']), $log));
+    $sorter = fn($a,$b) => (max($b['buy_count'],$b['sell_count']) - max($a['buy_count'],$a['sell_count']))
+                        ?: ($b['streak'] - $a['streak'])
+                        ?: ($b['avg_score'] <=> $a['avg_score']);
+
+    usort($todayBuy,$sorter); usort($todaySell,$sorter);
+    usort($hourBuy,$sorter);  usort($hourSell,$sorter);
+
+    $log         = file_exists($logFile) ? json_decode(file_get_contents($logFile), true) ?? [] : [];
+    $totalTicks  = array_sum(array_map(fn($d) => count($d['ticks'] ?? []), $log));
 
     return [
         'today_buy'   => array_slice($todayBuy,  0, 5),
