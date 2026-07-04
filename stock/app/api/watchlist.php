@@ -373,9 +373,13 @@ function apiTick(): array
     $minute  = date('H:i');
     $results = [];
 
-    // Batch fetch all symbols using the multi-source bulk fetcher (NSE→Stooq→Yahoo)
+    // Batch fetch all symbols using the multi-source bulk fetcher (BSE→Stooq→NSE→Groww).
+    // forceRefresh=true: this is a manual/per-minute "get current data now" action, so it
+    // must not silently serve the same up-to-5-min-old bulk_quotes.json cache that
+    // Watchlist/Leaders share — that was making repeated "Tick Now" clicks record identical
+    // duplicate ticks instead of fresh ones.
     $activeSyms = getActiveWatchlist();
-    $quotes = yahooQuoteBulk($activeSyms);
+    $quotes = yahooQuoteBulk($activeSyms, true);
 
     foreach ($activeSyms as $sym) {
         $quote = $quotes[$sym] ?? null;
@@ -383,7 +387,12 @@ function apiTick(): array
 
         $price   = $quote['regularMarketPrice'] ?? 0;
         $chgPct  = $quote['regularMarketChangePercent'] ?? 0;
-        $avgVol  = $quote['averageVolume'] ?? 1;
+        // Bug: this quote array never has an 'averageVolume' key — every provider in
+        // datasources.php populates 'averageDailyVolume3Month' instead. That meant
+        // $avgVol always fell back to 1, so $volR = $curVol / 1 (hundreds of thousands)
+        // was >1.5 on almost every tick, silently reinforcing whichever side the day's
+        // move already favored.
+        $avgVol  = $quote['averageDailyVolume3Month'] ?? 0;
         $curVol  = $quote['regularMarketVolume'] ?? 0;
         $volR    = $avgVol > 0 ? $curVol / $avgVol : 1;
 
@@ -391,25 +400,34 @@ function apiTick(): array
         $cached = $indCache[$sym] ?? null;
 
         if ($cached) {
-            $rsi  = $cached['rsi'] ?? 50;
+            $rsi   = $cached['rsi'] ?? 50;
             $ema20 = $cached['ema20'] ?? $price;
             $ema50 = $cached['ema50'] ?? $price;
-            $st   = $cached['supertrend'] ?? 'Bullish';
+            $st    = $cached['supertrend'] ?? null;
             $macdH = $cached['macd_hist'] ?? 0;
         } else {
-            $rsi = 50; $ema20 = $price; $ema50 = $price; $st = 'Bullish'; $macdH = 0;
+            // Bug: this used to hard-code $st = 'Bullish' and $rsi = 50 (itself counted
+            // as bullish below), giving every symbol a fake +3-bull-vs-+2-bear head start
+            // whenever the indicator cache hadn't been built yet (fresh deploy, or cache
+            // older than the 10-min rebuild window). Combined with the volume bug above,
+            // that made the "$bear > $bull + 1" bar needed for a Sell signal almost
+            // unreachable — matching the observed log of 37 ticks with zero Sells.
+            // Null/neutral here means "we don't know yet", not "assume bullish".
+            $rsi = null; $ema20 = $price; $ema50 = $price; $st = null; $macdH = 0;
         }
 
         // Quick signal logic
         $bull = 0; $bear = 0;
         if ($price > $ema20 && $ema20 > $ema50) $bull += 3;
         elseif ($price < $ema20 && $ema20 < $ema50) $bear += 3;
-        if ($rsi < 35) $bull += 2;
-        elseif ($rsi > 65) $bear += 2;
-        elseif ($rsi >= 50) $bull++;
-        else $bear++;
-        if ($macdH > 0) $bull += 2; else $bear += 2;
-        if ($st === 'Bullish') $bull += 2; else $bear += 2;
+        if ($rsi !== null) {
+            if ($rsi < 35) $bull += 2;
+            elseif ($rsi > 65) $bear += 2;
+            elseif ($rsi >= 50) $bull++;
+            else $bear++;
+        }
+        if ($macdH > 0) $bull += 2; elseif ($macdH < 0) $bear += 2;
+        if ($st === 'Bullish') $bull += 2; elseif ($st === 'Bearish') $bear += 2;
         if ($chgPct > 0.5) $bull++; elseif ($chgPct < -0.5) $bear++;
         if ($volR > 1.5 && $chgPct > 0) $bull++; elseif ($volR > 1.5 && $chgPct < 0) $bear++;
 

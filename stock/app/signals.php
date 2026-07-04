@@ -225,6 +225,25 @@ function generateSignal(array $quote, array $history, array $indicators): array
         }
     }
 
+    // ── Supertrend override ─────────────────────────────────────
+    // Supertrend is a trend-following indicator that traders treat as the
+    // primary "is this stock in an uptrend or downtrend" call. Previously
+    // the 15-indicator scorecard could still land on Sell while Supertrend
+    // itself read Bullish (or vice versa) whenever momentum/confirmation
+    // factors outweighed it — a contradiction that looked like a bug on the
+    // Watchlist ("Supertrend: Bullish" next to "Signal: Sell"). To keep the
+    // two always pointing the same direction, Supertrend now has veto power
+    // over the opposite-direction Buy/Sell call; it can't flip a Hold.
+    if ($st === 'Bullish' && in_array($signal, ['Sell', 'Strong Sell'], true)) {
+        $signal = 'Buy';
+        $trend  = 'Bullish';
+        $verdict = "Supertrend is Bullish, which overrides the scorecard's Sell lean ({$bearish} vs {$bullish}) — shown as Buy so the signal doesn't contradict the trend indicator. " . implode('. ', $bullFactors ?: ['none']) . ".";
+    } elseif ($st === 'Bearish' && in_array($signal, ['Buy', 'Strong Buy'], true)) {
+        $signal = 'Sell';
+        $trend  = 'Bearish';
+        $verdict = "Supertrend is Bearish, which overrides the scorecard's Buy lean ({$bullish} vs {$bearish}) — shown as Sell so the signal doesn't contradict the trend indicator. " . implode('. ', $bearFactors ?: ['none']) . ".";
+    }
+
     return compact('signal', 'trend', 'confidence', 'bullFactors', 'bearFactors', 'verdict', 'bullish', 'bearish', 'categories');
 }
 

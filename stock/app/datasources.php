@@ -505,10 +505,10 @@ function yahooQuote(string $symbol): ?array
  * Caches to bulk_quotes.json for 5 minutes so repeated calls (watchlist,
  * leaders, tick) within that window share one fetch.
  */
-function yahooQuoteBulk(array $symbols): array
+function yahooQuoteBulk(array $symbols, bool $forceRefresh = false): array
 {
     $bulkCache = STORAGE . '/bulk_quotes.json';
-    if (file_exists($bulkCache) && (time() - filemtime($bulkCache)) < 300) {
+    if (!$forceRefresh && file_exists($bulkCache) && (time() - filemtime($bulkCache)) < 300) {
         $cached = json_decode(file_get_contents($bulkCache), true) ?? [];
         if (!empty($cached)) return $cached;
     }
@@ -1086,7 +1086,7 @@ function bseScripCode(string $sym): string {
         'TATAPOWER'=>'500400','ADANIGREEN'=>'541450','SUZLON'=>'532667','BANKBARODA'=>'532134',
         'CANBK'=>'532483','PNB'=>'532461','UNIONBANK'=>'532477','IDFCFIRSTB'=>'539437',
         'FEDERALBNK'=>'500469','BANDHANBNK'=>'541153','LTIM'=>'540005','MPHASIS'=>'526299',
-        'PERSISTENT'=>'533179','COFORGE'=>'532541','OFSS'=>'532756','KPITTECH'=>'542651',
+        'PERSISTENT'=>'533179','COFORGE'=>'532541','OFSS'=>'532466','KPITTECH'=>'542651',
         'TATAELXSI'=>'500408','AUROPHARMA'=>'524804','ALKEM'=>'539523','IPCALAB'=>'544155',
         'LUPIN'=>'500257','TORNTPHARM'=>'500420','MAXHEALTH'=>'543220','FORTIS'=>'532843',
         'TVSMOTOR'=>'532343','ASHOKLEY'=>'500477','BHARATFORG'=>'500493','BOSCHLTD'=>'500530',

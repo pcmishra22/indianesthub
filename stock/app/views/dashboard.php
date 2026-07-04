@@ -917,45 +917,18 @@ async function runAnalyze(){
 
   const el=document.getElementById('analyzeResult');
   el.innerHTML=`<div class="loading-card"><div class="spin"></div>
-    <div>Fetching <strong>${escHtml(sym)}</strong> data…</div>
-    <div style="font-size:11px;color:var(--muted)">Browser fetching directly (bypasses server IP blocks)</div>
+    <div>Running technical analysis on <strong>${escHtml(sym)}</strong> (RSI, MACD, EMA, Supertrend…)</div>
   </div>`;
 
   try{
-    const yahooSym=sym.endsWith('.NS')?sym:sym+'.NS';
-
-    // ── Step 1: browser fetches quote ──────────────────────────
-    let quote=null;
-    const fields='regularMarketPrice,regularMarketChange,regularMarketChangePercent,'
-      +'regularMarketVolume,averageDailyVolume3Month,fiftyTwoWeekHigh,fiftyTwoWeekLow,'
-      +'trailingPE,priceToBook,marketCap,shortName,longName,sector,industry,'
-      +'returnOnEquity,debtToEquity,regularMarketDayHigh,regularMarketDayLow,'
-      +'regularMarketPreviousClose,regularMarketOpen';
-    for(const host of ['query1','query2']){
-      try{
-        const r=await fetch(`https://${host}.finance.yahoo.com/v8/finance/quote?symbols=${encodeURIComponent(yahooSym)}&fields=${fields}&lang=en-US&region=IN`);
-        if(r.ok){const j=await r.json();quote=j?.quoteResponse?.result?.[0]||null;if(quote)break;}
-      }catch(e){}
-    }
-    if(!quote){
-      el.innerHTML=`<div class="err-box"><strong>Analysis failed</strong><br>Could not fetch data for <strong>${escHtml(sym)}</strong>.<br><small>Check that the symbol is correct (e.g. TCS, RELIANCE, INFY).</small></div>`;
-      return;
-    }
-
-    el.innerHTML=`<div class="loading-card"><div class="spin"></div>
-      <div>Fetching 90-day price history for <strong>${escHtml(sym)}</strong>…</div></div>`;
-
-    // ── Step 2: browser fetches historical OHLCV ───────────────
-    const rows=await browserFetchHistory(yahooSym);
-
-    el.innerHTML=`<div class="loading-card"><div class="spin"></div>
-      <div>Running technical analysis (RSI, MACD, EMA, Supertrend…)</div></div>`;
-
-    // ── Step 3: push to PHP for TA, get full analysis back ─────
-    const r=await fetch(apiUrl('api/proxy/analyze'),{
+    // Analyze is now served entirely by the server (same BSE/Stooq/NSE
+    // pipeline the Watchlist already uses successfully) instead of the
+    // browser calling Yahoo Finance directly — that endpoint has been
+    // shut down by Yahoo and was failing for every symbol, not just this one.
+    const r=await fetch(apiUrl('api/analyze'),{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({symbol:sym,quote:quote,rows:rows})
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:'symbol='+encodeURIComponent(sym)
     });
     const d=await r.json();
     if(d.error){
