@@ -961,8 +961,8 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
     // Sort: Buy first by momentum, then Sells
     usort($stocks, fn($a,$b) => ($b['signal']==='Buy'?1:0) - ($a['signal']==='Buy'?1:0) ?: $b['momentum_score'] <=> $a['momentum_score']);
 
-    $buys  = array_values(array_filter($stocks, fn($s) => $s['signal'] === 'Buy'));
-    $sells = array_values(array_filter($stocks, fn($s) => $s['signal'] !== 'Buy'));
+    $buys  = array_values(array_filter($stocks, fn($s) => in_array($s['signal'], ['Buy', 'Strong Buy'], true)));
+    $sells = array_values(array_filter($stocks, fn($s) => in_array($s['signal'], ['Sell', 'Strong Sell'], true)));
     $mood  = count($buys) / max(1, count($stocks)) >= 0.6 ? 'Bullish'
            : (count($buys) / max(1, count($stocks)) <= 0.4 ? 'Bearish' : 'Mixed');
 
