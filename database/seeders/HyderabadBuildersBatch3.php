@@ -45,24 +45,15 @@ class HyderabadBuildersBatch3 extends Seeder
                     'latitude' => $data[6], 'longitude' => $data[7], 'total_units' => 290, 'available_units' => 115,
                     'price_from' => $data[8], 'price_to' => $data[9], 'possession_date' => '2029-10-31', 'total_towers' => 2,
                     'floors_per_tower' => '28', 'is_featured' => false, 'views_count' => 620, 'leads_count' => 0,
-                    'nearby_schools' => 'Silver Oaks International (Here is **Batch 3** for your three macro-markets (**Hyderabad**, **Delhi-NCR**, and **Mumbai MMR**), mapping builders 21 through 30. This data maintains identical structures, utilizing accurate regional micro-markets and pricing scales for the 2026 real estate ecosystem.
+                    'nearby_schools' => 'Silver Oaks International School (3.1 km)', 'nearby_hospitals' => 'Continental Hospitals Extension (4.0 km)',
+                    'metro_distance' => 'Approx. 15 minutes to nearest metro corridor link', 'connectivity_score' => '8',
+                ]
+            );
+        }
 
----
+        $stdAmenities = Amenity::whereIn('name', ['Swimming Pool', 'Gymnasium / Fitness', 'Clubhouse', 'Power Backup', 'Covered Parking'])->pluck('id')->toArray();
+        BuilderProject::where('city', 'Hyderabad')->get()->each(fn($p) => !empty($stdAmenities) && $p->amenityItems()->syncWithoutDetaching($stdAmenities));
 
-## 1. Hyderabad Marketplace Seeder (Batch 3)
-*   **Target Micro-markets:** Madhapur, Kondapur, Hafeezpet, Nanakramguda, Puppalguda, Appa Junction, Bachupally.
-
-```php
-<?php
-
-namespace Database\Seeders;
-
-use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
-use App\Models\Builder;
-use App\Models\BuilderProject;
-use App\Models\Amenity;
-
-class HyderabadBuildersBatch3 extends Seeder
-{
-    public function run():
+        $this->command->info('✅ Hyderabad Batch 3 Configured Successfully.');
+    }
+}

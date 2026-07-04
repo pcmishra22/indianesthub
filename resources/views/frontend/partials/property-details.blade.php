@@ -1821,7 +1821,7 @@
       </p>
       <div class="d-flex flex-wrap gap-2">
         @if($property->city)
-          <a href="{{ url('/properties/in/'.strtolower(str_replace(' ','-',$property->city))) }}"
+          <a href="{{ route('properties.location', strtolower(str_replace(' ','-',$property->city))) }}"
              class="btn btn-sm btn-outline-primary">
             All Properties in {{ $property->city }}
           </a>

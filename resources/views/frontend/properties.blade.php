@@ -52,6 +52,9 @@
 @include('frontend.partials.properties', [
     'properties' => $properties,
     'cities' => $cities,
-    'propertyTypes' => $propertyTypes
+    'propertyTypes' => $propertyTypes,
+    'builderProjects' => $builderProjects ?? collect(),
+    'builderProjectsCityUrl' => $builderProjectsCityUrl ?? null,
+    'locationLabel' => $locationLabel ?? null,
 ])
 @endsection

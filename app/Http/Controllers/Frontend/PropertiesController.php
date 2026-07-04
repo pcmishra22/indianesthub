@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Frontend;
 
 use App\Http\Controllers\Controller;
 use App\Models\Property;
+use App\Models\BuilderProject;
 use Illuminate\Http\Request;
 
 class PropertiesController extends Controller
@@ -175,12 +176,35 @@ class PropertiesController extends Controller
         $locationLabel = $loc['label'];
         $locationRadius = $radius;
 
+        // ── Builder projects fallback ─────────────────────────────────
+        // Some cities (e.g. national metros like Pune, Bangalore, Hyderabad,
+        // Delhi NCR) are primarily populated with builder inventory
+        // (builder_projects table) rather than individual dealer/agent
+        // listings (properties table). When the property search comes back
+        // empty, surface the city's builder projects instead of a dead end.
+        $builderProjects = collect();
+        if ($properties->total() === 0) {
+            $matchTerms = $loc['match'] ?? [$loc['label']];
+            $builderProjects = BuilderProject::with('builder')
+                ->where('is_active', true)
+                ->where(function ($q) use ($matchTerms) {
+                    foreach ($matchTerms as $term) {
+                        $q->orWhere('city', 'like', '%' . $term . '%');
+                    }
+                })
+                ->orderByDesc('is_featured')
+                ->orderByDesc('created_at')
+                ->limit(24)
+                ->get();
+        }
+        $builderProjectsCityUrl = route('builders.index', ['city' => $locationLabel]);
+
         $seoTitle = "Properties in {$locationLabel} | Buy & Rent Flats, Villas & Plots | IndianestHub";
         $seoDescription = "Browse {$properties->total()} verified properties in {$locationLabel} and nearby areas within {$radius} km. Find flats, villas, plots for sale & rent. Connect with verified agents on IndianestHub.";
         $seoH1 = "Properties in {$locationLabel}";
         $seoIntro = "Looking for property in {$locationLabel}? IndianestHub lists {$properties->total()} verified properties within {$radius} km of {$locationLabel} — including flats, villas, plots and commercial spaces. Browse by BHK type, budget and property status to find your perfect match.";
 
-        return view('frontend.properties', compact('properties', 'cities', 'propertyTypes', 'locationLabel', 'locationRadius', 'seoTitle', 'seoDescription', 'seoH1', 'seoIntro'));
+        return view('frontend.properties', compact('properties', 'cities', 'propertyTypes', 'locationLabel', 'locationRadius', 'seoTitle', 'seoDescription', 'seoH1', 'seoIntro', 'builderProjects', 'builderProjectsCityUrl'));
     }
 
     public function index(Request $request)
@@ -367,7 +391,7 @@ class PropertiesController extends Controller
         }
 
         // IMPORTANT CONSISTENCY NOTE:
-        // /properties/in/{location} uses locationSearch(): 10km geo-bounding-box OR label match.
+        // /properties-in-{location} uses locationSearch(): 10km geo-bounding-box OR label match.
         // To ensure counts match, when ?city={slug} is a known location slug we must
         // use the same geo+label filter BEFORE the result is finalized.
         //

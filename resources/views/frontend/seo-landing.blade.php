@@ -90,7 +90,7 @@
       <ol class="breadcrumb" style="background:none;padding:0;margin:0;">
         <li class="breadcrumb-item"><a href="{{ url('/') }}">Home</a></li>
         <li class="breadcrumb-item"><a href="{{ route('properties') }}">Properties</a></li>
-        <li class="breadcrumb-item"><a href="{{ url('/properties/in/' . $citySlug) }}">{{ $cityLabel }}</a></li>
+        <li class="breadcrumb-item"><a href="{{ url('/properties-in-' . $citySlug) }}">{{ $cityLabel }}</a></li>
         <li class="breadcrumb-item active">{{ $h1 }}</li>
       </ol>
     </nav>
@@ -362,7 +362,7 @@
                 'rera'          => url('/rera-approved-projects-in-'.$slug),
                 'investment'    => url('/investment-property-in-'.$slug),
                 'best-projects' => url('/best-residential-projects-in-'.$slug),
-                default         => url('/properties/in/'.$slug),
+                default         => url('/properties-in-'.$slug),
               };
             @endphp
             <a href="{{ $otherUrl }}" class="city-link-card">

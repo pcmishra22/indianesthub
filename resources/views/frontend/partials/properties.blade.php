@@ -701,11 +701,7 @@
         @endif
 
       @empty
-        <div class="no-results-box">
-          <i class="bi bi-building-slash"></i>
-          <h4>No properties found</h4>
-          <p>Try broadening your search or <a href="{{ url('/properties') }}">clear all filters</a>.</p>
-        </div>
+        @include('frontend.partials.builder-projects-fallback')
       @endforelse
     </div>{{-- /view-grid --}}
 
@@ -787,11 +783,7 @@
           </div>
         </div>
       @empty
-        <div class="no-results-box">
-          <i class="bi bi-building-slash"></i>
-          <h4>No properties found</h4>
-          <p>Try broadening your search or <a href="{{ url('/properties') }}">clear all filters</a>.</p>
-        </div>
+        @include('frontend.partials.builder-projects-fallback')
       @endforelse
     </div>{{-- /view-list --}}
 

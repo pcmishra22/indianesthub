@@ -105,6 +105,22 @@ Route::middleware('auth')->group(function () {
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/about', [AboutController::class, 'about'])->name('about');
 Route::get('/properties', [PropertiesController::class, 'index'])->name('properties');
+
+// ── SEO-friendly locality/city search (radius-based geo search) ───────
+// Handles Tricity localities + national metro cities (Pune, Bangalore,
+// Hyderabad, Delhi NCR). Registered BEFORE the generic /properties-in-{city}
+// catch-all below (and constrained via `where`) so these known slugs are
+// never swallowed by the generic SEO landing page route.
+// e.g. /properties-in-pune, /properties-in-zirakpur
+Route::get('/properties-in-{location}', [PropertiesController::class, 'locationSearch'])
+    ->name('properties.location')
+    ->where('location', 'dhakoli|zirakpur|peer-muchalla|derabassi|panchkula|chandigarh|mohali|manimajra|banur|landran|mullanpur|kharar|gharuan|kurali|morinda|fatehgarh-sahib|pinjore|kalka|solan|baddi|barotiwala|nalagarh|rajpura|ambala|ropar|rupnagar|patiala|pune|bangalore|hyderabad|delhi-ncr');
+
+// Legacy slash-based URL → 301 redirect to the SEO-friendly hyphenated URL
+Route::get('/properties/in/{location}', function ($location) {
+    return redirect()->route('properties.location', ['location' => $location], 301);
+});
+
 // SEO-friendly city search (maps to same filter logic as /properties)
 Route::get('/properties-in-{city}', [\App\Http\Controllers\Frontend\SeoLandingController::class, 'propertyListingsInCity'])->name('properties.city');
 
@@ -113,7 +129,6 @@ Route::get('/properties-in/{city}', function ($city) {
     return redirect()->route('properties.city', ['city' => $city], 301);
 });
 
-Route::get('/properties/in/{location}', [PropertiesController::class, 'locationSearch'])->name('properties.location');
 Route::get('/properties/{property:slug}', [PropertyDetailsController::class, 'show'])->name('property-details');
 
 /*

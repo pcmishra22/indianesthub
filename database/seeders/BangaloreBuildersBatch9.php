@@ -353,14 +353,5 @@ class BangaloreBuildersBatch9 extends Seeder
             ]
         );
 
-        // ── 88. Salarpuria Boutique (Urban Luxury Line) ──────────────
-        $sattvaBoutBuilder = Builder::firstOrCreate(
-            ['email' => 'sales.boutique@sattvagroup.in'],
-            [
-                'name'                     => 'Salarpuria Boutique',
-                'company_name'             => 'Sattva Boutique Living Private Limited',
-                'password'                 => Hash::make('SattvaBout2026'),
-                'phone'                    => '08042699011',
-                'city'                     => 'Bengaluru',
-                'cities_operating'         => 'Bengaluru',
-                'established_year
+    }
+}

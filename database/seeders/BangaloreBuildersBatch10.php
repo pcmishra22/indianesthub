@@ -70,5 +70,5 @@ class BangaloreBuildersBatch10 extends Seeder
                 'connectivity_score' => '9',
             ]
         );
-
-        // ── 92. Brigade Integrated Cities ────────────────
+    }
+}
