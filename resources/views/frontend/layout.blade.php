@@ -106,46 +106,8 @@
     <link rel="stylesheet" href="/assets/css/main.css">
 
     <!-- Global Blue Theme Override -->
-    <style>
-      /* Header – Edge-inspired deep blue gradient */
-      .header {
-        background: linear-gradient(135deg, #0a2d5e 0%, #0f4c81 60%, #1565c0 100%) !important;
-        box-shadow: 0 2px 20px rgba(10,45,94,0.35);
-      }
-      .scrolled .header {
-        background: linear-gradient(135deg, #061c3d 0%, #0a3670 60%, #1059b0 100%) !important;
-        box-shadow: 0 4px 24px rgba(6,28,61,0.45);
-      }
-      /* Nav active link – bright cyan underline */
-      .navmenu a.active {
-        color: #fff !important;
-        position: relative;
-      }
-      .navmenu a.active::after {
-        content: '';
-        position: absolute;
-        bottom: 10px; left: 15px; right: 15px;
-        height: 2px;
-        background: #50e6ff;
-        border-radius: 2px;
-      }
-      /* Scroll-to-top button */
-      .scroll-top { background: linear-gradient(135deg, #0078d4, #50e6ff); }
-      .scroll-top:hover { background: linear-gradient(135deg, #0a2d5e, #0078d4); }
-      /* Bootstrap primary overrides */
-      .btn-primary, .btn-outline-primary:hover {
-        background: linear-gradient(135deg, #0a2d5e, #0078d4) !important;
-        border-color: transparent !important;
-      }
-      .btn-outline-primary {
-        border-color: #0078d4 !important;
-        color: #0078d4 !important;
-      }
-      /* Page title sections */
-      .page-title { background: #eef5fb !important; }
-      .page-title .breadcrumbs a,
-      .breadcrumb-item a { color: #0078d4; }
-    </style>
+    <link rel="stylesheet" href="{{ asset('assets/css/frontend/layout.css') }}">
+    @stack('styles')
     @yield('head')
 
     {{-- Google Analytics GA4 --}}
@@ -170,67 +132,6 @@
          FLOATING WHATSAPP + CALLBACK BUTTONS
          Fixed bottom-right — visible on all pages
     ════════════════════════════════════════════ --}}
-    <style>
-      .floating-cta-wrap {
-        position: fixed;
-        bottom: 80px;
-        right: 20px;
-        z-index: 9999;
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 10px;
-      }
-      .floating-cta-wrap .fcta-label {
-        font-size: 11px;
-        font-weight: 600;
-        color: #fff;
-        background: rgba(0,0,0,.5);
-        padding: 2px 8px;
-        border-radius: 20px;
-        white-space: nowrap;
-        opacity: 0;
-        transition: opacity .2s;
-        pointer-events: none;
-      }
-      .floating-cta-wrap .fcta-btn:hover + .fcta-label,
-      .floating-cta-wrap .fcta-item:hover .fcta-label { opacity: 1; }
-      .floating-cta-wrap .fcta-item {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 4px;
-      }
-      .fcta-btn {
-        width: 52px;
-        height: 52px;
-        border-radius: 50%;
-        border: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.4rem;
-        cursor: pointer;
-        box-shadow: 0 4px 16px rgba(0,0,0,.25);
-        transition: transform .2s, box-shadow .2s;
-        text-decoration: none;
-        color: #fff;
-      }
-      .fcta-btn:hover {
-        transform: scale(1.1);
-        box-shadow: 0 6px 22px rgba(0,0,0,.32);
-        color: #fff;
-      }
-      .fcta-whatsapp { background: #25D366; }
-      .fcta-call     { background: linear-gradient(135deg, #0a2d5e, #0078d4); }
-      .fcta-pulse {
-        animation: pulseglow 2.5s infinite;
-      }
-      @keyframes pulseglow {
-        0%, 100% { box-shadow: 0 4px 16px rgba(37,211,102,.35); }
-        50%       { box-shadow: 0 4px 28px rgba(37,211,102,.75); }
-      }
-    </style>
 
     <div class="floating-cta-wrap">
       {{-- WhatsApp --}}
@@ -259,42 +160,6 @@
          STICKY BOTTOM BAR (mobile only)
          Shows Call | WhatsApp | Post Property
     ════════════════════════════════════════════ --}}
-    <style>
-      .sticky-bottom-bar {
-        position: fixed;
-        bottom: 0; left: 0; right: 0;
-        z-index: 9998;
-        display: none;
-        background: #fff;
-        border-top: 1px solid #e2e8f0;
-        box-shadow: 0 -4px 16px rgba(0,0,0,.12);
-        padding: 8px 12px;
-      }
-      @media (max-width: 768px) {
-        .sticky-bottom-bar { display: flex; }
-        .floating-cta-wrap { bottom: 72px; right: 14px; }
-        .floating-cta-wrap .fcta-btn { width: 44px; height: 44px; font-size: 1.2rem; }
-      }
-      .sticky-bottom-bar .sbb-btn {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        font-size: 11px;
-        font-weight: 600;
-        gap: 2px;
-        text-decoration: none;
-        border-radius: 8px;
-        padding: 6px 4px;
-        transition: background .15s;
-      }
-      .sticky-bottom-bar .sbb-btn i { font-size: 1.2rem; }
-      .sbb-call    { color: #0078d4; }
-      .sbb-wa      { color: #25D366; }
-      .sbb-post    { color: #fff; background: linear-gradient(135deg, #0a2d5e, #0078d4); }
-      .sbb-divider { width: 1px; background: #e2e8f0; margin: 0 4px; }
-    </style>
 
     <div class="sticky-bottom-bar d-md-none">
       <a href="tel:+91{{ config('app.contact_phone','7340753780') }}" class="sbb-btn sbb-call">

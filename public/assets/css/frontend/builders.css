@@ -1,0 +1,295 @@
+/*
+ * builders.css
+ * Extracted from inline <style> blocks in resources/views/frontend/*
+ * Generated as part of the "separate CSS from views" cleanup.
+ * NOTE: visual output should be unchanged — this file only relocates
+ * existing rules out of the Blade templates.
+ */
+
+/* ==================================================================
+   resources/views/frontend/partials/builders.blade.php
+   ================================================================== */
+
+/* ===== BUILDERS LIST PAGE ===== */
+.bl-page { background: #f1f5f9; min-height: 100vh; }
+
+/* Header banner */
+.bl-banner {
+  background: linear-gradient(135deg, #0a2d5e 0%, #0f4c81 60%, #1565c0 100%);
+  padding: 48px 0 40px;
+  color: #fff;
+}
+.bl-banner h1 { font-size: 2rem; font-weight: 800; margin: 0 0 6px; }
+.bl-banner p  { font-size: .95rem; opacity: .88; margin: 0; }
+.bl-banner .bl-stats-row {
+  display: flex; gap: 28px; flex-wrap: wrap; margin-top: 24px;
+}
+.bl-banner .bl-stat {
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.25);
+  border-radius: 8px; padding: 10px 18px; text-align: center;
+}
+.bl-banner .bl-stat .val { font-size: 1.5rem; font-weight: 800; line-height: 1; }
+.bl-banner .bl-stat .lbl { font-size: .72rem; opacity: .85; margin-top: 2px; }
+
+/* Search bar */
+.bl-search-bar {
+  background: #fff; border-bottom: 1px solid #e2e8f0;
+  padding: 16px 0; position: sticky; top: 70px; z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+.bl-search-bar .bl-search-inner { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.bl-search-bar .bl-input {
+  flex: 1; min-width: 220px;
+  border: 1px solid #cbd5e1; border-radius: 8px;
+  padding: 10px 14px 10px 38px; font-size: .88rem; color: #334155; outline: none;
+  background: #f8fafc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0'/%3E%3C/svg%3E") no-repeat 12px center;
+  transition: border-color .2s;
+}
+.bl-search-bar .bl-input:focus { border-color: #0078d4; background-color: #fff; }
+.bl-search-bar .bl-search-btn {
+  background: #0078d4; color: #fff; border: none;
+  border-radius: 8px; padding: 10px 22px;
+  font-size: .88rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+  transition: background .2s;
+}
+.bl-search-bar .bl-search-btn:hover { background: #0a2d5e; }
+
+/* Builder card */
+.bl-card {
+  background: #fff; border-radius: 12px; border: 1px solid #e2e8f0;
+  overflow: hidden; transition: box-shadow .22s, transform .22s;
+  height: 100%; display: flex; flex-direction: column;
+}
+.bl-card:hover { box-shadow: 0 8px 24px rgba(0,120,212,.12); transform: translateY(-3px); }
+
+/* Card photo */
+.bl-card-photo {
+  position: relative; height: 180px;
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  overflow: hidden; flex-shrink: 0;
+}
+.bl-card-photo img { width: 100%; height: 100%; object-fit: cover; transition: transform .3s; }
+.bl-card:hover .bl-card-photo img { transform: scale(1.05); }
+.bl-card-photo .bl-avatar-fallback {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 3.5rem; color: #0078d4; font-weight: 800;
+  background: linear-gradient(135deg, #dbeafe 0%, #93c5fd 100%);
+}
+.bl-badge {
+  position: absolute; top: 10px; left: 10px;
+  font-size: .68rem; font-weight: 700; padding: 3px 9px;
+  border-radius: 4px; text-transform: uppercase; letter-spacing: .4px;
+}
+.bl-badge.verified { background: #22c55e; color: #fff; }
+.bl-badge.featured { background: #f59e0b; color: #fff; }
+.bl-proj-count {
+  position: absolute; bottom: 10px; right: 10px;
+  background: rgba(0,0,0,.65); color: #fff;
+  font-size: .72rem; font-weight: 600;
+  padding: 4px 10px; border-radius: 20px;
+  display: flex; align-items: center; gap: 4px;
+}
+
+/* Card body */
+.bl-card-body { padding: 18px; flex: 1; display: flex; flex-direction: column; }
+.bl-builder-name { font-size: 1.05rem; font-weight: 700; color: #1e293b; margin: 0 0 2px; line-height: 1.3; }
+.bl-company-sub  { font-size: .8rem; color: #64748b; margin: 0 0 10px; display: flex; align-items: center; gap: 4px; }
+.bl-cities       { font-size: .78rem; color: #475569; display: flex; align-items: flex-start; gap: 5px; margin-bottom: 10px; }
+.bl-cities i     { color: #ef4444; margin-top: 2px; flex-shrink: 0; }
+
+/* Project type tags */
+.bl-type-tags    { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 14px; }
+.bl-type-tag {
+  background: #eff6ff; border: 1px solid #bfdbfe;
+  color: #1d4ed8; font-size: .7rem; font-weight: 500;
+  padding: 3px 9px; border-radius: 20px;
+}
+
+/* Mini stats */
+.bl-mini-stats {
+  display: flex; gap: 0;
+  border-top: 1px solid #f1f5f9; border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 14px; padding: 10px 0;
+}
+.bl-mini-stat   { flex: 1; text-align: center; border-right: 1px solid #f1f5f9; }
+.bl-mini-stat:last-child { border-right: none; }
+.bl-mini-stat .ms-val { font-size: .95rem; font-weight: 700; color: #1e293b; }
+.bl-mini-stat .ms-lbl { font-size: .65rem; color: #94a3b8; margin-top: 1px; }
+
+/* Card actions */
+.bl-card-actions { display: flex; gap: 8px; margin-top: auto; }
+.bl-btn-profile {
+  flex: 1; background: #0078d4; color: #fff;
+  border: none; border-radius: 7px; padding: 10px;
+  font-size: .85rem; font-weight: 600; cursor: pointer;
+  text-align: center; text-decoration: none;
+  transition: background .2s; display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.bl-btn-profile:hover { background: #0a2d5e; color: #fff; text-decoration: none; }
+.bl-btn-call {
+  width: 40px; height: 40px; background: #f0fdf4; color: #16a34a;
+  border: 1px solid #bbf7d0; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; text-decoration: none; transition: all .2s; flex-shrink: 0;
+}
+.bl-btn-call:hover { background: #16a34a; color: #fff; border-color: #16a34a; }
+.bl-btn-wa {
+  width: 40px; height: 40px; background: #f0fdf4; color: #25d366;
+  border: 1px solid #bbf7d0; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; text-decoration: none; transition: all .2s; flex-shrink: 0;
+}
+.bl-btn-wa:hover { background: #25d366; color: #fff; border-color: #25d366; }
+
+/* Empty / section */
+.bl-empty { text-align: center; padding: 80px 20px; background: #fff; border-radius: 12px; border: 2px dashed #e2e8f0; }
+.bl-empty i { font-size: 3.5rem; color: #cbd5e1; margin-bottom: 16px; display: block; }
+.bl-empty h4 { font-size: 1.1rem; color: #64748b; margin: 0 0 6px; }
+.bl-empty p  { font-size: .88rem; color: #94a3b8; }
+.bl-section-title {
+  font-size: .8rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .8px; color: #64748b; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.bl-section-title::after { content: ''; flex: 1; height: 1px; background: #e2e8f0; }
+
+@media(max-width:768px) {
+  .bl-banner h1 { font-size: 1.45rem; }
+  .bl-banner .bl-stats-row { gap: 12px; }
+}
+
+/* ==================================================================
+   resources/views/frontend/partials/builder-profile.blade.php
+   ================================================================== */
+
+/* ===== BUILDER PROFILE PAGE ===== */
+.bp-page { background: #f1f5f9; min-height: 100vh; }
+
+/* Hero */
+.bp-hero {
+  background: linear-gradient(135deg, #0a2d5e 0%, #0f4c81 50%, #1565c0 100%);
+  padding: 40px 0 0; color: #fff; position: relative;
+}
+.bp-hero::after {
+  content: ''; display: block; height: 40px; background: #f1f5f9;
+  margin-top: -1px; clip-path: ellipse(55% 100% at 50% 100%);
+}
+.bp-logo-wrap { position: relative; display: inline-block; }
+.bp-logo {
+  width: 110px; height: 110px; border-radius: 16px; object-fit: cover;
+  border: 4px solid rgba(255,255,255,.9); box-shadow: 0 4px 20px rgba(0,0,0,.25); background: #fff;
+}
+.bp-logo-fallback {
+  width: 110px; height: 110px; border-radius: 16px;
+  background: rgba(255,255,255,.2); border: 4px solid rgba(255,255,255,.9);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.8rem; font-weight: 800; color: #fff;
+}
+.bp-verified-dot {
+  position: absolute; bottom: -6px; right: -6px;
+  width: 28px; height: 28px; border-radius: 50%;
+  background: #22c55e; border: 2px solid #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .7rem; color: #fff;
+}
+.bp-builder-name   { font-size: 1.75rem; font-weight: 800; margin: 0 0 4px; }
+.bp-builder-sub    { font-size: .92rem; opacity: .88; margin: 0 0 8px; }
+.bp-builder-meta   { display: flex; gap: 16px; flex-wrap: wrap; font-size: .83rem; opacity: .9; margin-bottom: 18px; }
+.bp-builder-meta span { display: flex; align-items: center; gap: 5px; }
+.bp-hero-ctas      { display: flex; gap: 10px; flex-wrap: wrap; padding-bottom: 48px; }
+.bp-hero-ctas .btn { border-radius: 8px; font-weight: 600; font-size: .88rem; padding: 10px 20px; display: flex; align-items: center; gap: 7px; }
+.btn-wa-hero { background: #25d366; border-color: #25d366; color: #fff; }
+.btn-wa-hero:hover { background: #1ebe5d; border-color: #1ebe5d; color: #fff; }
+
+/* Stats row */
+.bp-stats-row { display: flex; flex-wrap: wrap; gap: 0; background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; margin-bottom: 24px; }
+.bp-stat { flex: 1; min-width: 120px; text-align: center; padding: 20px 10px; border-right: 1px solid #f1f5f9; }
+.bp-stat:last-child { border-right: none; }
+.bp-stat .val { font-size: 1.6rem; font-weight: 800; color: #0078d4; }
+.bp-stat .lbl { font-size: .72rem; color: #94a3b8; margin-top: 3px; text-transform: uppercase; letter-spacing: .5px; }
+
+/* Section title */
+.bp-section-title { font-size: 1.1rem; font-weight: 700; color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.bp-section-title i { color: #0078d4; }
+
+/* Info card */
+.bp-card { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 22px; margin-bottom: 20px; }
+
+/* Project filter tabs */
+.bp-filter-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; }
+.bp-filter-tab {
+  padding: 6px 16px; border-radius: 20px; border: 1.5px solid #e2e8f0;
+  font-size: .78rem; font-weight: 600; cursor: pointer; color: #64748b;
+  background: #fff; transition: all .2s;
+}
+.bp-filter-tab.active, .bp-filter-tab:hover { background: #0078d4; color: #fff; border-color: #0078d4; }
+
+/* Project card */
+.bp-proj-card {
+  background: #fff; border-radius: 12px; border: 1px solid #e2e8f0;
+  overflow: hidden; transition: box-shadow .22s, transform .22s; height: 100%;
+}
+.bp-proj-card:hover { box-shadow: 0 8px 24px rgba(0,120,212,.12); transform: translateY(-3px); }
+.bp-proj-img {
+  height: 180px; background: linear-gradient(135deg, #dbeafe, #bfdbfe); position: relative; overflow: hidden;
+}
+.bp-proj-img img { width: 100%; height: 100%; object-fit: cover; transition: transform .3s; }
+.bp-proj-card:hover .bp-proj-img img { transform: scale(1.05); }
+.bp-proj-img .bp-status {
+  position: absolute; top: 10px; left: 10px; font-size: .68rem; font-weight: 700;
+  padding: 3px 10px; border-radius: 4px; text-transform: uppercase;
+}
+.bp-proj-img .bp-units-pill {
+  position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,.65); color: #fff;
+  font-size: .72rem; font-weight: 600; padding: 4px 10px; border-radius: 20px;
+}
+.bp-proj-body { padding: 16px; }
+.bp-proj-title { font-size: .98rem; font-weight: 700; color: #1e293b; margin: 0 0 4px; }
+.bp-proj-city  { font-size: .78rem; color: #64748b; margin: 0 0 10px; display: flex; align-items: center; gap: 4px; }
+.bp-proj-price { font-size: .88rem; font-weight: 600; color: #0078d4; margin: 0 0 12px; }
+.bp-proj-btn {
+  display: block; text-align: center; background: #0078d4; color: #fff;
+  border-radius: 7px; padding: 9px; font-size: .82rem; font-weight: 600;
+  text-decoration: none; transition: background .2s;
+}
+.bp-proj-btn:hover { background: #0a2d5e; color: #fff; }
+
+/* RERA badge */
+.bp-rera-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #f0fdf4; border: 1px solid #86efac;
+  color: #16a34a; font-size: .75rem; font-weight: 600;
+  padding: 4px 10px; border-radius: 6px;
+}
+
+/* Builder lead form (sidebar) */
+.bp-lead-form {
+  background: linear-gradient(135deg,#0078d4 0%,#1565c0 100%);
+  border-radius: 12px; padding: 22px; color: #fff; position: sticky; top: 80px;
+}
+.bp-lead-form h5 { font-size: 1rem; font-weight: 700; margin-bottom: 4px; }
+.bp-lead-form p  { font-size: .8rem; opacity: .85; margin-bottom: 14px; }
+.bp-lead-form .form-control {
+  background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3);
+  color: #fff; border-radius: 8px; padding: 9px 12px; font-size: .83rem; margin-bottom: 8px;
+}
+.bp-lead-form .form-control::placeholder { color: rgba(255,255,255,.6); }
+.bp-lead-form .form-control:focus { background: rgba(255,255,255,.2); border-color: rgba(255,255,255,.6); color: #fff; box-shadow: none; }
+.bp-lead-btn { width:100%; background:#fff; color:#0078d4; border:none; border-radius:8px; padding:11px; font-size:.88rem; font-weight:700; cursor:pointer; transition:all .2s; margin-top:4px; }
+.bp-lead-btn:hover { background:#eff6ff; }
+
+/* Builder Trust Timeline */
+.bp-trust-timeline { position:relative; padding-left:28px; }
+.bp-trust-timeline::before { content:''; position:absolute; left:9px; top:8px; bottom:8px; width:2px; background:#e2e8f0; }
+.bp-tt-item { position:relative; margin-bottom:18px; }
+.bp-tt-item:last-child { margin-bottom:0; }
+.bp-tt-dot { position:absolute; left:-24px; top:4px; width:16px; height:16px; border-radius:50%; background:#0078d4; border:2px solid #fff; box-shadow:0 0 0 2px #dbeafe; }
+.bp-tt-year { font-size:.7rem; font-weight:700; color:#0078d4; text-transform:uppercase; letter-spacing:.5px; }
+.bp-tt-text { font-size:.82rem; color:#334155; margin-top:1px; }
+
+@media(max-width:768px) {
+  .bp-builder-name { font-size: 1.3rem; }
+  .bp-stat .val { font-size: 1.2rem; }
+}

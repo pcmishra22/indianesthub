@@ -1,0 +1,482 @@
+/*
+ * agents.css
+ * Extracted from inline <style> blocks in resources/views/frontend/*
+ * Generated as part of the "separate CSS from views" cleanup.
+ * NOTE: visual output should be unchanged — this file only relocates
+ * existing rules out of the Blade templates.
+ */
+
+/* ==================================================================
+   resources/views/frontend/partials/agents.blade.php
+   ================================================================== */
+
+/* ===== DEALERS LIST PAGE ===== */
+.dl-page { background: #f1f5f9; min-height: 100vh; }
+
+/* Header banner */
+.dl-banner {
+  background: linear-gradient(135deg, #1565c0 0%, #1f85de 60%, #0ea5e9 100%);
+  padding: 48px 0 40px;
+  color: #fff;
+}
+.dl-banner h1 { font-size: 2rem; font-weight: 800; margin: 0 0 6px; }
+.dl-banner p  { font-size: .95rem; opacity: .88; margin: 0; }
+.dl-banner .dl-stats-row {
+  display: flex; gap: 28px; flex-wrap: wrap; margin-top: 24px;
+}
+.dl-banner .dl-stat {
+  background: rgba(255,255,255,.15);
+  border: 1px solid rgba(255,255,255,.25);
+  border-radius: 8px;
+  padding: 10px 18px;
+  text-align: center;
+}
+.dl-banner .dl-stat .val { font-size: 1.5rem; font-weight: 800; line-height: 1; }
+.dl-banner .dl-stat .lbl { font-size: .72rem; opacity: .85; margin-top: 2px; }
+
+/* Search / filter bar */
+.dl-search-bar {
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 16px 0;
+  position: sticky;
+  top: 70px;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+.dl-search-bar .dl-search-inner {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+.dl-search-bar .dl-input {
+  flex: 1;
+  min-width: 220px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 14px 10px 38px;
+  font-size: .88rem;
+  color: #334155;
+  outline: none;
+  transition: border-color .2s;
+  background: #f8fafc url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0'/%3E%3C/svg%3E") no-repeat 12px center;
+}
+.dl-search-bar .dl-input:focus { border-color: #1f85de; background-color: #fff; }
+.dl-search-bar .dl-search-btn {
+  background: #1f85de; color: #fff; border: none;
+  border-radius: 8px; padding: 10px 22px;
+  font-size: .88rem; font-weight: 600; cursor: pointer;
+  transition: background .2s; white-space: nowrap;
+}
+.dl-search-bar .dl-search-btn:hover { background: #1565c0; }
+
+/* Dealer card */
+.dl-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  transition: box-shadow .22s, transform .22s;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.dl-card:hover {
+  box-shadow: 0 8px 24px rgba(31,133,222,.15);
+  transform: translateY(-3px);
+}
+
+/* Card photo */
+.dl-card-photo {
+  position: relative;
+  height: 180px;
+  background: linear-gradient(135deg, #dbeafe 0%, #e0f2fe 100%);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.dl-card-photo img {
+  width: 100%; height: 100%; object-fit: cover;
+  transition: transform .3s ease;
+}
+.dl-card:hover .dl-card-photo img { transform: scale(1.05); }
+.dl-card-photo .dl-avatar-fallback {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 3.5rem; color: #1f85de; font-weight: 800;
+  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+}
+.dl-badge {
+  position: absolute; top: 10px; left: 10px;
+  font-size: .68rem; font-weight: 700; padding: 3px 9px;
+  border-radius: 4px; text-transform: uppercase; letter-spacing: .4px;
+}
+.dl-badge.verified { background: #22c55e; color: #fff; }
+.dl-badge.active   { background: #1f85de; color: #fff; }
+.dl-badge.premium  { background: #7c3aed; color: #fff; }
+
+.dl-prop-count {
+  position: absolute; bottom: 10px; right: 10px;
+  background: rgba(0,0,0,.65); color: #fff;
+  font-size: .72rem; font-weight: 600;
+  padding: 4px 10px; border-radius: 20px;
+  display: flex; align-items: center; gap: 4px;
+}
+
+/* Card body */
+.dl-card-body { padding: 18px; flex: 1; display: flex; flex-direction: column; }
+.dl-dealer-name {
+  font-size: 1.05rem; font-weight: 700; color: #1e293b;
+  margin: 0 0 2px; line-height: 1.3;
+}
+.dl-company-name {
+  font-size: .8rem; color: #64748b;
+  margin: 0 0 10px;
+  display: flex; align-items: center; gap: 4px;
+}
+.dl-cities {
+  font-size: .78rem; color: #475569;
+  display: flex; align-items: flex-start; gap: 5px;
+  margin-bottom: 10px;
+}
+.dl-cities i { color: #ef4444; margin-top: 2px; flex-shrink: 0; }
+
+/* Specialization tags */
+.dl-spec-tags {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  margin-bottom: 14px;
+}
+.dl-spec-tag {
+  background: #f1f5f9; border: 1px solid #e2e8f0;
+  color: #475569; font-size: .7rem; font-weight: 500;
+  padding: 3px 9px; border-radius: 20px;
+}
+
+/* Mini stats */
+.dl-mini-stats {
+  display: flex; gap: 0;
+  border-top: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f1f5f9;
+  margin-bottom: 14px; padding: 10px 0;
+}
+.dl-mini-stat {
+  flex: 1; text-align: center;
+  border-right: 1px solid #f1f5f9;
+}
+.dl-mini-stat:last-child { border-right: none; }
+.dl-mini-stat .ms-val { font-size: .95rem; font-weight: 700; color: #1e293b; }
+.dl-mini-stat .ms-lbl { font-size: .65rem; color: #94a3b8; margin-top: 1px; }
+
+/* Card actions */
+.dl-card-actions { display: flex; gap: 8px; margin-top: auto; }
+.dl-btn-profile {
+  flex: 1;
+  background: #1f85de; color: #fff;
+  border: none; border-radius: 7px;
+  padding: 10px; font-size: .85rem; font-weight: 600;
+  cursor: pointer; text-align: center; text-decoration: none;
+  transition: background .2s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.dl-btn-profile:hover { background: #1565c0; color: #fff; text-decoration: none; }
+.dl-btn-call {
+  width: 40px; height: 40px;
+  background: #f0fdf4; color: #16a34a;
+  border: 1px solid #bbf7d0; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; text-decoration: none;
+  transition: all .2s; flex-shrink: 0;
+}
+.dl-btn-call:hover { background: #16a34a; color: #fff; border-color: #16a34a; }
+.dl-btn-wa {
+  width: 40px; height: 40px;
+  background: #f0fdf4; color: #25d366;
+  border: 1px solid #bbf7d0; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; text-decoration: none;
+  transition: all .2s; flex-shrink: 0;
+}
+.dl-btn-wa:hover { background: #25d366; color: #fff; border-color: #25d366; }
+
+/* Empty state */
+.dl-empty {
+  text-align: center; padding: 80px 20px;
+  background: #fff; border-radius: 12px;
+  border: 2px dashed #e2e8f0;
+}
+.dl-empty i { font-size: 3.5rem; color: #cbd5e1; margin-bottom: 16px; display: block; }
+.dl-empty h4 { font-size: 1.1rem; color: #64748b; margin: 0 0 6px; }
+.dl-empty p  { font-size: .88rem; color: #94a3b8; }
+
+/* Section title */
+.dl-section-title {
+  font-size: .8rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .8px;
+  color: #64748b; margin-bottom: 16px;
+  display: flex; align-items: center; gap: 8px;
+}
+.dl-section-title::after {
+  content: ''; flex: 1; height: 1px; background: #e2e8f0;
+}
+
+/* Pagination handled by vendor/pagination/indianesthub.blade.php */
+
+@media(max-width:768px) {
+  .dl-banner h1 { font-size: 1.45rem; }
+  .dl-banner .dl-stats-row { gap: 12px; }
+}
+
+/* ==================================================================
+   resources/views/frontend/partials/agent-profile.blade.php
+   ================================================================== */
+
+/* ===== DEALER PROFILE PAGE ===== */
+.dp-page { background: #f1f5f9; min-height: 100vh; }
+
+/* Hero */
+.dp-hero {
+  background: linear-gradient(135deg, #1565c0 0%, #1f85de 60%, #0ea5e9 100%);
+  padding: 40px 0 0;
+  color: #fff;
+  position: relative;
+}
+.dp-hero::after {
+  content: '';
+  display: block;
+  height: 40px;
+  background: #f1f5f9;
+  margin-top: -1px;
+  clip-path: ellipse(55% 100% at 50% 100%);
+}
+.dp-avatar-wrap {
+  position: relative;
+  display: inline-block;
+}
+.dp-avatar {
+  width: 110px; height: 110px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 4px solid rgba(255,255,255,.9);
+  box-shadow: 0 4px 20px rgba(0,0,0,.25);
+}
+.dp-avatar-fallback {
+  width: 110px; height: 110px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.2);
+  border: 4px solid rgba(255,255,255,.9);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.8rem; font-weight: 800; color: #fff;
+}
+.dp-verified-dot {
+  position: absolute; bottom: 6px; right: 6px;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: #22c55e; border: 2px solid #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: .65rem; color: #fff;
+}
+.dp-dealer-name { font-size: 1.75rem; font-weight: 800; margin: 0 0 4px; }
+.dp-dealer-company { font-size: .92rem; opacity: .88; margin: 0 0 8px; }
+.dp-dealer-meta {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  font-size: .83rem; opacity: .9; margin-bottom: 18px;
+}
+.dp-dealer-meta span { display: flex; align-items: center; gap: 5px; }
+.dp-hero-ctas { display: flex; gap: 10px; flex-wrap: wrap; padding-bottom: 48px; }
+.dp-hero-ctas .btn {
+  border-radius: 8px; font-weight: 600; font-size: .88rem; padding: 10px 20px;
+  display: flex; align-items: center; gap: 7px;
+}
+.btn-wa-hero { background: #25d366; border-color: #25d366; color: #fff; }
+.btn-wa-hero:hover { background: #1ebe5d; border-color: #1ebe5d; color: #fff; }
+
+/* Stats bar */
+.dp-stats-bar {
+  background: #fff;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 24px;
+}
+.dp-stats-inner {
+  display: flex; flex-wrap: wrap;
+}
+.dp-stat-item {
+  flex: 1; min-width: 130px;
+  padding: 16px 20px;
+  text-align: center;
+  border-right: 1px solid #f1f5f9;
+}
+.dp-stat-item:last-child { border-right: none; }
+.dp-stat-item .s-val {
+  font-size: 1.55rem; font-weight: 800; color: #1565c0; line-height: 1;
+}
+.dp-stat-item .s-lbl {
+  font-size: .72rem; color: #64748b; margin-top: 3px; text-transform: uppercase; letter-spacing: .5px;
+}
+
+/* Two-column layout */
+.dp-layout { display: flex; gap: 20px; align-items: flex-start; }
+.dp-main { flex: 1; min-width: 0; }
+.dp-aside {
+  width: 300px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 80px;
+}
+
+/* Cards */
+.dp-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 20px 22px;
+  margin-bottom: 16px;
+}
+.dp-card-title {
+  font-size: 1rem; font-weight: 700; color: #1e293b;
+  padding-bottom: 12px; margin-bottom: 16px;
+  border-bottom: 2px solid #f1f5f9;
+  display: flex; align-items: center; gap: 8px;
+}
+.dp-card-title i { color: #1f85de; }
+
+/* Bio */
+.dp-bio { font-size: .9rem; color: #475569; line-height: 1.75; }
+
+/* Specializations */
+.dp-spec-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.dp-spec-chip {
+  background: #f1f5f9; border: 1px solid #e2e8f0;
+  color: #475569; font-size: .78rem; font-weight: 500;
+  padding: 5px 12px; border-radius: 20px;
+}
+
+/* Cities */
+.dp-cities-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.dp-city-chip {
+  background: #eff6ff; border: 1px solid #bfdbfe;
+  color: #1d4ed8; font-size: .78rem; font-weight: 600;
+  padding: 5px 12px; border-radius: 20px;
+  display: flex; align-items: center; gap: 4px;
+}
+
+/* ===== PROPERTY CARDS GRID ===== */
+.dp-prop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.dp-prop-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: box-shadow .22s, transform .22s;
+  text-decoration: none;
+  display: block;
+}
+.dp-prop-card:hover {
+  box-shadow: 0 8px 24px rgba(31,133,222,.14);
+  transform: translateY(-3px);
+  text-decoration: none;
+}
+.dp-prop-img {
+  position: relative;
+  height: 175px;
+  overflow: hidden;
+}
+.dp-prop-img img { width: 100%; height: 100%; object-fit: cover; transition: transform .3s; }
+.dp-prop-card:hover .dp-prop-img img { transform: scale(1.05); }
+.dp-prop-tag {
+  position: absolute; top: 10px; left: 10px;
+  font-size: .68rem; font-weight: 700; padding: 3px 9px;
+  border-radius: 4px; text-transform: uppercase; letter-spacing: .4px;
+}
+.dp-prop-tag.sale { background: #22c55e; color: #fff; }
+.dp-prop-tag.rent { background: #1f85de; color: #fff; }
+.dp-prop-tag.featured { background: #f97316; color: #fff; }
+.dp-prop-views {
+  position: absolute; bottom: 8px; right: 8px;
+  background: rgba(0,0,0,.6); color: #fff;
+  font-size: .68rem; padding: 3px 8px; border-radius: 12px;
+  display: flex; align-items: center; gap: 3px;
+}
+.dp-prop-body { padding: 14px 16px; }
+.dp-prop-price {
+  font-size: 1.1rem; font-weight: 800; color: #1565c0;
+  margin: 0 0 4px;
+}
+.dp-prop-title {
+  font-size: .85rem; font-weight: 600; color: #1e293b;
+  margin: 0 0 6px; line-height: 1.35;
+}
+.dp-prop-location {
+  font-size: .75rem; color: #64748b;
+  display: flex; align-items: center; gap: 4px;
+  margin-bottom: 10px;
+}
+.dp-prop-specs {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  font-size: .72rem; color: #64748b;
+  padding-top: 10px; border-top: 1px solid #f1f5f9;
+}
+.dp-prop-specs span { display: flex; align-items: center; gap: 3px; }
+
+/* Filter/sort bar */
+.dp-filter-bar {
+  background: #fff; border: 1px solid #e2e8f0;
+  border-radius: 10px; padding: 14px 16px;
+  margin-bottom: 16px;
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+}
+.dp-filter-bar .dp-filter-label { font-size: .8rem; font-weight: 600; color: #64748b; white-space: nowrap; }
+.dp-filter-bar .form-select {
+  border: 1px solid #e2e8f0; border-radius: 7px;
+  font-size: .82rem; padding: 7px 10px; color: #334155;
+  max-width: 180px;
+}
+
+/* Sidebar contact card */
+.dp-contact-card {
+  background: linear-gradient(135deg, #1565c0 0%, #1f85de 100%);
+  border-radius: 12px; padding: 20px;
+  color: #fff; margin-bottom: 16px;
+  box-shadow: 0 4px 15px rgba(31,133,222,.3);
+}
+.dp-contact-card h5 { font-size: .95rem; font-weight: 700; margin-bottom: 14px; }
+.dp-contact-row { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.dp-contact-item {
+  display: flex; align-items: center; gap: 8px;
+  font-size: .82rem;
+  background: rgba(255,255,255,.15);
+  border-radius: 7px; padding: 9px 12px;
+}
+.dp-contact-item i { width: 16px; text-align: center; }
+.dp-contact-btn { display: flex; flex-direction: column; gap: 8px; }
+.dp-contact-btn .btn {
+  border-radius: 7px; font-weight: 600; font-size: .85rem;
+  padding: 10px; display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+
+/* Inquiry form in aside */
+.dp-inq-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+.dp-inq-card h5 { font-size: .9rem; font-weight: 700; color: #1e293b; margin-bottom: 14px; }
+.dp-inq-card .form-control {
+  border: 1px solid #cbd5e1; border-radius: 7px;
+  font-size: .82rem; padding: 9px 12px; color: #334155;
+}
+.dp-inq-card .form-control:focus { border-color: #1f85de; box-shadow: 0 0 0 3px rgba(31,133,222,.1); }
+
+/* Empty state */
+.dp-no-props {
+  text-align: center; padding: 60px 20px;
+  background: #fff; border-radius: 12px; border: 2px dashed #e2e8f0;
+}
+.dp-no-props i { font-size: 3rem; color: #cbd5e1; display: block; margin-bottom: 14px; }
+.dp-no-props h5 { color: #64748b; margin: 0 0 6px; }
+.dp-no-props p  { font-size: .85rem; color: #94a3b8; }
+
+/* Pagination handled by vendor/pagination/indianesthub.blade.php */
+
+@media(max-width:991px) {
+  .dp-layout { flex-direction: column; }
+  .dp-aside { width: 100%; position: static; }
+  .dp-prop-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media(max-width:576px) {
+  .dp-prop-grid { grid-template-columns: 1fr; }
+  .dp-stats-inner { flex-wrap: wrap; }
+  .dp-stat-item { min-width: 120px; }
+}

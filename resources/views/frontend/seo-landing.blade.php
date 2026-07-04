@@ -41,44 +41,7 @@
 
 {{-- ════════════════════════ PAGE STYLES ════════════════════════ --}}
 @section('head')
-<style>
-.seo-hero {
-  background: linear-gradient(135deg, #0a2d5e 0%, #0f4c81 55%, #1565c0 100%);
-  padding: 56px 0 90px;
-  position: relative;
-  overflow: hidden;
-}
-.seo-hero::after {
-  content: '';
-  position: absolute;
-  bottom: -2px; left: 0; right: 0;
-  height: 60px;
-  background: #f4f6f9;
-  clip-path: ellipse(55% 100% at 50% 100%);
-}
-.seo-hero h1 { color:#fff; font-size:2.4rem; font-weight:800; letter-spacing:-0.5px; }
-.seo-hero p  { color:rgba(255,255,255,.8); font-size:1.05rem; }
-.seo-hero .breadcrumb-item a { color:rgba(255,255,255,.75); }
-.seo-hero .breadcrumb-item.active { color:rgba(255,255,255,.55); }
-.seo-hero .breadcrumb-item+.breadcrumb-item::before { color:rgba(255,255,255,.4); }
-.stat-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.2); color:#fff; padding:6px 14px; border-radius:20px; font-size:.85rem; font-weight:600; margin:4px 4px 0 0; }
-.seo-intro-box { background:#fff; border-left:4px solid #0078d4; padding:18px 22px; border-radius:0 8px 8px 0; margin-bottom:28px; }
-.seo-intro-box p { margin:0; color:#475569; line-height:1.75; }
-.prop-card { border:none; border-radius:12px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.07); transition:transform .2s,box-shadow .2s; }
-.prop-card:hover { transform:translateY(-4px); box-shadow:0 8px 28px rgba(0,0,0,.12); }
-.prop-img { width:100%; height:200px; object-fit:cover; }
-.prop-price { font-size:1.2rem; font-weight:800; color:#0a2d5e; }
-.prop-badge { font-size:.7rem; font-weight:700; padding:3px 8px; border-radius:4px; }
-.locality-chip { display:inline-block; background:#eef5fb; color:#0a2d5e; border:1px solid #bee3f8; padding:5px 12px; border-radius:20px; font-size:.83rem; font-weight:600; margin:3px; text-decoration:none; transition:background .2s; }
-.locality-chip:hover { background:#0078d4; color:#fff; border-color:#0078d4; }
-.faq-item { background:#fff; border-radius:10px; padding:20px 24px; margin-bottom:12px; box-shadow:0 1px 6px rgba(0,0,0,.06); }
-.faq-item h5 { color:#0a2d5e; font-weight:700; margin-bottom:8px; font-size:1rem; }
-.faq-item p  { color:#475569; margin:0; line-height:1.7; }
-.city-link-card { display:flex; flex-direction:column; align-items:center; justify-content:center; background:#fff; border:1.5px solid #e2e8f0; border-radius:10px; padding:16px 10px; text-decoration:none; color:#0a2d5e; font-weight:700; font-size:.88rem; text-align:center; transition:all .2s; }
-.city-link-card:hover { border-color:#0078d4; background:#eef5fb; color:#0078d4; }
-.city-link-card i { font-size:1.6rem; color:#0078d4; margin-bottom:6px; }
-.section-title-line { display:inline-block; padding-bottom:10px; border-bottom:3px solid #0078d4; margin-bottom:0; }
-</style>
+<link rel="stylesheet" href="{{ asset('assets/css/frontend/pages.css') }}">
 @endsection
 
 @section('content')
