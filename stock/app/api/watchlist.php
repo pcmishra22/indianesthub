@@ -14,8 +14,10 @@ function getActiveWatchlist(): array
         $custom = json_decode(file_get_contents(WL_FILE), true);
         if (!empty($custom)) return $custom;
     }
-    // Default: top 5 well-known NSE stocks for fast/reliable loading
-    return ['RELIANCE.NS', 'TCS.NS', 'HDFCBANK.NS', 'INFY.NS', 'ICICIBANK.NS'];
+    // Default: the full curated NSE universe (config.php WATCHLIST_SYMBOLS, ~230 stocks).
+    // Was previously hardcoded to 5 well-known names — too narrow for anything that needs
+    // real breadth (e.g. Top-10 gainers/losers, sector-momentum picks).
+    return WATCHLIST_SYMBOLS;
 }
 
 function apiWatchlist(): array
@@ -557,6 +559,156 @@ function apiLeaders(): array
         'total_ticks' => $totalTicks,
         'date'        => date('Y-m-d'),
         'generated'   => date('H:i:s'),
+    ];
+}
+
+/**
+ * Momentum Picks — a separate, standalone list (does NOT feed generateSignal()/
+ * generateSignalFull() or the main Buy/Sell score). Built from the per-minute
+ * tick log that apiTick() already writes to storage/signals_YYYY-MM-DD.json.
+ *
+ * Encodes two observed patterns, requested to be checked explicitly rather than
+ * assumed:
+ *   1. "Top gainer/loser at market open tends to stay on top" — checked by
+ *      comparing the open-snapshot rank (first tick at/before 09:20) against the
+ *      current rank, not just asserted.
+ *   2. "Whichever sector dominates the current Top 10 gainers/losers is a good
+ *      momentum pick" — a sector only qualifies if it has 3+ members in the
+ *      current Top 10 (i.e. a stock shares its sector with 2+ others), per your
+ *      confirmed requirement.
+ *
+ * IMPORTANT CAVEATS (see these reflected in the 'disclaimer' field too):
+ * - This is a heuristic based on today's single session, not a backtested
+ *   strategy. Gap-and-fade (reversal) is at least as common as gap-and-go
+ *   (continuation), especially for large/low-volume gaps.
+ * - No stop-loss, target, or position-sizing logic is included — this is a
+ *   watchlist filter, not a trade plan.
+ * - Needs the cron (api/cron) to have been running since ~09:16 for the open
+ *   snapshot to be meaningful; if cron started late, the earliest available
+ *   tick of the day is used instead and flagged as such.
+ */
+function apiMomentumPicks(): array
+{
+    $today   = date('Y-m-d');
+    $logFile = STORAGE . '/signals_' . $today . '.json';
+
+    if (!file_exists($logFile)) {
+        return ['error' => 'No tick data logged yet today — the cron endpoint (api/cron) needs to run at least once (ideally from market open).', 'date' => $today];
+    }
+    $log = json_decode(file_get_contents($logFile), true) ?? [];
+    if (!$log) {
+        return ['error' => 'Tick log is empty for today.', 'date' => $today];
+    }
+
+    $openCutoff = '09:20'; // ticks at/before this are treated as the "at open" snapshot
+    $now        = time();
+    $hourAgo    = $now - 3600;
+
+    $openRows = []; $nowRows = []; $hourRows = []; $lateOpenFlag = false;
+
+    foreach ($log as $sym => $data) {
+        $ticks = $data['ticks'] ?? [];
+        if (!$ticks) continue;
+        $name = $data['name'] ?? $sym;
+
+        // Open-snapshot tick: earliest tick at/before cutoff; else the day's first tick (flagged as late-start)
+        $openTick = null;
+        foreach ($ticks as $t) {
+            if (($t['min'] ?? '99:99') <= $openCutoff) { $openTick = $t; break; }
+        }
+        if (!$openTick) { $openTick = $ticks[0]; $lateOpenFlag = true; }
+
+        $lastTick = end($ticks);
+        $hourTicks = array_values(array_filter($ticks, fn($t) => ($t['ts'] ?? 0) >= $hourAgo));
+        $hourStartTick = $hourTicks[0] ?? $lastTick;
+
+        $openRows[] = ['symbol' => $sym, 'name' => $name, 'chg' => $openTick['chg'], 'price' => $openTick['price'], 'min' => $openTick['min'] ?? null];
+        $nowRows[]  = ['symbol' => $sym, 'name' => $name, 'chg' => $lastTick['chg'],  'price' => $lastTick['price']];
+        $hourRows[] = ['symbol' => $sym, 'name' => $name, 'chg_now' => $lastTick['chg'], 'chg_hour_start' => $hourStartTick['chg'], 'price' => $lastTick['price']];
+    }
+
+    // Rank at open and now (gainers descending, losers ascending)
+    $openByGain = $openRows; usort($openByGain, fn($a, $b) => $b['chg'] <=> $a['chg']);
+    $openByLoss = $openRows; usort($openByLoss, fn($a, $b) => $a['chg'] <=> $b['chg']);
+    $nowByGain  = $nowRows;  usort($nowByGain,  fn($a, $b) => $b['chg'] <=> $a['chg']);
+    $nowByLoss  = $nowRows;  usort($nowByLoss,  fn($a, $b) => $a['chg'] <=> $b['chg']);
+
+    $openTop10GainSyms = array_slice(array_column($openByGain, 'symbol'), 0, 10);
+    $openTop10LossSyms = array_slice(array_column($openByLoss, 'symbol'), 0, 10);
+    $nowTop10Gainers   = array_slice($nowByGain, 0, 10);
+    $nowTop10Losers    = array_slice($nowByLoss, 0, 10);
+
+    // ── Single-stock picks: current #1 mover, flagged by whether it persisted from the open Top 10 ──
+    $topBuyForDay = null;
+    if (!empty($nowByGain)) {
+        $c = $nowByGain[0];
+        $persisted = in_array($c['symbol'], $openTop10GainSyms, true);
+        $topBuyForDay = array_merge($c, [
+            'persisted_from_open' => $persisted,
+            'note' => $persisted
+                ? 'Was in the top-10 gainers at the market-open snapshot (~09:16-09:20) and is still the #1 gainer now — the "stays on top" pattern held today.'
+                : 'Currently the #1 gainer, but was NOT in the open-snapshot top 10 — this is fresh intraday momentum, not the open-persistence pattern you observed.',
+        ]);
+    }
+    $topSellForDay = null;
+    if (!empty($nowByLoss)) {
+        $c = $nowByLoss[0];
+        $persisted = in_array($c['symbol'], $openTop10LossSyms, true);
+        $topSellForDay = array_merge($c, [
+            'persisted_from_open' => $persisted,
+            'note' => $persisted
+                ? 'Was in the top-10 losers at the market-open snapshot (~09:16-09:20) and is still the #1 loser now — the "stays down" pattern held today.'
+                : 'Currently the #1 loser, but was NOT in the open-snapshot top 10 — this is fresh intraday weakness, not the open-persistence pattern you observed.',
+        ]);
+    }
+
+    // ── Hour picks: biggest mover strictly within the trailing 1-hour window (independent of open-of-day rank) ──
+    $hourByGain = $hourRows; usort($hourByGain, fn($a, $b) => ($b['chg_now'] - $b['chg_hour_start']) <=> ($a['chg_now'] - $a['chg_hour_start']));
+    $hourByLoss = $hourRows; usort($hourByLoss, fn($a, $b) => ($a['chg_now'] - $a['chg_hour_start']) <=> ($b['chg_now'] - $b['chg_hour_start']));
+    $topBuyForHour  = $hourByGain[0] ?? null;
+    $topSellForHour = $hourByLoss[0] ?? null;
+
+    // ── Sector-momentum picks: sector must have 3+ members in the current Top 10 (shares with 2+ others) ──
+    $sectorOf = function (string $sym): ?string {
+        $bare = strtoupper(str_replace('.NS', '', $sym));
+        foreach (SECTOR_MAP as $sector => $members) {
+            if (in_array($bare, $members, true)) return $sector;
+        }
+        return null;
+    };
+
+    $gainBySector = [];
+    foreach ($nowTop10Gainers as $row) {
+        $s = $sectorOf($row['symbol']);
+        if ($s) $gainBySector[$s][] = $row;
+    }
+    $lossBySector = [];
+    foreach ($nowTop10Losers as $row) {
+        $s = $sectorOf($row['symbol']);
+        if ($s) $lossBySector[$s][] = $row;
+    }
+    $sectorMomentumBuy  = array_filter($gainBySector, fn($rows) => count($rows) >= 3);
+    $sectorMomentumSell = array_filter($lossBySector, fn($rows) => count($rows) >= 3);
+
+    return [
+        'date'      => $today,
+        'generated' => date('H:i:s'),
+
+        'top_buy_for_day'   => $topBuyForDay,
+        'top_sell_for_day'  => $topSellForDay,
+        'top_buy_for_hour'  => $topBuyForHour,
+        'top_sell_for_hour' => $topSellForHour,
+
+        'sector_momentum_buy'  => $sectorMomentumBuy,
+        'sector_momentum_sell' => $sectorMomentumSell,
+
+        'now_top10_gainers' => $nowTop10Gainers,
+        'now_top10_losers'  => $nowTop10Losers,
+
+        'open_snapshot_late' => $lateOpenFlag,
+        'stocks_tracked'     => count($nowRows),
+
+        'disclaimer' => "Heuristic watchlist filter based on today's session only — not a backtested strategy, not risk-managed, and not the same as the main scorecard signal. Gap-and-fade (reversal) happens about as often as gap-and-go (continuation); confirm with volume/trend before acting, and use your own stop-loss.",
     ];
 }
 

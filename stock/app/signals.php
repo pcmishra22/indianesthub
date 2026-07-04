@@ -17,13 +17,46 @@ function lastNonNull(array $arr, mixed $default = null): mixed
     return empty($filtered) ? $default : end($filtered);
 }
 
-/** Generate buy/sell signal + reasoning from indicators */
+/**
+ * Generate buy/sell signal + reasoning from indicators.
+ *
+ * Implements the weighted 15-indicator scorecard below, split into three
+ * categories (Trend / Momentum / Confirmation). A confidence filter turns
+ * the raw bullish/bearish totals into a signal, and a Strong Buy/Strong
+ * Sell additionally requires all three categories to agree in direction —
+ * this is what prevents a "momentum looks good but trend is weak" false
+ * signal from ever showing as a top-conviction call.
+ *
+ *   Indicator             Bull  Bear   Category
+ *   Supertrend              3     3    Trend
+ *   EMA20 vs EMA50          2     2    Trend
+ *   ADX > 25                2     0    Trend
+ *   RSI                     2     2    Momentum
+ *   MACD Cross              2     2    Momentum
+ *   Price vs EMA20          1     1    Confirmation
+ *   VWAP                    1     1    Confirmation
+ *   Bollinger Reversal      1     1    Confirmation
+ *   Volume Spike            2     2    Confirmation
+ *   HH-HL / LH-LL           2     2    Confirmation
+ *   Resistance Breakout     2     0    Confirmation
+ *   Support Breakdown       0     2    Confirmation
+ *   52-week Breakout        3     0    Confirmation
+ *   Delivery %              1     1    Confirmation  (no data feed yet — see note below)
+ *   OI + Price              2     2    Confirmation  (no data feed yet — see note below)
+ *
+ * Delivery % and F&O Open Interest aren't available from this app's Yahoo
+ * Finance data source (that comes from NSE bhavcopy / F&O feeds this app
+ * doesn't fetch). Both are wired in and activate automatically the moment
+ * $quote['deliveryPercent'] / $quote['oiChangePercent'] are populated;
+ * until then they contribute 0 to both sides instead of being guessed at.
+ */
 function generateSignal(array $quote, array $history, array $indicators): array
 {
     $price  = $quote['regularMarketPrice'] ?? 0;
     $rsiVal = lastNonNull($indicators['rsi']) ?: 50;
     $macdH  = lastNonNull($indicators['macd']['hist']) ?: 0;
-    $macdV  = lastNonNull($indicators['macd']['macd']) ?: 0;
+    $histVals = array_values(array_filter($indicators['macd']['hist'] ?? [], fn($v) => $v !== null));
+    $macdHPrev = count($histVals) >= 2 ? $histVals[count($histVals) - 2] : $macdH;
     $ema20  = lastNonNull($indicators['ema20']) ?: $price;
     $ema50  = lastNonNull($indicators['ema50']) ?: $price;
     $bbU    = lastNonNull($indicators['bb']['upper']) ?: $price * 1.05;
@@ -31,74 +64,168 @@ function generateSignal(array $quote, array $history, array $indicators): array
     $vwap   = $indicators['vwap'];
     $st     = $indicators['supertrend'];
 
-    $bullish = 0; $bearish = 0;
+    $bbBounceBull = false; $bbRejectBear = false;
+    $bbUpperArr = $indicators['bb']['upper'] ?? [];
+    $bbLowerArr = $indicators['bb']['lower'] ?? [];
+    $n = count($history);
+    if ($n >= 2) {
+        $prevBar = $history[$n - 2];
+        $currBar = $history[$n - 1];
+        $prevBbL = $bbLowerArr[$n - 2] ?? null;
+        $prevBbU = $bbUpperArr[$n - 2] ?? null;
+        if ($prevBbL !== null && $prevBar['low'] <= $prevBbL && $currBar['close'] > $prevBar['close'] && $currBar['close'] > $bbL) {
+            $bbBounceBull = true;
+        }
+        if ($prevBbU !== null && $prevBar['high'] >= $prevBbU && $currBar['close'] < $prevBar['close'] && $currBar['close'] < $bbU) {
+            $bbRejectBear = true;
+        }
+    }
+
+    // Per-category accumulators
+    $trendB = 0; $trendR = 0;
+    $momB   = 0; $momR   = 0;
+    $confB  = 0; $confR  = 0;
     $bullFactors = []; $bearFactors = [];
 
-    // EMA signals
-    if ($price > $ema20 && $price > $ema50) { $bullish += 2; $bullFactors[] = 'Price above EMA20 and EMA50 — uptrend intact'; }
-    elseif ($price < $ema20 && $price < $ema50) { $bearish += 2; $bearFactors[] = 'Price below EMA20 and EMA50 — downtrend active'; }
-    if ($ema20 > $ema50) { $bullish++; $bullFactors[] = 'Golden Cross: EMA20 above EMA50'; }
-    elseif ($ema20 < $ema50) { $bearish++; $bearFactors[] = 'Death Cross: EMA20 below EMA50'; }
+    // ── TREND ──────────────────────────────────────────────────
+    if ($st === 'Bullish') { $trendB += 3; $bullFactors[] = 'Supertrend is Bullish — uptrend confirmed'; }
+    else                   { $trendR += 3; $bearFactors[] = 'Supertrend is Bearish — downtrend confirmed'; }
 
-    // RSI
-    if ($rsiVal < 30) { $bullish += 2; $bullFactors[] = "RSI oversold at {$rsiVal} — potential bounce"; }
-    elseif ($rsiVal > 70) { $bearish += 2; $bearFactors[] = "RSI overbought at {$rsiVal} — potential pullback"; }
-    elseif ($rsiVal >= 50) { $bullish++; $bullFactors[] = "RSI at {$rsiVal} — bullish momentum"; }
-    else { $bearish++; $bearFactors[] = "RSI at {$rsiVal} — bearish momentum"; }
+    if ($ema20 > $ema50) { $trendB += 2; $bullFactors[] = 'EMA20 above EMA50 — Golden Cross, uptrend'; }
+    elseif ($ema20 < $ema50) { $trendR += 2; $bearFactors[] = 'EMA20 below EMA50 — Death Cross, downtrend'; }
 
-    // MACD
-    if ($macdH > 0 && $macdV > 0) { $bullish += 2; $bullFactors[] = 'MACD above signal line — bullish crossover'; }
-    elseif ($macdH < 0 && $macdV < 0) { $bearish += 2; $bearFactors[] = 'MACD below signal line — bearish crossover'; }
-    elseif ($macdH > 0) { $bullish++; $bullFactors[] = 'MACD histogram turning positive'; }
-    else { $bearish++; $bearFactors[] = 'MACD histogram turning negative'; }
+    $adxData = adx($history);
+    if (($adxData['adx'] ?? 0) > 25) {
+        if ($adxData['direction'] === 'Bullish') { $trendB += 2; $bullFactors[] = "ADX {$adxData['adx']} > 25 — strong bullish trend"; }
+        else { $bearFactors[] = "ADX {$adxData['adx']} > 25 — strong trend, but bearish side scores 0 by design"; }
+    }
 
-    // Bollinger
-    if ($price <= $bbL) { $bullish++; $bullFactors[] = 'Price at lower Bollinger Band — oversold zone'; }
-    elseif ($price >= $bbU) { $bearish++; $bearFactors[] = 'Price at upper Bollinger Band — overbought zone'; }
+    // ── MOMENTUM ───────────────────────────────────────────────
+    if ($rsiVal > 55) { $momB += 2; $bullFactors[] = "RSI at {$rsiVal} — bullish momentum"; }
+    elseif ($rsiVal < 45) { $momR += 2; $bearFactors[] = "RSI at {$rsiVal} — bearish momentum"; }
 
-    // Supertrend — weighted heavily, acts as a directional veto
-    if ($st === 'Bullish') { $bullish += 3; $bullFactors[] = 'Supertrend is Bullish — uptrend confirmed'; }
-    else                   { $bearish += 3; $bearFactors[] = 'Supertrend is Bearish — downtrend confirmed'; }
+    if ($macdHPrev <= 0 && $macdH > 0) { $momB += 2; $bullFactors[] = 'MACD crossed above Signal line — bullish crossover'; }
+    elseif ($macdHPrev >= 0 && $macdH < 0) { $momR += 2; $bearFactors[] = 'MACD crossed below Signal line — bearish crossover'; }
 
-    // VWAP
-    if ($price > $vwap && $vwap > 0) { $bullish++; $bullFactors[] = 'Price above VWAP — intraday buyers in control'; }
-    elseif ($price < $vwap && $vwap > 0) { $bearish++; $bearFactors[] = 'Price below VWAP — sellers in control'; }
+    // ── CONFIRMATION ───────────────────────────────────────────
+    if ($price > $ema20) { $confB++; $bullFactors[] = 'Price above EMA20'; }
+    elseif ($price < $ema20) { $confR++; $bearFactors[] = 'Price below EMA20'; }
 
-    // Change
-    $chgPct = $quote['regularMarketChangePercent'] ?? 0;
-    if ($chgPct > 1.5) { $bullish++; $bullFactors[] = sprintf('Strong positive day: +%.2f%%', $chgPct); }
-    elseif ($chgPct < -1.5) { $bearish++; $bearFactors[] = sprintf('Strong negative day: %.2f%%', $chgPct); }
+    if ($price > $vwap && $vwap > 0) { $confB++; $bullFactors[] = 'Price above VWAP — intraday buyers in control'; }
+    elseif ($price < $vwap && $vwap > 0) { $confR++; $bearFactors[] = 'Price below VWAP — sellers in control'; }
+
+    if ($bbBounceBull) { $confB++; $bullFactors[] = 'Price bounced off lower Bollinger Band — support held'; }
+    elseif ($bbRejectBear) { $confR++; $bearFactors[] = 'Price rejected from upper Bollinger Band — resistance held'; }
+
+    $volInfo = volumeAnalysis($history);
+    $chgPct  = $quote['regularMarketChangePercent'] ?? 0;
+    if ($volInfo['ratio'] !== null && $volInfo['ratio'] >= 1.5) {
+        if ($chgPct > 0) { $confB += 2; $bullFactors[] = "Volume {$volInfo['ratio']}x the 20-day average on an up day — real buying participation"; }
+        elseif ($chgPct < 0) { $confR += 2; $bearFactors[] = "Volume {$volInfo['ratio']}x the 20-day average on a down day — real selling participation"; }
+    }
+
+    $swing = swingStructure($history);
+    if ($swing['structure'] === 'HH-HL') { $confB += 2; $bullFactors[] = 'Higher-High / Higher-Low structure — uptrend confirmed by price action'; }
+    elseif ($swing['structure'] === 'LH-LL') { $confR += 2; $bearFactors[] = 'Lower-High / Lower-Low structure — downtrend confirmed by price action'; }
+
+    $high52 = (float)($quote['fiftyTwoWeekHigh'] ?? 0);
+    $nHist  = count($history);
+    $priorHigh20 = $nHist > 21 ? max(array_column(array_slice($history, -21, 20), 'high')) : null;
+    $priorLow20  = $nHist > 21 ? min(array_column(array_slice($history, -21, 20), 'low'))  : null;
+
+    if ($high52 > 0 && $price >= $high52) {
+        $confB += 3; $bullFactors[] = "Price at/above the 52-week high of {$high52} — breakout";
+    } elseif ($priorHigh20 !== null && $price > $priorHigh20) {
+        $confB += 2; $bullFactors[] = "Price broke above the prior 20-day high of {$priorHigh20} — resistance breakout";
+    }
+    if ($priorLow20 !== null && $price < $priorLow20) {
+        $confR += 2; $bearFactors[] = "Price broke below the prior 20-day low of {$priorLow20} — support breakdown";
+    }
+
+    // Delivery % — activates automatically once a data source populates it
+    if (isset($quote['deliveryPercent']) && $quote['deliveryPercent'] !== null) {
+        $dp = (float)$quote['deliveryPercent'];
+        if ($dp > 60) { $confB++; $bullFactors[] = "Delivery % at {$dp}% — high delivery, genuine buying"; }
+        elseif ($dp < 40) { $confR++; $bearFactors[] = "Delivery % at {$dp}% — low delivery, speculative move"; }
+    }
+
+    // OI + Price — activates automatically once a data source populates it
+    if (isset($quote['oiChangePercent']) && $quote['oiChangePercent'] !== null) {
+        $oi = (float)$quote['oiChangePercent'];
+        if ($oi > 0 && $chgPct > 0) { $confB += 2; $bullFactors[] = 'OI up with price up — long build-up'; }
+        elseif ($oi > 0 && $chgPct < 0) { $confR += 2; $bearFactors[] = 'OI up with price down — short build-up'; }
+    }
+
+    $bullish = $trendB + $momB + $confB;
+    $bearish = $trendR + $momR + $confR;
+    $diff    = $bullish - $bearish;
 
     $total = $bullish + $bearish;
     if ($total === 0) $total = 1;
     $confidence = (int) round(max($bullish, $bearish) / $total * 100);
 
-    // Determine signal — Supertrend acts as a veto:
-    // If Supertrend is Bullish, signal cannot be Sell (at most Hold)
-    // If Supertrend is Bearish, signal cannot be Buy (at most Hold)
-    if ($bullish > $bearish + 1) {
-        $signal = 'Buy';
-        $trend  = 'Bullish';
-        $verdict = "The technical picture leans bullish. " . implode('. ', $bullFactors) . ". Consider entering near current levels with a stop below EMA20.";
-    } elseif ($bearish > $bullish + 1) {
-        // Veto: Supertrend Bullish overrides Sell → Hold
-        if ($st === 'Bullish') {
-            $signal  = 'Hold';
-            $trend   = 'Sideways';
-            $verdict = "Mixed signals — Supertrend is Bullish so avoiding a Sell call. Wait for clearer direction. Bullish: " . implode(', ', $bullFactors) . ". Bearish: " . implode(', ', $bearFactors) . ".";
-        } else {
-            $signal  = 'Sell';
-            $trend   = 'Bearish';
-            $verdict = "Bears are in control. " . implode('. ', $bearFactors) . ". Avoid fresh long positions.";
-        }
-    } else {
-        // Veto: Supertrend Bearish with neutral overall → lean Hold
+    $trendBullish      = $trendB > $trendR;
+    $trendBearish      = $trendR > $trendB;
+    $momentumBullish   = $momB > $momR;
+    $momentumBearish   = $momR > $momB;
+    $confirmBullish    = $confB > $confR;
+    $confirmBearish    = $confR > $confB;
+    $allCategoriesBull = $trendBullish && $momentumBullish && $confirmBullish;
+    $allCategoriesBear = $trendBearish && $momentumBearish && $confirmBearish;
+
+    $categories = [
+        'trend'        => ['bullish' => $trendB, 'bearish' => $trendR, 'agrees' => $trendBullish ? 'Bullish' : ($trendBearish ? 'Bearish' : 'Neutral')],
+        'momentum'     => ['bullish' => $momB,   'bearish' => $momR,   'agrees' => $momentumBullish ? 'Bullish' : ($momentumBearish ? 'Bearish' : 'Neutral')],
+        'confirmation' => ['bullish' => $confB,  'bearish' => $confR,  'agrees' => $confirmBullish ? 'Bullish' : ($confirmBearish ? 'Bearish' : 'Neutral')],
+    ];
+
+    // ── Confidence-filter decision logic ────────────────────────
+    if (abs($diff) <= 3) {
         $signal = 'Hold';
         $trend  = 'Sideways';
-        $verdict = "Mixed signals. Bullish: " . implode(', ', $bullFactors ?: ['none']) . ". Bearish: " . implode(', ', $bearFactors ?: ['none']) . ". Wait for a cleaner setup.";
+        $verdict = "Bullish {$bullish} vs Bearish {$bearish} — too close to call (within +/-3). Bullish: " . implode(', ', $bullFactors ?: ['none']) . ". Bearish: " . implode(', ', $bearFactors ?: ['none']) . ". Wait for a cleaner setup.";
+    } elseif ($bullish >= 15 && $diff >= 5) {
+        if ($allCategoriesBull) {
+            $signal = 'Strong Buy';
+            $trend  = 'Bullish';
+            $verdict = "All three categories (Trend, Momentum, Confirmation) agree bullish, and the score ({$bullish} vs {$bearish}) clears the Strong Buy bar. " . implode('. ', $bullFactors) . ".";
+        } else {
+            $signal = 'Buy';
+            $trend  = 'Bullish';
+            $verdict = "Score clears the Strong Buy bar ({$bullish} vs {$bearish}) but categories don't all agree (Trend: {$categories['trend']['agrees']}, Momentum: {$categories['momentum']['agrees']}, Confirmation: {$categories['confirmation']['agrees']}), so this is downgraded to a plain Buy. " . implode('. ', $bullFactors) . ".";
+        }
+    } elseif ($bullish >= 11 && $diff > 3) {
+        $signal = 'Buy';
+        $trend  = 'Bullish';
+        $verdict = "The technical picture leans bullish ({$bullish} vs {$bearish}). " . implode('. ', $bullFactors) . ". Consider entering near current levels with a stop below EMA20.";
+    } elseif ($bearish >= 15 && $diff <= -5) {
+        if ($allCategoriesBear) {
+            $signal = 'Strong Sell';
+            $trend  = 'Bearish';
+            $verdict = "All three categories (Trend, Momentum, Confirmation) agree bearish, and the score ({$bearish} vs {$bullish}) clears the Strong Sell bar. " . implode('. ', $bearFactors) . ".";
+        } else {
+            $signal = 'Sell';
+            $trend  = 'Bearish';
+            $verdict = "Score clears the Strong Sell bar ({$bearish} vs {$bullish}) but categories don't all agree (Trend: {$categories['trend']['agrees']}, Momentum: {$categories['momentum']['agrees']}, Confirmation: {$categories['confirmation']['agrees']}), so this is downgraded to a plain Sell. " . implode('. ', $bearFactors) . ".";
+        }
+    } elseif ($bearish >= 11 && $diff < -3) {
+        $signal = 'Sell';
+        $trend  = 'Bearish';
+        $verdict = "Bears are in control ({$bearish} vs {$bullish}). " . implode('. ', $bearFactors) . ". Avoid fresh long positions.";
+    } else {
+        if ($diff > 0) {
+            $signal = 'Buy'; $trend = 'Bullish';
+            $verdict = "Leans bullish ({$bullish} vs {$bearish}) but conviction is low. " . implode('. ', $bullFactors ?: ['none']) . ".";
+        } elseif ($diff < 0) {
+            $signal = 'Sell'; $trend = 'Bearish';
+            $verdict = "Leans bearish ({$bearish} vs {$bullish}) but conviction is low. " . implode('. ', $bearFactors ?: ['none']) . ".";
+        } else {
+            $signal = 'Hold'; $trend = 'Sideways';
+            $verdict = "Bullish and bearish scores are tied at {$bullish}. Wait for a cleaner setup.";
+        }
     }
 
-    return compact('signal', 'trend', 'confidence', 'bullFactors', 'bearFactors', 'verdict');
+    return compact('signal', 'trend', 'confidence', 'bullFactors', 'bearFactors', 'verdict', 'bullish', 'bearish', 'categories');
 }
 
 /** Map Yahoo symbol to NSE symbol display */
@@ -321,64 +448,26 @@ function scoreBreakdown(array $quote, array $history, array $indicators, array $
     return ['components' => $components, 'total' => round($total, 2)];
 }
 
-// ── Extend generateSignal to use new indicators ───────────────
+// ── Extend generateSignal with supplementary (non-scoring) indicators ─
+// generateSignal() already implements the full 15-indicator scorecard
+// (including ADX, as part of the Trend category) and produces the final
+// signal via the category-based confidence filter. This wrapper only
+// attaches extra indicators (Stochastic, OBV) as supplementary context
+// for display — it deliberately does NOT let them change bullish/bearish
+// totals or override the signal, since they aren't part of the specified
+// scorecard and mixing them in would dilute the Trend/Momentum/Confirmation
+// category logic (and silently break the 15-point "Strong Buy/Sell" bar).
 function generateSignalFull(array $quote, array $history, array $indicators): array
 {
-    // Start with base signal
-    $base = generateSignal($quote, $history, $indicators);
-
-    $price   = $quote['regularMarketPrice'] ?? 0;
+    $base    = generateSignal($quote, $history, $indicators);
     $adxData = adx($history);
     $stoch   = stochastic($history);
     $obvData = obv($history);
 
-    $bull = $base['bullFactors'];
-    $bear = $base['bearFactors'];
-    $b = 0; $be = 0;
-
-    // ADX/DMI
-    if ($adxData['adx'] !== null) {
-        if ($adxData['adx'] >= 25) {
-            if ($adxData['direction'] === 'Bullish') { $b += 2; $bull[] = "ADX {$adxData['adx']} — Strong bullish trend (+DI > -DI)"; }
-            else { $be += 2; $bear[] = "ADX {$adxData['adx']} — Strong bearish trend (-DI > +DI)"; }
-        } else {
-            $bear[] = "ADX {$adxData['adx']} — Weak/no trend ({$adxData['trend_strength']})";
-        }
-    }
-
-    // Stochastic
-    if ($stoch['k'] !== null) {
-        if ($stoch['k'] < 20) { $b += 2; $bull[] = "Stochastic oversold at {$stoch['k']} — potential reversal up"; }
-        elseif ($stoch['k'] > 80) { $be += 2; $bear[] = "Stochastic overbought at {$stoch['k']} — potential reversal down"; }
-        elseif ($stoch['signal'] === 'Bullish') { $b++; $bull[] = "Stochastic K({$stoch['k']}) above D({$stoch['d']}) — bullish"; }
-        else { $be++; $bear[] = "Stochastic K({$stoch['k']}) below D({$stoch['d']}) — bearish"; }
-    }
-
-    // OBV
-    if ($obvData['trend']) {
-        if (str_contains($obvData['trend'], 'accumulation')) { $b++; $bull[] = "OBV: " . $obvData['trend']; }
-        else { $be++; $bear[] = "OBV: " . $obvData['trend']; }
-    }
-
-    // Recompute total
-    $totalBull = substr_count(implode(',', array_keys(array_filter(['b'=>count($bull)]))), 'b');
-    $newBull = count($bull); $newBear = count($bear);
-    $total   = $newBull + $newBear ?: 1;
-    $conf    = (int)round(max($newBull, $newBear) / $total * 100);
-
-    $signal = ($newBull > $newBear + 1) ? 'Buy' : (($newBear > $newBull + 1) ? 'Sell' : $base['signal']);
-    $trend  = $signal === 'Buy' ? 'Bullish' : ($signal === 'Sell' ? 'Bearish' : $base['trend']);
-    $verdict = $base['verdict']; // keep existing verdict
-
     return array_merge($base, [
-        'signal'      => $signal,
-        'trend'       => $trend,
-        'confidence'  => $conf,
-        'bullFactors' => $bull,
-        'bearFactors' => $bear,
-        'adx'         => $adxData,
-        'stoch'       => $stoch,
-        'obv'         => $obvData,
+        'adx'   => $adxData,
+        'stoch' => $stoch,
+        'obv'   => $obvData,
     ]);
 }
 

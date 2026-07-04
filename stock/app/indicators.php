@@ -454,4 +454,37 @@ function position52W(float $price, float $high52, float $low52): ?float
     return $range > 0 ? round(($price - $low52) / $range * 100, 1) : null;
 }
 
+/**
+ * Detect swing (fractal) highs/lows and classify recent price structure as
+ * Higher-High/Higher-Low (uptrend), Lower-High/Lower-Low (downtrend), or Mixed.
+ * A swing high at index i is confirmed when high[i] is the max within [i-$look, i+$look];
+ * a swing low is the analogous min. Compares the two most recent confirmed swings.
+ */
+function swingStructure(array $history, int $look = 2): array
+{
+    $n = count($history);
+    $highsIdx = []; $lowsIdx = [];
+    for ($i = $look; $i < $n - $look; $i++) {
+        $isHigh = true; $isLow = true;
+        for ($j = $i - $look; $j <= $i + $look; $j++) {
+            if ($j === $i) continue;
+            if ($history[$j]['high'] >= $history[$i]['high']) $isHigh = false;
+            if ($history[$j]['low']  <= $history[$i]['low'])  $isLow  = false;
+        }
+        if ($isHigh) $highsIdx[] = $i;
+        if ($isLow)  $lowsIdx[]  = $i;
+    }
+    $lastHighs = array_slice($highsIdx, -2);
+    $lastLows  = array_slice($lowsIdx, -2);
+    $structure = 'Mixed';
+    $h1 = $h2 = $l1 = $l2 = null;
+    if (count($lastHighs) === 2 && count($lastLows) === 2) {
+        $h1 = $history[$lastHighs[0]]['high']; $h2 = $history[$lastHighs[1]]['high'];
+        $l1 = $history[$lastLows[0]]['low'];   $l2 = $history[$lastLows[1]]['low'];
+        if ($h2 > $h1 && $l2 > $l1) $structure = 'HH-HL';
+        elseif ($h2 < $h1 && $l2 < $l1) $structure = 'LH-LL';
+    }
+    return ['structure' => $structure, 'high1' => $h1, 'high2' => $h2, 'low1' => $l1, 'low2' => $l2];
+}
+
 

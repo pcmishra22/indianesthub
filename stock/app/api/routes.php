@@ -163,6 +163,14 @@ if ($uri === '/api/watchlist/page') {
     exit;
 }
 
+// ── Momentum Picks — standalone open-persistence + sector-momentum list ──
+// (independent of the main generateSignal()/generateSignalFull() scorecard)
+if ($uri === '/api/momentum-picks') {
+    header('Content-Type: application/json');
+    try { echo json_encode(apiMomentumPicks()); } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
+    exit;
+}
+
 // All available sectors
 if ($uri === '/api/sectors') {
     header('Content-Type: application/json');
