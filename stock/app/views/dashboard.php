@@ -1604,8 +1604,8 @@ function renderLeaders(d){
         ⏰ THIS HOUR — Last 60 Minutes
       </div>
       <div class="leader-grid">
-        ${leaderCard(d.hour_buy,  '📈 Top Buy This Hour',  '🟢', 'buy',  'var(--green)')}
-        ${leaderCard(d.hour_sell, '📉 Top Sell This Hour', '🔴', 'sell', 'var(--red)')}
+        ${leaderCard(d.hour_buy,  '📈 Top Buy By AI For This Hour',  '🟢', 'buy',  'var(--green)')}
+        ${leaderCard(d.hour_sell, '📉 Top Sell By AI For This Hour', '🔴', 'sell', 'var(--red)')}
       </div>
     </div>
 
@@ -1614,14 +1614,14 @@ function renderLeaders(d){
         📅 TODAY — Since Market Open
       </div>
       <div class="leader-grid">
-        ${leaderCard(d.today_buy,  '🏆 Top Buy Today',  '🥇', 'buy',  'var(--green)')}
-        ${leaderCard(d.today_sell, '🏆 Top Sell Today', '🏴', 'sell', 'var(--red)')}
+        ${leaderCard(d.today_buy,  '🏆 Top Buy For Today By AI',  '🥇', 'buy',  'var(--green)')}
+        ${leaderCard(d.today_sell, '🏆 Top Sell For Today By AI', '🏴', 'sell', 'var(--red)')}
       </div>
     </div>
 
     <div style="font-size:11px;color:var(--muted);margin-top:14px;padding:10px;background:rgba(255,255,255,.02);border-radius:8px;line-height:1.7">
       💡 <strong>How it works:</strong> Every minute, each stock gets a Buy/Sell/Hold signal based on RSI, EMA20/50, MACD, Supertrend + volume. 
-      The stock with the most Buy signals in the last hour = <strong style="color:var(--green)">Top Buy This Hour</strong>. 
+      The stock with the most Buy signals in the last hour = <strong style="color:var(--green)">Top Buy By AI For This Hour</strong>. 
       If a stock gets Buy 4 out of 5 minutes, it jumps to #1. 
       Streak = consecutive same signals right now. Click any row to deep-analyze that stock.
     </div>

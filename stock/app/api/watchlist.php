@@ -405,7 +405,16 @@ function apiTick(): array
         $curVol  = $quote['regularMarketVolume'] ?? 0;
         $volR    = $avgVol > 0 ? $curVol / $avgVol : 1;
 
-        // Use cached indicators if available, else quick signal from price action only
+        // Use cached indicators if available; otherwise compute a real (not guessed)
+        // quick read from the already-cached price history (hist_*.json, 6-hour TTL —
+        // no network call needed) instead of assuming either direction.
+        //
+        // Note: an earlier version of this fallback just set everything to a neutral
+        // 0/null when indicators_cache.json was stale, which turned out to be too
+        // weak on its own — chgPct/volR alone almost never cross the "$bull > $bear+1"
+        // bar, so every symbol without a fresh cache entry landed on Hold (visible as
+        // an all-Hold Leaders page). Computing the real indicators here instead of
+        // punting fixes that without reintroducing the old fake-bullish-default bug.
         $cached = $indCache[$sym] ?? null;
 
         if ($cached) {
@@ -415,14 +424,19 @@ function apiTick(): array
             $st    = $cached['supertrend'] ?? null;
             $macdH = $cached['macd_hist'] ?? 0;
         } else {
-            // Bug: this used to hard-code $st = 'Bullish' and $rsi = 50 (itself counted
-            // as bullish below), giving every symbol a fake +3-bull-vs-+2-bear head start
-            // whenever the indicator cache hadn't been built yet (fresh deploy, or cache
-            // older than the 10-min rebuild window). Combined with the volume bug above,
-            // that made the "$bear > $bull + 1" bar needed for a Sell signal almost
-            // unreachable — matching the observed log of 37 ticks with zero Sells.
-            // Null/neutral here means "we don't know yet", not "assume bullish".
-            $rsi = null; $ema20 = $price; $ema50 = $price; $st = null; $macdH = 0;
+            $hist = yahooHistory($sym, 60);
+            if (count($hist) >= 20) {
+                $closesArr = closes($hist);
+                $rsi   = lastNonNull(rsi($closesArr));
+                $ema20 = lastNonNull(ema($closesArr, 20)) ?: $price;
+                $ema50 = lastNonNull(ema($closesArr, 50)) ?: $price;
+                $macdH = lastNonNull(macd($closesArr)['hist'] ?? []);
+                $st    = supertrend($hist);
+            } else {
+                // Genuinely no data available anywhere yet (brand-new symbol) —
+                // stay neutral rather than guess.
+                $rsi = null; $ema20 = $price; $ema50 = $price; $st = null; $macdH = null;
+            }
         }
 
         // Quick signal logic
@@ -435,7 +449,9 @@ function apiTick(): array
             elseif ($rsi >= 50) $bull++;
             else $bear++;
         }
-        if ($macdH > 0) $bull += 2; elseif ($macdH < 0) $bear += 2;
+        if ($macdH !== null) {
+            if ($macdH > 0) $bull += 2; elseif ($macdH < 0) $bear += 2;
+        }
         if ($st === 'Bullish') $bull += 2; elseif ($st === 'Bearish') $bear += 2;
         if ($chgPct > 0.5) $bull++; elseif ($chgPct < -0.5) $bear++;
         if ($volR > 1.5 && $chgPct > 0) $bull++; elseif ($volR > 1.5 && $chgPct < 0) $bear++;
