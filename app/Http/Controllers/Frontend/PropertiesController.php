@@ -67,6 +67,21 @@ class PropertiesController extends Controller
         ];
     }
 
+    /**
+     * Major metro cities outside the Chandigarh Tricity region where we're
+     * expanding builder coverage (city-import pipeline). These use a wider
+     * radius and multiple city-name variants since they aren't single towns.
+     */
+    public function getNationalCityMap(): array
+    {
+        return [
+            'pune'       => ['label' => 'Pune',      'lat' => 18.5204, 'lng' => 73.8567, 'radius' => 40, 'match' => ['Pune']],
+            'bangalore'  => ['label' => 'Bangalore', 'lat' => 12.9716, 'lng' => 77.5946, 'radius' => 40, 'match' => ['Bangalore', 'Bengaluru']],
+            'hyderabad'  => ['label' => 'Hyderabad', 'lat' => 17.3850, 'lng' => 78.4867, 'radius' => 40, 'match' => ['Hyderabad', 'Secunderabad']],
+            'delhi-ncr'  => ['label' => 'Delhi NCR', 'lat' => 28.6139, 'lng' => 77.2090, 'radius' => 50, 'match' => ['Delhi', 'New Delhi', 'Gurgaon', 'Gurugram', 'Noida', 'Greater Noida', 'Faridabad', 'Ghaziabad', 'NCR']],
+        ];
+    }
+
     public function locationSearch(Request $request, string $location)
     {
         // Redirect ?page=1 to the base URL to prevent duplicate content flags
@@ -77,15 +92,20 @@ class PropertiesController extends Controller
             return redirect()->to(url()->current() . $queryString, 301);
         }
 
-        $locations = $this->getLocationMap();
-        $slug = strtolower(trim($location));
+        $locations      = $this->getLocationMap();
+        $nationalCities = $this->getNationalCityMap();
+        $slug           = strtolower(trim($location));
 
-        if (!isset($locations[$slug])) {
+        if (isset($locations[$slug])) {
+            $loc    = $locations[$slug];
+            $radius = 10;
+        } elseif (isset($nationalCities[$slug])) {
+            $loc    = $nationalCities[$slug];
+            $radius = $loc['radius'] ?? 40;
+        } else {
             abort(404);
         }
 
-        $loc      = $locations[$slug];
-        $radius   = 10;
         $latDelta = $radius / 111.0;
         $lngDelta = $radius / 96.5;
 
@@ -112,9 +132,13 @@ class PropertiesController extends Controller
                           ->whereNotNull('longitude')
                           ->whereBetween('latitude', [$minLat, $maxLat])
                           ->whereBetween('longitude', [$minLng, $maxLng]);
-                })
-                ->orWhere('city', 'like', '%' . $loc['label'] . '%')
-                ->orWhere('locality', 'like', '%' . $loc['label'] . '%');
+                });
+
+                $matchTerms = $loc['match'] ?? [$loc['label']];
+                foreach ($matchTerms as $term) {
+                    $q->orWhere('city', 'like', '%' . $term . '%')
+                      ->orWhere('locality', 'like', '%' . $term . '%');
+                }
             });
 
         if ($request->filled('property_type')) $query->where('property_type', $request->property_type);

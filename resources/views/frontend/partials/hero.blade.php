@@ -114,9 +114,9 @@
 
       {{-- LEFT --}}
       <div class="col-lg-7">
-        <div class="hero-label"><i class="bi bi-geo-alt-fill"></i> Chandigarh Tricity's Trusted Property Platform</div>
-        <h1>Buy, Sell & Rent Properties in <span>Chandigarh Tricity</span></h1>
-        <p class="hero-sub">Search <strong style="color:#50e6ff;">{{ number_format($totalProperties ?? 323) }}+</strong> verified flats, villas, plots & new projects across Chandigarh, Mohali, Zirakpur & Panchkula — all in one place.</p>
+        <div class="hero-label"><i class="bi bi-geo-alt-fill"></i> India's Trusted Property Platform</div>
+        <h1>Buy, Sell & Rent Properties in <span>Top Cities</span></h1>
+        <p class="hero-sub">Search <strong style="color:#50e6ff;">{{ number_format($totalProperties ?? 323) }}+</strong> verified flats, villas, plots & new projects across Chandigarh Tricity, Pune, Bangalore, Hyderabad & Delhi NCR — all in one place.</p>
 
         {{-- Search Card --}}
         <div class="hero-search-card">
@@ -290,7 +290,7 @@
             <div class="hero-stat-label">Builders</div>
           </div>
           <div class="hero-stat">
-            <div class="hero-stat-num"><span data-purecounter-start="0" data-purecounter-end="96" data-purecounter-duration="1" class="purecounter"></span>%</div>
+            <div class="hero-stat-num"><span data-purecounter-start="0" data-purecounter-end="{{ $satisfactionRate ?? 96 }}" data-purecounter-duration="1" class="purecounter"></span>%</div>
             <div class="hero-stat-label">Satisfaction</div>
           </div>
         </div>

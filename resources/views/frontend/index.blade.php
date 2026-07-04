@@ -2,7 +2,7 @@
 @extends('frontend.layout')
 
 {{-- ════════════════════════ SEO META ════════════════════════ --}}
-@section('title', config('app.name') . ' – Property in Chandigarh, Mohali, Zirakpur')
+@section('title', config('app.name') . ' – Property in Top Cities Across India')
 @section('meta_description', 'Find verified flats, villas & plots for sale and rent in Chandigarh, Mohali, Zirakpur & Panchkula. Browse 2,000+ listings from trusted dealers & builders.')
 @section('meta_keywords', 'property in chandigarh, flats in mohali, property in zirakpur, real estate tricity, buy flat chandigarh, rent flat mohali, new projects zirakpur, 3bhk flats mohali, villas chandigarh, plots panchkula')
 @section('canonical', url('/'))
@@ -755,7 +755,7 @@
       <div class="col-lg-5">
         <span class="hs-badge">Why Us</span>
         <h2 class="fw-800 mt-2 mb-4" style="font-size:2rem;color:var(--text-dark);font-weight:800;">Why Choose <span style="color:#0078d4;">{{ config('app.name') }}?</span></h2>
-        <p style="color:#64748b;line-height:1.8;margin-bottom:24px;">We're Chandigarh Tricity's dedicated real estate platform, connecting local home seekers with verified dealers and top builders across Chandigarh, Mohali, Zirakpur & Panchkula. Our commitment to transparency and quality ensures you make informed decisions.</p>
+        <p style="color:#64748b;line-height:1.8;margin-bottom:24px;">We started as Chandigarh Tricity's dedicated real estate platform and now connect home seekers with verified dealers and top builders across Chandigarh, Mohali, Zirakpur, Panchkula and expanding into Pune, Bangalore, Hyderabad & Delhi NCR. Our commitment to transparency and quality ensures you make informed decisions.</p>
         <div class="d-flex gap-4 flex-wrap" style="margin-bottom:28px;">
           <div class="text-center">
             <div style="font-size:1.8rem;font-weight:900;color:#0078d4;">{{ number_format($totalProperties) }}+</div>
@@ -766,7 +766,7 @@
             <div style="font-size:.8rem;color:#94a3b8;font-weight:600;">Cities</div>
           </div>
           <div class="text-center">
-            <div style="font-size:1.8rem;font-weight:900;color:#0078d4;">96%</div>
+            <div style="font-size:1.8rem;font-weight:900;color:#0078d4;">{{ $satisfactionRate ?? 96 }}%</div>
             <div style="font-size:.8rem;color:#94a3b8;font-weight:600;">Satisfaction</div>
           </div>
         </div>

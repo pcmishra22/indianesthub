@@ -225,6 +225,17 @@
           </ul>
         </div>
 
+        {{-- Col 6: Builders in Top Cities (National) --}}
+        <div class="col-lg col-6 footer-links">
+          <p class="loc-group-head">Builders in Top Cities</p>
+          <ul>
+            <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties.location','pune') }}">Builders in Pune</a></li>
+            <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties.location','bangalore') }}">Builders in Bangalore</a></li>
+            <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties.location','hyderabad') }}">Builders in Hyderabad</a></li>
+            <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties.location','delhi-ncr') }}">Builders in Delhi NCR</a></li>
+          </ul>
+        </div>
+
       </div>
     </div>
   </div>

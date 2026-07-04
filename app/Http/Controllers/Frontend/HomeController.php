@@ -71,6 +71,16 @@ class HomeController extends Controller
         $totalBuilders  = Builder::count();
         $totalCities    = Property::whereNotNull('city')->distinct()->count('city');
 
+        // Satisfaction rate — % of approved reviews rated 4★ or higher.
+        // Falls back to 96 (current placeholder) until enough reviews exist.
+        $approvedReviewsCount = \App\Models\Review::where('status', 'approved')->count();
+        $satisfactionRate = $approvedReviewsCount > 0
+            ? (int) round(
+                \App\Models\Review::where('status', 'approved')->where('rating', '>=', 4)->count()
+                / $approvedReviewsCount * 100
+              )
+            : 96;
+
         // Property types with counts
         $propertyTypes = Property::whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
             ->whereNotNull('property_type')
@@ -90,6 +100,7 @@ class HomeController extends Controller
             'totalDealers',
             'totalBuilders',
             'totalCities',
+            'satisfactionRate',
             'propertyTypes'
         ));
     }
