@@ -589,12 +589,19 @@ Route::prefix('admin')->middleware('auth:admin')->name('admin.')->group(function
     Route::post('/dealers/{dealer}/toggle-status', [AdminDealerController::class, 'toggleStatus'])->name('dealers.toggle-status');
 
 
-    // Manage Properties
-    Route::resource('properties', AdminPropertyController::class)->only(['index', 'show', 'destroy']);
+        // Manage Properties
+        Route::resource('properties', AdminPropertyController::class)->only(['index', 'show', 'destroy']);
 Route::post('/properties/{property:id}/toggle-featured', [AdminPropertyController::class, 'toggleFeatured'])->name('properties.toggle-featured');
 Route::post('/properties/{property:id}/toggle-status', [AdminPropertyController::class, 'toggleStatus'])->name('properties.toggle-status');
 
+        // Manage Service Providers
+        Route::resource('service-providers', \App\Http\Controllers\Admin\ServiceProviderController::class);
+
+        // Manage Services (service categories)
+        Route::resource('services', \App\Http\Controllers\Admin\ServiceCategoryController::class);
+
 require __DIR__ . '/admin_properties.php';
+
 
 
     // Property viewers (guest token based tracking)

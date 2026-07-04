@@ -26,6 +26,18 @@
                 </a>
             </li>
 
+            {{-- Service Providers Section --}}
+            <li class="sidebar-item {{ request()->routeIs('admin.service-providers.*') ? 'active' : '' }}">
+                <a class="sidebar-link" href="{{ route('admin.service-providers.index') }}">
+                    <i class="align-middle" data-feather="user"></i> <span class="align-middle">Service Providers</span>
+                </a>
+            </li>
+            <li class="sidebar-item {{ request()->routeIs('admin.services.*') ? 'active' : '' }}">
+                <a class="sidebar-link" href="{{ route('admin.services.index') }}">
+                    <i class="align-middle" data-feather="tool"></i> <span class="align-middle">Services</span>
+                </a>
+            </li>
+
             {{-- Builder Section --}}
             <li class="sidebar-header">Builders</li>
             <li class="sidebar-item {{ request()->routeIs('admin.builders.*') ? 'active' : '' }}">
