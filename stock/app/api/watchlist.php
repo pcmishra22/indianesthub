@@ -144,11 +144,20 @@ function apiWatchlist(): array
     // Sort by momentum score descending
     usort($stocks, fn($a, $b) => $b['momentum_score'] <=> $a['momentum_score']);
 
-    // Split into buy and sell lists
-    $buyList  = array_values(array_filter($stocks, fn($s) => $s['momentum_score'] >= 0));
-    $sellList = array_values(array_filter($stocks, fn($s) => $s['momentum_score'] < 0));
-    // Sell list: weakest first (most negative at top)
-    $sellList = array_reverse($sellList);
+    // Split into buy and sell lists.
+    // Bug: this used to bucket purely on momentum_score (>=0 → Buy Candidates,
+    // <0 → Sell/Avoid) — a completely separate number from the 'signal' field
+    // shown in each row. That let a stock read "Signal: Hold, Supertrend:
+    // Bullish" while still being dropped into the "SELL / Avoid" section,
+    // because its momentum_score happened to be negative. Buckets now follow
+    // the same signal (and therefore the same Supertrend override) the row
+    // itself displays, so the section a stock lands in can never contradict
+    // its own Signal/Supertrend columns. Hold stocks appear in neither list.
+    $buyList  = array_values(array_filter($stocks, fn($s) => in_array($s['signal'], ['Buy', 'Strong Buy'], true)));
+    $sellList = array_values(array_filter($stocks, fn($s) => in_array($s['signal'], ['Sell', 'Strong Sell'], true)));
+    // Buy list: strongest momentum first; sell list: weakest first
+    usort($buyList,  fn($a, $b) => $b['momentum_score'] <=> $a['momentum_score']);
+    usort($sellList, fn($a, $b) => $a['momentum_score'] <=> $b['momentum_score']);
 
     $buys  = count(array_filter($stocks, fn($s) => in_array($s['signal'], ['Buy'])));
     $sells = count(array_filter($stocks, fn($s) => in_array($s['signal'], ['Sell'])));
