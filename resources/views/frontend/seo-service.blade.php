@@ -66,6 +66,63 @@
 
 @section('head')
 <link rel="stylesheet" href="{{ asset('assets/css/frontend/pages.css') }}">
+{{-- The block below depends on the $serviceType variable and must stay
+     inline (a static .css file can't evaluate Blade conditionals). --}}
+<style>
+.svc-hero {
+  background: linear-gradient(135deg,
+    @if($serviceType === 'loan') #061830 0%, #0a2d5e 50%, #0078d4 100%
+    @elseif($serviceType === 'insurance') #062010 0%, #064d20 50%, #16a34a 100%
+    @else #1a0533 0%, #3b0764 50%, #6b21a8 100%
+    @endif
+  );
+  padding: 60px 0 40px;
+  color: #fff;
+}
+.svc-hero h1 { font-size: clamp(1.4rem, 3.5vw, 2.2rem); font-weight: 800; line-height: 1.25; }
+.svc-hero .subtitle { opacity: .85; font-size: .95rem; margin-top: 8px; }
+.trust-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,.12); color: #fff;
+  border-radius: 20px; padding: 5px 14px;
+  font-size: .78rem; font-weight: 600;
+}
+.svc-form-card {
+  border-radius: 16px; overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0,0,0,.18);
+}
+.svc-form-header {
+  padding: 18px 24px 14px;
+  @if($serviceType === 'loan')
+    background: linear-gradient(135deg,#0a2d5e,#0078d4);
+  @elseif($serviceType === 'insurance')
+    background: linear-gradient(135deg,#064d20,#16a34a);
+  @else
+    background: linear-gradient(135deg,#3b0764,#6b21a8);
+  @endif
+  color: #fff;
+}
+.step-circle {
+  width: 38px; height: 38px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 1rem; flex-shrink: 0;
+  @if($serviceType === 'loan') background: #eff6ff; color: #0078d4;
+  @elseif($serviceType === 'insurance') background: #f0fdf4; color: #16a34a;
+  @else background: #f5f3ff; color: #6b21a8;
+  @endif
+}
+.faq-item { border-bottom: 1px solid #f1f5f9; }
+.faq-q { cursor: pointer; padding: 16px 0; font-weight: 600; user-select: none; }
+.faq-a { display: none; padding: 0 0 16px; color: #475569; line-height: 1.7; }
+.faq-item.open .faq-a { display: block; }
+.city-chip {
+  display: inline-block;
+  padding: 5px 12px; border-radius: 20px; font-size: .78rem; font-weight: 600;
+  border: 1px solid #e2e8f0; color: #475569; text-decoration: none;
+  transition: all .15s;
+}
+.city-chip:hover { border-color: #0078d4; color: #0078d4; background: #eff6ff; }
+</style>
 @endsection
 
 @section('content')
