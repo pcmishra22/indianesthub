@@ -11,6 +11,15 @@ define('STORAGE',    BASE . '/storage');
 define('WL_FILE',    STORAGE . '/watchlist.json');
 define('ALERT_FILE', STORAGE . '/alerts.json');
 
+// ─── Prakash Recommendation settings ─────────────────────────
+// Intraday target as a percentage move from entry price (both Buy and Sell).
+define('PRAKASH_TARGET_PCT', 1.0);
+// Minimum % change swing since the previous refresh to flag a stock as a
+// "fast mover" candidate, even if its rank barely moved.
+define('PRAKASH_FAST_MOVER_THRESHOLD_PCT', 1.0);
+// Max number of stocks shown in each of the Buy/Sell boxes.
+define('PRAKASH_MAX_PER_BOX', 5);
+
 // ─── Default watchlist symbols ───────────────────────────────
 define('WATCHLIST_SYMBOLS', [
     // ── NIFTY 50 ─────────────────────────────────────────────

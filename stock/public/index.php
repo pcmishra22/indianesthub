@@ -25,11 +25,13 @@ error_reporting(E_ALL);
  */
 
 require __DIR__ . '/../app/config.php';      // constants, .env, session, $uri
+require __DIR__ . '/../app/users.php';        // multi-user helpers and JSON storage
 require __DIR__ . '/../app/auth.php';        // login/logout routes; exits if not authed
 require __DIR__ . '/../app/http.php';        // yahooGetCrumb(), httpGet(), httpGetDebug()
 require __DIR__ . '/../app/datasources.php'; // yahooQuote(), yahooQuoteBulk(), yahooHistory(), legacy fallbacks
 require __DIR__ . '/../app/indicators.php';  // sma(), ema(), rsi(), macd(), adx(), etc.
 require __DIR__ . '/../app/signals.php';     // generateSignal(), momentumScore(), multiTimeframe(), etc.
+require __DIR__ . '/../app/prakash_recommendations.php';
 
 // ── Function definitions only (no executable routes) — must load before
 //    any file below that might call these functions from a matched route.

@@ -318,6 +318,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div id="wlItems" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:4px"></div>
   </div>
 
+  <div id="prakashRecommendations" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:12px"></div>
+
   <div class="panel" id="watchPanel">
     <div class="loading-card" id="watchLoading">
       <div class="spin"></div>
@@ -392,6 +394,24 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <button class="btn btn-outline" onclick="forceTick()" style="padding:6px 14px;font-size:12px">▶ Tick Now</button>
       <button class="btn btn-outline" onclick="loadLeaders()" style="padding:6px 14px;font-size:12px">🔄 Refresh Leaders</button>
     </div>
+  </div>
+
+  <!-- Prakash intraday Buy/Sell boxes with entry price + 1% target + achieved status -->
+  <div class="panel" style="margin-bottom:16px;padding:14px 16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0">🎯 Prakash Intraday Recommendations</h3>
+      <div id="prakashDailySummary" style="font-size:12px;color:var(--muted)"></div>
+    </div>
+    <div id="prakashBoxes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
+  </div>
+
+  <!-- Prakash Track Record: cross-day win-rate rollup -->
+  <div class="panel" style="margin-bottom:16px;padding:14px 16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0">📊 Prakash Track Record</h3>
+      <button class="btn btn-outline" onclick="loadPrakashRollup()" style="padding:5px 12px;font-size:11px">🔄 Refresh</button>
+    </div>
+    <div id="prakashRollup"><div style="font-size:12px;color:var(--muted)">Loading track record…</div></div>
   </div>
 
   <!-- Live ticker strip -->
@@ -531,6 +551,7 @@ function showTab(name,btn){
   if(name==='news'&&!newsLoaded) loadNews();
   if(name==='leaders'){
     if(!leaderLoaded) loadLeaders();
+    if(!prakashRollupLoaded) loadPrakashRollup();
     if(!tickTimer){
       forceTick();
       tickTimer=setInterval(forceTick, TICK_INTERVAL);
@@ -627,6 +648,7 @@ async function loadWatchlist(force=false){
     wlTotalPages=d.total_pages||1;
     renderWatchlist(d);
     renderPagination(d);
+    renderPrakashRecommendations(d.prakash_recommendations);
     startCountdown();
   }catch(e){
     document.getElementById('watchLoading').innerHTML=`<div class="err-box">Error: ${escHtml(e.message)}</div>`;
@@ -738,6 +760,119 @@ async function loadSectors(){
     el.innerHTML='<option value="">All Sectors</option>'
       +(d.sectors||[]).map(s=>`<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
   }catch(e){}
+}
+
+function renderPrakashRecommendations(rec){
+  const el=document.getElementById('prakashRecommendations');
+  if(!el) return;
+  if(!rec){el.innerHTML='';return;}
+  const buy=rec.buy_recommendation||rec.top_gainer||null;
+  const sell=rec.sell_recommendation||rec.top_loser||null;
+  const cardStyle='background:linear-gradient(135deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1px solid var(--border);border-radius:12px;padding:12px 14px;min-height:120px';
+  const buyTitle=buy?.reason==='Rank Movement Up'?'Rank Movement Buy':'Top Buy by Prakash';
+  const sellTitle=sell?.reason==='Rank Movement Down'?'Rank Movement Sell':'Top Sell by Prakash';
+
+  const buyHtml=`<div style="${cardStyle}">
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px">${escHtml(buyTitle)}</div>
+    <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:4px">${escHtml(buy?.symbol||'—')}</div>
+    <div style="font-size:12px;color:var(--green);margin-bottom:4px">${buy?.recommendation||'Buy'} · ${buy?.reason||'Top Gainer'}</div>
+    <div style="font-size:12px;color:var(--muted2)">Price: ₹${fmtNum(buy?.price||0)} · Change: ${fmtNum(buy?.percentage_change||0)}%</div>
+    ${buy?.previous_rank!==null&&buy?.current_rank!==null?`<div style="font-size:11px;color:var(--muted);margin-top:4px">Rank ${buy.previous_rank} → ${buy.current_rank}</div>`:''}
+  </div>`;
+
+  const sellHtml=`<div style="${cardStyle}">
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px">${escHtml(sellTitle)}</div>
+    <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:4px">${escHtml(sell?.symbol||'—')}</div>
+    <div style="font-size:12px;color:var(--red);margin-bottom:4px">${sell?.recommendation||'Sell'} · ${sell?.reason||'Top Loser'}</div>
+    <div style="font-size:12px;color:var(--muted2)">Price: ₹${fmtNum(sell?.price||0)} · Change: ${fmtNum(sell?.percentage_change||0)}%</div>
+    ${sell?.previous_rank!==null&&sell?.current_rank!==null?`<div style="font-size:11px;color:var(--muted);margin-top:4px">Rank ${sell.previous_rank} → ${sell.current_rank}</div>`:''}
+  </div>`;
+
+  el.innerHTML=`<div>${buy?buyHtml:'<div style="'+cardStyle+'">No buy recommendation yet</div>'}</div><div>${sell?sellHtml:'<div style="'+cardStyle+'">No sell recommendation yet</div>'}</div>`;
+
+  renderPrakashBoxes(rec);
+}
+
+// Renders the up-to-5-stock Buy/Sell boxes with locked-in entry price,
+// 1% intraday target, and achieved/open status — pulled from
+// rec.buy_box / rec.sell_box / rec.daily_summary (populated server-side by
+// buildPrakashRecommendations()).
+function renderPrakashBoxes(rec){
+  const el=document.getElementById('prakashBoxes');
+  const summaryEl=document.getElementById('prakashDailySummary');
+  if(!el) return;
+  if(!rec){el.innerHTML='';if(summaryEl)summaryEl.textContent='';return;}
+
+  const daily=rec.daily_summary||null;
+  const dailyBySymbol={};
+  (daily?.recommendations||[]).forEach(r=>{dailyBySymbol[r.symbol]=r;});
+
+  if(summaryEl){
+    if(daily && daily.total>0){
+      const rate=daily.success_rate!==null?daily.success_rate+'%':'—';
+      summaryEl.innerHTML=`Today: <strong style="color:#fff">${daily.achieved}/${daily.total}</strong> targets hit · <strong style="color:${daily.success_rate>=50?'var(--green)':'var(--red)'}">${rate}</strong>${daily.closed?' · <span style="color:var(--muted)">Market closed</span>':''}`;
+    } else {
+      summaryEl.textContent='No recommendations yet today';
+    }
+  }
+
+  function boxCard(entry,side){
+    const isBuy=side==='Buy';
+    const symbol=escHtml(entry.symbol||'—');
+    const trackedDaily=dailyBySymbol[entry.symbol]||null;
+    const entryPrice=trackedDaily?.entry_price ?? entry.price ?? 0;
+    const targetPrice=trackedDaily?.target_price ?? null;
+    const achieved=trackedDaily?.achieved || false;
+    const achievedAt=trackedDaily?.achieved_at || null;
+    const statusColor=achieved?'var(--green)':'var(--muted)';
+    const statusText=achieved?`✅ Target hit${achievedAt?' @ '+achievedAt.split(' ')[1]:''}`:'⏳ Open';
+    const sideColor=isBuy?'var(--green)':'var(--red)';
+    return `<div style="background:linear-gradient(135deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1px solid var(--border);border-radius:10px;padding:10px 12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:14px;font-weight:700;color:#fff">${symbol}</span>
+        <span style="font-size:10px;font-weight:700;color:${sideColor};text-transform:uppercase">${side}</span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:3px">${escHtml(entry.reason||'')}</div>
+      <div style="font-size:12px;color:var(--muted2)">Entry: ₹${fmtNum(entryPrice)}${targetPrice?` → Target: ₹${fmtNum(targetPrice)}`:''}</div>
+      <div style="font-size:11px;color:${statusColor};margin-top:4px;font-weight:600">${statusText}</div>
+    </div>`;
+  }
+
+  const buyBox=rec.buy_box||[];
+  const sellBox=rec.sell_box||[];
+  if(buyBox.length===0 && sellBox.length===0){el.innerHTML='<div style="font-size:12px;color:var(--muted)">No box entries yet — waiting for next refresh</div>';return;}
+  el.innerHTML = buyBox.map(e=>boxCard(e,'Buy')).join('') + sellBox.map(e=>boxCard(e,'Sell')).join('');
+}
+
+// Cross-day win-rate rollup from /api/prakash/rollup
+async function loadPrakashRollup(){
+  const el=document.getElementById('prakashRollup');
+  if(!el) return;
+  try{
+    const r=await fetch(apiUrl('api/prakash/rollup?days=30'));
+    const d=await r.json();
+    prakashRollupLoaded=true;
+    if(d.error){ el.innerHTML=`<div class="err-box">${escHtml(d.error)}</div>`; return; }
+    if(!d.days || d.days.length===0){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">No daily history yet — check back after a full trading day.</div>'; return; }
+
+    const overallRate=d.overall_success_rate!==null?d.overall_success_rate+'%':'—';
+    const rateColor=(d.overall_success_rate||0)>=50?'var(--green)':'var(--red)';
+    let html=`<div style="margin-bottom:12px;font-size:13px;color:var(--muted2)">Last ${d.days.length} day(s): <strong style="color:#fff">${d.overall_achieved}/${d.overall_total}</strong> targets hit · <strong style="color:${rateColor}">${overallRate}</strong> overall success rate</div>`;
+    html+='<div style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto">';
+    d.days.forEach(day=>{
+      const rate=day.success_rate!==null?day.success_rate+'%':'—';
+      const rc=(day.success_rate||0)>=50?'var(--green)':'var(--red)';
+      html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(255,255,255,.03);border-radius:6px;font-size:12px">
+        <span style="color:var(--muted2)">${escHtml(day.date)}${day.closed?'':' <span style=\"color:var(--orange)\">(in progress)</span>'}</span>
+        <span style="color:#fff">${day.achieved}/${day.total}</span>
+        <span style="color:${rc};font-weight:600">${rate}</span>
+      </div>`;
+    });
+    html+='</div>';
+    el.innerHTML=html;
+  }catch(e){
+    el.innerHTML=`<div class="err-box">Error: ${escHtml(e.message)}</div>`;
+  }
 }
 
 function renderWatchlist(d){
@@ -1464,8 +1599,8 @@ function fmtNum(n){
 function N(n){const f=parseInt(n);return isNaN(f)?"—":f.toLocaleString("en-IN");}
 
 // ── Leaders / Tick ───────────────────────────────────────────
-let tickTimer=null, leaderLoaded=false, tickCount=0;
-const TICK_INTERVAL=60000; // 1 minute
+let tickTimer=null, leaderLoaded=false, tickCount=0, prakashRollupLoaded=false;
+const TICK_INTERVAL=300000; // 5 minutes
 
 async function forceTick(){
   document.getElementById('tickStatus').innerHTML='<span class="pulse">🔴 Ticking…</span>';

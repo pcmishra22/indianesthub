@@ -42,35 +42,41 @@ if ($uri === '/api/leaders') {
 // ── Custom watchlist management ───────────────────────────────
 if ($uri === '/api/watchlist/add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
+    $username = getCurrentUser();
     $sym = strtoupper(trim($_POST['symbol'] ?? ''));
     if ($sym && !str_ends_with($sym, '.NS')) $sym .= '.NS';
-    $wl = file_exists(WL_FILE) ? json_decode(file_get_contents(WL_FILE), true) : [];
-    if ($sym && !in_array($sym, $wl)) { $wl[] = $sym; file_put_contents(WL_FILE, json_encode($wl)); }
+    $wl = $username ? getUserWatchlist($username) : [];
+    if ($sym && !in_array($sym, $wl)) { $wl[] = $sym; }
+    if ($username) saveUserWatchlist($username, $wl);
     echo json_encode(['ok' => true, 'watchlist' => $wl]);
     exit;
 }
 if ($uri === '/api/watchlist/remove' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
+    $username = getCurrentUser();
     $sym = strtoupper(trim($_POST['symbol'] ?? ''));
     if (!str_ends_with($sym, '.NS')) $sym .= '.NS';
-    $wl = file_exists(WL_FILE) ? json_decode(file_get_contents(WL_FILE), true) : [];
+    $wl = $username ? getUserWatchlist($username) : [];
     $wl = array_values(array_filter($wl, fn($s) => $s !== $sym));
-    file_put_contents(WL_FILE, json_encode($wl));
+    if ($username) saveUserWatchlist($username, $wl);
     echo json_encode(['ok' => true, 'watchlist' => $wl]);
     exit;
 }
 if ($uri === '/api/watchlist/list') {
     header('Content-Type: application/json');
-    $wl = file_exists(WL_FILE) ? json_decode(file_get_contents(WL_FILE), true) : [];
+    $username = getCurrentUser();
+    $wl = $username ? getUserWatchlist($username) : [];
     echo json_encode(['watchlist' => $wl]);
     exit;
 }
 if ($uri === '/api/watchlist/reset' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
-    if (file_exists(WL_FILE)) unlink(WL_FILE);
-    // Also clear watchlist cache so it refetches with defaults
-    $cacheFile = STORAGE . '/watchlist_cache.json';
-    if (file_exists($cacheFile)) unlink($cacheFile);
+    $username = getCurrentUser();
+    if ($username) {
+        saveUserWatchlist($username, []);
+        $cacheFile = getUserWatchlistCachePath($username);
+        if (file_exists($cacheFile)) unlink($cacheFile);
+    }
     echo json_encode(['ok' => true]);
     exit;
 }
@@ -233,6 +239,15 @@ if ($uri === '/api/eod/dates') {
     }
     rsort($dates);
     echo json_encode(['dates' => $dates]);
+    exit;
+}
+
+// ── Prakash Track Record: rolled-up win rate across all daily files ───
+if ($uri === '/api/prakash/rollup') {
+    header('Content-Type: application/json');
+    $days = isset($_GET['days']) ? max(1, (int)$_GET['days']) : 90;
+    try { echo json_encode(prakashRollupHistory(getCurrentUser(), $days)); }
+    catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
     exit;
 }
 

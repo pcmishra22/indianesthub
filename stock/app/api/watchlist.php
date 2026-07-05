@@ -10,8 +10,9 @@ declare(strict_types=1);
 // ── Custom watchlist helpers ──────────────────────────────────
 function getActiveWatchlist(): array
 {
-    if (file_exists(WL_FILE)) {
-        $custom = json_decode(file_get_contents(WL_FILE), true);
+    $username = getCurrentUser();
+    if ($username) {
+        $custom = getUserWatchlist($username);
         if (!empty($custom)) return $custom;
     }
     // Default: the full curated NSE universe (config.php WATCHLIST_SYMBOLS, ~230 stocks).
@@ -22,7 +23,7 @@ function getActiveWatchlist(): array
 
 function apiWatchlist(): array
 {
-    $cacheFile = STORAGE . '/watchlist_cache.json';
+    $cacheFile = getUserWatchlistCachePath(getCurrentUser());
     if (file_exists($cacheFile)) {
         $cached = json_decode(file_get_contents($cacheFile), true);
         if ($cached && (time() - ($cached['ts'] ?? 0)) < 300) {
@@ -31,7 +32,8 @@ function apiWatchlist(): array
         }
     }
 
-    $symbols = getActiveWatchlist();
+    $username = getCurrentUser();
+    $symbols = $username ? getUserWatchlist($username) : getActiveWatchlist();
     $stocks  = [];
 
     foreach ($symbols as $sym) {
@@ -176,7 +178,7 @@ function apiWatchlist(): array
         'ts'               => time(),
         'cached'           => false,
         'source'           => DATA_API_KEY ? 'Twelve Data' : 'Legacy fallback sources',
-        'custom_watchlist' => file_exists(WL_FILE) ? json_decode(file_get_contents(WL_FILE), true) : [],
+        'custom_watchlist' => getCurrentUser() ? getUserWatchlist(getCurrentUser()) : [],
     ];
 
     if (!is_dir(STORAGE)) mkdir(STORAGE, 0755, true);
@@ -496,7 +498,7 @@ function apiTick(): array
 function apiLeaders(): array
 {
     $logFile   = STORAGE . '/signals_' . date('Y-m-d') . '.json';
-    $wlCache   = STORAGE . '/watchlist_cache.json';
+    $wlCache   = getUserWatchlistCachePath(getCurrentUser());
     $now       = time();
     $hour      = $now - 3600;
 
@@ -758,7 +760,8 @@ function apiMomentumPicks(): array
 function apiWatchlistPage(int $page = 1, string $sector = '', string $search = ''): array
 {
     $perPage  = 20;
-    $allSyms  = getActiveWatchlist();
+    $username = getCurrentUser();
+    $allSyms  = $username ? getUserWatchlist($username) : getActiveWatchlist();
 
     // ── Step 1: check if browser already pushed quotes via /api/proxy/quotes ──
     // This is the primary path when server-side sources (Stooq/Yahoo/NSE) are IP-blocked.
@@ -982,6 +985,12 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
     $mood  = count($buys) / max(1, count($stocks)) >= 0.6 ? 'Bullish'
            : (count($buys) / max(1, count($stocks)) <= 0.4 ? 'Bearish' : 'Mixed');
 
+    $prakash = buildPrakashRecommendations($stocks, null, null, getCurrentUser());
+    // Freeze today's file as Not Achieved for any open target once market
+    // close has passed. Cheap no-op check on every request; only actually
+    // rewrites the daily file the first time it runs after close each day.
+    closePrakashDailyIfNeeded(getCurrentUser());
+
     return [
         'stocks'          => $stocks,
         'buy_list'        => $buys,
@@ -997,6 +1006,8 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
         'quotes_fetched'  => count($allQuotes),
         'skipped_no_quote'=> $skippedNoQuote ?? 0,
         'warning'         => empty($allQuotes) ? ('Could not fetch live quotes. Sources tried: Stooq, NSE India, Groww, BSE. Market may be closed or sources temporarily unavailable. Try refreshing in a few minutes.') : (count($allQuotes) < 10 ? 'Partial data: only ' . count($allQuotes) . ' quotes fetched. Some stocks may be missing.' : null),
+        'custom_watchlist' => $username ? getUserWatchlist($username) : [],
+        'prakash_recommendations' => $prakash,
     ];
 }
 
