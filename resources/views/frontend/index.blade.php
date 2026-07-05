@@ -290,7 +290,7 @@
           $priceTo   = $launch->price_to   ? homeFmt($launch->price_to)   : null;
         @endphp
         <div class="col-lg-3 col-md-6">
-          <a href="{{ route('projects.show', $launch->id) }}" class="launch-card d-block text-decoration-none h-100">
+          <a href="{{ route('projects.show', $launch->slug) }}" class="launch-card d-block text-decoration-none h-100">
             <div class="launch-card-img">
               <img src="{{ $launchImg }}" alt="{{ $launch->title }}" loading="lazy">
               @php

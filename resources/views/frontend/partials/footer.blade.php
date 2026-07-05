@@ -84,6 +84,10 @@
         <div class="col-lg col-6 footer-links">
           <p class="loc-group-head">Builders in Top Cities</p>
           <ul>
+            <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties.location','pune') }}">Properties in Pune</a></li>
+            <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties.location','bangalore') }}">Properties in Bangalore</a></li>
+            <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties.location','hyderabad') }}">Properties in Hyderabad</a></li>
+            <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties.location','delhi-ncr') }}">Properties in Delhi NCR</a></li>
             <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties.location','pune') }}">Builders in Pune</a></li>
             <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties.location','bangalore') }}">Builders in Bangalore</a></li>
             <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties.location','hyderabad') }}">Builders in Hyderabad</a></li>

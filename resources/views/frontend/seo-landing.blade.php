@@ -135,7 +135,7 @@
       <div class="row g-3">
         @foreach($newProjects as $project)
         <div class="col-md-4">
-          <a href="{{ route('projects.show', $project->id) }}" class="text-decoration-none">
+          <a href="{{ route('projects.show', $project->slug) }}" class="text-decoration-none">
             <div class="prop-card card h-100">
               @php
                 $projImg = $project->cover_image ? asset('storage/'.$project->cover_image) : asset('assets/img/og-default.jpg');

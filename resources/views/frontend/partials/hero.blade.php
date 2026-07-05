@@ -158,7 +158,7 @@
               <span>Popular:</span>
               <a href="{{ route('builders.index') }}" class="popular-tag">All Builders</a>
               @foreach(($newLaunches ?? collect())->take(3) as $nl)
-                <a href="{{ route('projects.show', $nl->id) }}" class="popular-tag">{{ Str::limit($nl->title, 25) }}</a>
+                <a href="{{ route('projects.show', $nl->slug) }}" class="popular-tag">{{ Str::limit($nl->title, 25) }}</a>
               @endforeach
             </div>
           </div>
