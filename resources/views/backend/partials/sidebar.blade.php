@@ -55,6 +55,11 @@
                     <i class="align-middle" data-feather="user-plus"></i> <span class="align-middle">Builder Leads</span>
                 </a>
             </li>
+            <li class="sidebar-item {{ request()->routeIs('admin.city-import.*') ? 'active' : '' }}">
+                <a class="sidebar-link" href="{{ route('admin.city-import.create') }}">
+                    <i class="align-middle" data-feather="download-cloud"></i> <span class="align-middle">City Data Import</span>
+                </a>
+            </li>
             <li class="sidebar-item {{ request()->routeIs('admin.loan-leads.*') ? 'active' : '' }}">
                 <a class="sidebar-link" href="{{ route('admin.loan-leads.index') }}">
                     <i class="align-middle" data-feather="dollar-sign"></i>
