@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
  * Adds dealers, builders and FOR-SALE properties in the 10–100 km ring
  * around Srishti Avenue, Dhakoli, Zirakpur (30.6400, 76.8190) that are
  * NOT already covered by ZirakpurProximitySeeder / Batch2 / Batch3 or the
- * Tricity*/MohaliKharar* seeders (those already cover Zirakpur, Baltana,
+ * Tricity- and MohaliKharar- seeders (those already cover Zirakpur, Baltana,
  * Peer Mushalla, VIP Road, Ambala Highway, Panchkula, Mohali, Kharar,
  * Derabassi, Landran, Mullanpur, Gharuan, Kurali, Banur, Rajpura, Patiala,
  * Fatehgarh Sahib, Ropar, Morinda, Chandigarh, Kalka, Pinjore, Solan,

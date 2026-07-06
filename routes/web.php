@@ -81,6 +81,7 @@ use App\Http\Controllers\Admin\BuilderController as AdminBuilderController;
 use App\Http\Controllers\Admin\BuilderProjectController as AdminBuilderProjectController;
 use App\Http\Controllers\Admin\BuilderLeadController as AdminBuilderLeadController;
 use App\Http\Controllers\Admin\PropertyViewersController;
+use App\Http\Controllers\Admin\CityDataImportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -706,6 +707,12 @@ require __DIR__ . '/admin_properties.php';
 
         // Banners
         Route::resource('banners', \App\Http\Controllers\Admin\BannerController::class)->except(['show']);
+
+        // City Data Import (crawl builders/agents by city, review, confirm)
+        Route::get('city-import',                  [CityDataImportController::class, 'create'])->name('city-import.create');
+        Route::post('city-import/discover',        [CityDataImportController::class, 'discover'])->name('city-import.discover');
+        Route::post('city-import/{batch}/confirm', [CityDataImportController::class, 'confirm'])->name('city-import.confirm');
+        Route::post('city-import/{batch}/reject',  [CityDataImportController::class, 'reject'])->name('city-import.reject');
 });
 
 /*
