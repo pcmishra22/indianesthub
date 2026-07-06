@@ -1,8 +1,33 @@
 APP_NAME=NSE Stock Analyzer
 APP_SECRET=change_this_random_string
+TIMEZONE=Asia/Kolkata
+
+# ─── Multi-user demo logins ───────────────────────────────────
+# Each user below gets their OWN watchlist, and their OWN Prakash + AI
+# recommendation history / success-failure rate — fully separate storage
+# per username. Change these passwords before going live.
+# User 1 (also the admin/default account)
 DEMO_USER=admin
 DEMO_PASS=stockpass123
-TIMEZONE=Asia/Kolkata
+
+# User 2
+DEMO_USER_2=trader2
+DEMO_PASS_2=Trader2@123
+
+# User 3
+DEMO_USER_3=trader3
+DEMO_PASS_3=Trader3@123
+
+# User 4
+DEMO_USER_4=trader4
+DEMO_PASS_4=Trader4@123
+
+# User 5
+DEMO_USER_5=trader5
+DEMO_PASS_5=Trader5@123
+
+# Anyone else can also self-register their own account at /register —
+# it creates a normal user with the same per-user isolation as the 5 above.
 
 # Primary data provider — Twelve Data (free tier: 800 requests/day, NSE supported)
 DATA_API_PROVIDER=twelvedata

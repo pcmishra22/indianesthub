@@ -70,6 +70,23 @@ function getDefaultUserCredentials(): array
     ];
 }
 
+// Extra demo users beyond the primary DEMO_USER/DEMO_PASS, read from
+// DEMO_USER_2/DEMO_PASS_2 .. DEMO_USER_5/DEMO_PASS_5 in .env. Each gets
+// their own watchlist, Prakash/AI recommendation history, and success/
+// failure rate — fully isolated per-username (see getUserWatchlistPath(),
+// getUserRecommendationStatePath(), aiDailyFile(), etc.).
+function getExtraDemoUsers(): array
+{
+    $extras = [];
+    for ($i = 2; $i <= 5; $i++) {
+        $extras[] = [
+            'username' => getenv("DEMO_USER_{$i}") ?: '',
+            'password' => getenv("DEMO_PASS_{$i}") ?: '',
+        ];
+    }
+    return $extras;
+}
+
 function ensureUsersStore(): array
 {
     $storePath = getUsersStorePath();
@@ -86,10 +103,7 @@ function ensureUsersStore(): array
                 saveUsersStore($decoded);
             }
 
-            foreach ([
-                ['username' => getenv('DEMO_USER_2') ?: '', 'password' => getenv('DEMO_PASS_2') ?: ''],
-                ['username' => getenv('DEMO_USER_3') ?: '', 'password' => getenv('DEMO_PASS_3') ?: ''],
-            ] as $extra) {
+            foreach (getExtraDemoUsers() as $extra) {
                 $u = trim((string)($extra['username'] ?? ''));
                 $p = trim((string)($extra['password'] ?? ''));
                 if ($u !== '' && $p !== '' && !isset($decoded['users'][$u])) {
@@ -116,10 +130,7 @@ function ensureUsersStore(): array
         ],
     ];
 
-    foreach ([
-        ['username' => getenv('DEMO_USER_2') ?: '', 'password' => getenv('DEMO_PASS_2') ?: ''],
-        ['username' => getenv('DEMO_USER_3') ?: '', 'password' => getenv('DEMO_PASS_3') ?: ''],
-    ] as $extra) {
+    foreach (getExtraDemoUsers() as $extra) {
         $u = trim((string)($extra['username'] ?? ''));
         $p = trim((string)($extra['password'] ?? ''));
         if ($u !== '' && $p !== '') {
