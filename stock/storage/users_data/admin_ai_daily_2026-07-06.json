@@ -1,0 +1,90 @@
+{
+    "date": "2026-07-06",
+    "recommendations": [
+        {
+            "symbol": "MARUTI",
+            "side": "Buy",
+            "reason": "Buy Signal",
+            "confidence": 100,
+            "entry_price": 14451.4,
+            "entry_time": "2026-07-06 11:41:29",
+            "target_pct": 1,
+            "target_price": 14595.91,
+            "achieved": false,
+            "achieved_at": null,
+            "achieved_price": null,
+            "last_checked_price": 14421.15
+        },
+        {
+            "symbol": "BAJFINANCE",
+            "side": "Buy",
+            "reason": "Strong Buy Signal",
+            "confidence": 100,
+            "entry_price": 1035.05,
+            "entry_time": "2026-07-06 11:41:29",
+            "target_pct": 1,
+            "target_price": 1045.4,
+            "achieved": false,
+            "achieved_at": null,
+            "achieved_price": null,
+            "last_checked_price": 1026.5
+        },
+        {
+            "symbol": "ICICIBANK",
+            "side": "Buy",
+            "reason": "Buy Signal",
+            "confidence": 100,
+            "entry_price": 1421.5,
+            "entry_time": "2026-07-06 11:41:29",
+            "target_pct": 1,
+            "target_price": 1435.72,
+            "achieved": false,
+            "achieved_at": null,
+            "achieved_price": null,
+            "last_checked_price": 1427.4
+        },
+        {
+            "symbol": "BHARTIARTL",
+            "side": "Buy",
+            "reason": "Buy Signal",
+            "confidence": 100,
+            "entry_price": 1922.4,
+            "entry_time": "2026-07-06 11:41:29",
+            "target_pct": 1,
+            "target_price": 1941.62,
+            "achieved": false,
+            "achieved_at": null,
+            "achieved_price": null,
+            "last_checked_price": 1931.55
+        },
+        {
+            "symbol": "TITAN",
+            "side": "Buy",
+            "reason": "Buy Signal",
+            "confidence": 100,
+            "entry_price": 4461.3,
+            "entry_time": "2026-07-06 11:41:29",
+            "target_pct": 1,
+            "target_price": 4505.91,
+            "achieved": false,
+            "achieved_at": null,
+            "achieved_price": null,
+            "last_checked_price": 4482.05
+        },
+        {
+            "symbol": "SUNPHARMA",
+            "side": "Buy",
+            "reason": "Buy Signal",
+            "confidence": 100,
+            "entry_price": 1905.9,
+            "entry_time": "2026-07-06 11:48:26",
+            "target_pct": 1,
+            "target_price": 1924.96,
+            "achieved": false,
+            "achieved_at": null,
+            "achieved_price": null,
+            "last_checked_price": 1912.7
+        }
+    ],
+    "closed": false
+}

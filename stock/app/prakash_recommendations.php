@@ -413,7 +413,7 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
                 $rec = &$daily['recommendations'][$idx];
                 $rec['last_checked_price'] = $livePrice;
                 if (!$rec['achieved']) {
-                    $hit = $side === 'Buy' ? ($livePrice >= $rec['target_price']) : ($livePrice <= $rec['target_price']);
+                    $hit = $rec['side'] === 'Buy' ? ($livePrice >= $rec['target_price']) : ($livePrice <= $rec['target_price']);
                     if ($hit) {
                         $rec['achieved'] = true;
                         $rec['achieved_at'] = $now;
