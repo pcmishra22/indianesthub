@@ -93,6 +93,7 @@ class DatabaseSeeder extends Seeder
             ZirakpurProximitySeeder::class,
             ZirakpurProximitySeederBatch2::class,
             ZirakpurProximitySeederBatch3::class,
+            ZirakpurExtendedRingSeeder::class,
             NearbyProjectsSeeder::class,
             TricityBuilderProjectsSeeder::class,  
             TricityBuilderProjectsBatch3::class, 
