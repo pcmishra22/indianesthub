@@ -66,7 +66,11 @@ function closePrakashDailyIfNeeded(?string $username = null): ?array
 // Rolls up every stored daily file (across all days, optionally for one
 // user) into overall win-rate stats — the number you'd actually want to see
 // on a "Prakash Track Record" page.
-function prakashRollupHistory(?string $username = null, int $maxDays = 90): array
+// $withDetails=true attaches every individual stock-level recommendation
+// (symbol, side, entry/target price, achieved/not) for each day, so a "view
+// details" UI can list and let the user verify every entry behind the
+// aggregate rate rather than just trusting the summary number.
+function prakashRollupHistory(?string $username = null, int $maxDays = 90, bool $withDetails = false): array
 {
     $dir = getStorageBasePath();
     $prefix = $username ? preg_replace('/[^a-z0-9._-]/i', '_', trim($username)) . '_' : '';
@@ -90,13 +94,15 @@ function prakashRollupHistory(?string $username = null, int $maxDays = 90): arra
         $count = count($recs);
         $totalAchieved += $achieved;
         $totalCount += $count;
-        $days[] = [
+        $dayEntry = [
             'date' => $decoded['date'] ?? basename($file),
             'total' => $count,
             'achieved' => $achieved,
             'success_rate' => $count > 0 ? round($achieved / $count * 100, 1) : null,
             'closed' => (bool)($decoded['closed'] ?? false),
         ];
+        if ($withDetails) $dayEntry['recommendations'] = $recs;
+        $days[] = $dayEntry;
     }
 
     return [

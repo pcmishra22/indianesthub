@@ -243,15 +243,61 @@ if ($uri === '/api/eod/dates') {
 }
 
 // ── Prakash Track Record: rolled-up win rate across all daily files ───
+// ?details=1 attaches every individual stock-level recommendation per day
+// (for the "view all stocks" detail button on the dashboard).
 if ($uri === '/api/prakash/rollup') {
     header('Content-Type: application/json');
     $days = isset($_GET['days']) ? max(1, (int)$_GET['days']) : 90;
-    try { echo json_encode(prakashRollupHistory(getCurrentUser(), $days)); }
+    $details = !empty($_GET['details']);
+    try { echo json_encode(prakashRollupHistory(getCurrentUser(), $days, $details)); }
     catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
     exit;
 }
 
+// ── AI Track Record: rolled-up win rate for the AI signal-engine box ──
+if ($uri === '/api/ai/rollup') {
+    header('Content-Type: application/json');
+    $days = isset($_GET['days']) ? max(1, (int)$_GET['days']) : 90;
+    $details = !empty($_GET['details']);
+    try { echo json_encode(aiRollupHistory(getCurrentUser(), $days, $details)); }
+    catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
+    exit;
+}
 
+// ── Combined EOD recommendation report: merges Prakash's and AI's daily
+// tracked Buy/Sell entries (entry price, target price, achieved status) for
+// one calendar day, for the person to download/keep as their own EOD log.
+if ($uri === '/api/eod/combined') {
+    header('Content-Type: application/json');
+    $date = $_GET['date'] ?? date('Y-m-d');
+    $username = getCurrentUser();
+    try {
+        $prakashDaily = loadPrakashDaily(prakashDailyFile($username, $date));
+        $aiDaily = loadPrakashDaily(aiDailyFile($username, $date));
+        $rows = [];
+        foreach (($prakashDaily['recommendations'] ?? []) as $r) {
+            $rows[] = array_merge($r, ['engine' => 'Prakash']);
+        }
+        foreach (($aiDaily['recommendations'] ?? []) as $r) {
+            $rows[] = array_merge($r, ['engine' => 'AI']);
+        }
+        $achieved = count(array_filter($rows, fn($r) => !empty($r['achieved'])));
+        $total = count($rows);
+        echo json_encode([
+            'date' => $date,
+            'rows' => $rows,
+            'summary' => [
+                'total' => $total,
+                'achieved' => $achieved,
+                'failed' => $total - $achieved,
+                'success_rate' => $total > 0 ? round($achieved / $total * 100, 1) : null,
+                'prakash_total' => count($prakashDaily['recommendations'] ?? []),
+                'ai_total' => count($aiDaily['recommendations'] ?? []),
+            ],
+        ]);
+    } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
+    exit;
+}
 
 // ── Server-side bulk quotes via Stooq (replaces browser Yahoo fetch) ──
 if ($uri === '/api/quotes/bulk' && $_SERVER['REQUEST_METHOD'] === 'POST') {

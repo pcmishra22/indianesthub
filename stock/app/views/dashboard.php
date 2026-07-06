@@ -319,6 +319,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </div>
 
   <div id="prakashRecommendations" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:12px"></div>
+  <div id="aiRecommendations" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:12px"></div>
 
   <div class="panel" id="watchPanel">
     <div class="loading-card" id="watchLoading">
@@ -409,9 +410,71 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <div class="panel" style="margin-bottom:16px;padding:14px 16px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
       <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0">📊 Prakash Track Record</h3>
-      <button class="btn btn-outline" onclick="loadPrakashRollup()" style="padding:5px 12px;font-size:11px">🔄 Refresh</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="openTrackRecordDetails('prakash')" style="padding:5px 12px;font-size:11px">🔍 View All Details</button>
+        <button class="btn btn-outline" onclick="loadPrakashRollup()" style="padding:5px 12px;font-size:11px">🔄 Refresh</button>
+      </div>
     </div>
     <div id="prakashRollup"><div style="font-size:12px;color:var(--muted)">Loading track record…</div></div>
+  </div>
+
+  <!-- AI intraday Buy/Sell boxes with entry price + 1% target + achieved status,
+       driven by this app's own indicator signal engine (signals.php) rather
+       than Prakash's rank-movement logic. -->
+  <div class="panel" style="margin-bottom:16px;padding:14px 16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0">🤖 AI Intraday Recommendations</h3>
+      <div id="aiDailySummary" style="font-size:12px;color:var(--muted)"></div>
+    </div>
+    <div id="aiBoxes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
+  </div>
+
+  <!-- AI Track Record: cross-day win-rate rollup, same shape as Prakash's -->
+  <div class="panel" style="margin-bottom:16px;padding:14px 16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0">📊 AI Track Record</h3>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="openTrackRecordDetails('ai')" style="padding:5px 12px;font-size:11px">🔍 View All Details</button>
+        <button class="btn btn-outline" onclick="loadAiRollup()" style="padding:5px 12px;font-size:11px">🔄 Refresh</button>
+      </div>
+    </div>
+    <div id="aiRollup"><div style="font-size:12px;color:var(--muted)">Loading track record…</div></div>
+  </div>
+
+  <!-- Top Recommendation for Today: every distinct stock that appeared in
+       either engine's Buy/Sell box at any point today (not just the latest
+       5-per-refresh snapshot), so a stock/two coming up across refreshes
+       isn't lost when the box rotates. -->
+  <div class="panel" style="margin-bottom:16px;padding:14px 16px">
+    <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0 0 10px">⭐ Top Recommendation for Today</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">🎯 Prakash</div>
+        <div style="font-size:11px;color:var(--green);font-weight:700;margin-bottom:4px">Today Buy</div>
+        <div id="prakashTodayBuy" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+        <div style="font-size:11px;color:var(--red);font-weight:700;margin-bottom:4px">Today Sell</div>
+        <div id="prakashTodaySell" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">🤖 AI</div>
+        <div style="font-size:11px;color:var(--green);font-weight:700;margin-bottom:4px">Today Buy</div>
+        <div id="aiTodayBuy" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
+        <div style="font-size:11px;color:var(--red);font-weight:700;margin-bottom:4px">Today Sell</div>
+        <div id="aiTodaySell" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Track Record detail modal: full stock-level list behind the rollup
+       numbers (task: "so user can see and trust on this data") -->
+  <div id="trackRecordModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;padding:20px">
+    <div style="background:var(--panel,#171923);border:1px solid var(--border);border-radius:12px;max-width:820px;width:100%;max-height:85vh;display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)">
+        <h3 id="trackRecordModalTitle" style="font-size:.95rem;font-weight:700;color:#fff;margin:0">Track Record Details</h3>
+        <button class="btn btn-outline" onclick="closeTrackRecordDetails()" style="padding:4px 10px;font-size:12px">✕ Close</button>
+      </div>
+      <div id="trackRecordModalBody" style="padding:14px 18px;overflow-y:auto"></div>
+    </div>
   </div>
 
   <!-- Live ticker strip -->
@@ -487,7 +550,19 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <option value="">Today</option>
       </select>
       <button class="btn btn-primary" onclick="loadEodReport()" style="padding:7px 16px">🔄 Refresh</button>
+      <button class="btn btn-outline" onclick="downloadCombinedEodReport()" style="padding:7px 16px">⬇ Download Prakash+AI Report (CSV)</button>
     </div>
+  </div>
+
+  <!-- Combined Prakash + AI recommendation log for the selected date — every
+       stock either engine recommended, with entry/target price and whether
+       it succeeded or failed, for the person's own EOD understanding. -->
+  <div class="panel" id="combinedEodPanel" style="margin-bottom:16px;padding:14px 16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0">🗂 Prakash + AI Recommendation Log</h3>
+      <div id="combinedEodSummary" style="font-size:12px;color:var(--muted)"></div>
+    </div>
+    <div id="combinedEodTable" style="font-size:12px"><div style="color:var(--muted)">Loading…</div></div>
   </div>
 
   <!-- Summary KPI row -->
@@ -649,6 +724,7 @@ async function loadWatchlist(force=false){
     renderWatchlist(d);
     renderPagination(d);
     renderPrakashRecommendations(d.prakash_recommendations);
+    renderAiRecommendations(d.ai_recommendations);
     startCountdown();
   }catch(e){
     document.getElementById('watchLoading').innerHTML=`<div class="err-box">Error: ${escHtml(e.message)}</div>`;
@@ -762,44 +838,54 @@ async function loadSectors(){
   }catch(e){}
 }
 
-function renderPrakashRecommendations(rec){
-  const el=document.getElementById('prakashRecommendations');
-  if(!el) return;
-  if(!rec){el.innerHTML='';return;}
-  const buy=rec.buy_recommendation||rec.top_gainer||null;
-  const sell=rec.sell_recommendation||rec.top_loser||null;
-  const cardStyle='background:linear-gradient(135deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1px solid var(--border);border-radius:12px;padding:12px 14px;min-height:120px';
-  const buyTitle=buy?.reason==='Rank Movement Up'?'Rank Movement Buy':'Top Buy by Prakash';
-  const sellTitle=sell?.reason==='Rank Movement Down'?'Rank Movement Sell':'Top Sell by Prakash';
+function renderPrakashRecommendations(rec){ renderEngineRecommendations('prakash', rec); }
+function renderAiRecommendations(rec){ renderEngineRecommendations('ai', rec); }
 
-  const buyHtml=`<div style="${cardStyle}">
-    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px">${escHtml(buyTitle)}</div>
-    <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:4px">${escHtml(buy?.symbol||'—')}</div>
-    <div style="font-size:12px;color:var(--green);margin-bottom:4px">${buy?.recommendation||'Buy'} · ${buy?.reason||'Top Gainer'}</div>
-    <div style="font-size:12px;color:var(--muted2)">Price: ₹${fmtNum(buy?.price||0)} · Change: ${fmtNum(buy?.percentage_change||0)}%</div>
-    ${buy?.previous_rank!==null&&buy?.current_rank!==null?`<div style="font-size:11px;color:var(--muted);margin-top:4px">Rank ${buy.previous_rank} → ${buy.current_rank}</div>`:''}
-  </div>`;
+// Shared renderer for both engines — 'prakash' uses ids prakashRecommendations/
+// prakashBoxes/prakashDailySummary/prakashTodayBuy/prakashTodaySell, 'ai' uses
+// the aiXxx equivalents. Behavior is otherwise identical.
+function renderEngineRecommendations(engine, rec){
+  const el=document.getElementById(engine+'Recommendations');
+  const isPrakash=engine==='prakash';
+  if(el){
+    if(!rec){ el.innerHTML=''; }
+    else{
+      const buy=rec.buy_recommendation||rec.top_gainer||null;
+      const sell=rec.sell_recommendation||rec.top_loser||null;
+      const cardStyle='background:linear-gradient(135deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1px solid var(--border);border-radius:12px;padding:12px 14px;min-height:120px';
+      const buyTitle=isPrakash?(buy?.reason==='Rank Movement Up'?'Rank Movement Buy':'Top Buy by Prakash'):(buy?.reason||'Top Buy — AI');
+      const sellTitle=isPrakash?(sell?.reason==='Rank Movement Down'?'Rank Movement Sell':'Top Sell by Prakash'):(sell?.reason||'Top Sell — AI');
 
-  const sellHtml=`<div style="${cardStyle}">
-    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px">${escHtml(sellTitle)}</div>
-    <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:4px">${escHtml(sell?.symbol||'—')}</div>
-    <div style="font-size:12px;color:var(--red);margin-bottom:4px">${sell?.recommendation||'Sell'} · ${sell?.reason||'Top Loser'}</div>
-    <div style="font-size:12px;color:var(--muted2)">Price: ₹${fmtNum(sell?.price||0)} · Change: ${fmtNum(sell?.percentage_change||0)}%</div>
-    ${sell?.previous_rank!==null&&sell?.current_rank!==null?`<div style="font-size:11px;color:var(--muted);margin-top:4px">Rank ${sell.previous_rank} → ${sell.current_rank}</div>`:''}
-  </div>`;
+      const buyHtml=`<div style="${cardStyle}">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px">${escHtml(buyTitle)}</div>
+        <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:4px">${escHtml(buy?.symbol||'—')}</div>
+        <div style="font-size:12px;color:var(--green);margin-bottom:4px">${buy?.recommendation||'Buy'} · ${buy?.reason||''}</div>
+        <div style="font-size:12px;color:var(--muted2)">Price: ₹${fmtNum(buy?.price||0)} · Change: ${fmtNum(buy?.percentage_change||0)}%${buy?.confidence!==undefined&&buy?.confidence!==null?` · Confidence: ${fmtNum(buy.confidence)}%`:''}</div>
+        ${buy?.previous_rank!==null&&buy?.previous_rank!==undefined&&buy?.current_rank!==null&&buy?.current_rank!==undefined?`<div style="font-size:11px;color:var(--muted);margin-top:4px">Rank ${buy.previous_rank} → ${buy.current_rank}</div>`:''}
+      </div>`;
 
-  el.innerHTML=`<div>${buy?buyHtml:'<div style="'+cardStyle+'">No buy recommendation yet</div>'}</div><div>${sell?sellHtml:'<div style="'+cardStyle+'">No sell recommendation yet</div>'}</div>`;
+      const sellHtml=`<div style="${cardStyle}">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px">${escHtml(sellTitle)}</div>
+        <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:4px">${escHtml(sell?.symbol||'—')}</div>
+        <div style="font-size:12px;color:var(--red);margin-bottom:4px">${sell?.recommendation||'Sell'} · ${sell?.reason||''}</div>
+        <div style="font-size:12px;color:var(--muted2)">Price: ₹${fmtNum(sell?.price||0)} · Change: ${fmtNum(sell?.percentage_change||0)}%${sell?.confidence!==undefined&&sell?.confidence!==null?` · Confidence: ${fmtNum(sell.confidence)}%`:''}</div>
+        ${sell?.previous_rank!==null&&sell?.previous_rank!==undefined&&sell?.current_rank!==null&&sell?.current_rank!==undefined?`<div style="font-size:11px;color:var(--muted);margin-top:4px">Rank ${sell.previous_rank} → ${sell.current_rank}</div>`:''}
+      </div>`;
 
-  renderPrakashBoxes(rec);
+      el.innerHTML=`<div>${buy?buyHtml:'<div style="'+cardStyle+'">No buy recommendation yet</div>'}</div><div>${sell?sellHtml:'<div style="'+cardStyle+'">No sell recommendation yet</div>'}</div>`;
+    }
+  }
+  renderEngineBoxes(engine, rec);
+  renderEngineTodayLists(engine, rec);
 }
 
 // Renders the up-to-5-stock Buy/Sell boxes with locked-in entry price,
 // 1% intraday target, and achieved/open status — pulled from
 // rec.buy_box / rec.sell_box / rec.daily_summary (populated server-side by
-// buildPrakashRecommendations()).
-function renderPrakashBoxes(rec){
-  const el=document.getElementById('prakashBoxes');
-  const summaryEl=document.getElementById('prakashDailySummary');
+// buildPrakashRecommendations() / buildAiRecommendations()).
+function renderEngineBoxes(engine, rec){
+  const el=document.getElementById(engine+'Boxes');
+  const summaryEl=document.getElementById(engine+'DailySummary');
   if(!el) return;
   if(!rec){el.innerHTML='';if(summaryEl)summaryEl.textContent='';return;}
 
@@ -844,14 +930,48 @@ function renderPrakashBoxes(rec){
   el.innerHTML = buyBox.map(e=>boxCard(e,'Buy')).join('') + sellBox.map(e=>boxCard(e,'Sell')).join('');
 }
 
-// Cross-day win-rate rollup from /api/prakash/rollup
-async function loadPrakashRollup(){
-  const el=document.getElementById('prakashRollup');
+// "Top Recommendation for Today": every distinct stock the engine has put in
+// a Buy/Sell box at ANY point today, pulled straight from daily_summary.recommendations
+// (which already accumulates across refreshes) — not just the latest 5-per-refresh
+// snapshot, so a stock that showed up once earlier today doesn't disappear
+// once the box rotates to different names.
+function renderEngineTodayLists(engine, rec){
+  const buyEl=document.getElementById(engine+'TodayBuy');
+  const sellEl=document.getElementById(engine+'TodaySell');
+  if(!buyEl || !sellEl) return;
+  const recs=(rec?.daily_summary?.recommendations)||[];
+  if(recs.length===0){
+    buyEl.innerHTML='<div style="font-size:11px;color:var(--muted)">None yet today</div>';
+    sellEl.innerHTML='<div style="font-size:11px;color:var(--muted)">None yet today</div>';
+    return;
+  }
+  function row(r){
+    const achieved=!!r.achieved;
+    const statusColor=achieved?'var(--green)':'var(--muted)';
+    const statusText=achieved?'✅ Hit':(r.final_status==='Not Achieved'?'❌ Not achieved':'⏳ Open');
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(255,255,255,.03);border-radius:6px;font-size:11px">
+      <span style="color:#fff;font-weight:600">${escHtml(r.symbol)}</span>
+      <span style="color:var(--muted2)">₹${fmtNum(r.entry_price)} → ₹${fmtNum(r.target_price)}</span>
+      <span style="color:${statusColor};font-weight:600">${statusText}</span>
+    </div>`;
+  }
+  const buys=recs.filter(r=>r.side==='Buy');
+  const sells=recs.filter(r=>r.side==='Sell');
+  buyEl.innerHTML = buys.length ? buys.map(row).join('') : '<div style="font-size:11px;color:var(--muted)">None yet today</div>';
+  sellEl.innerHTML = sells.length ? sells.map(row).join('') : '<div style="font-size:11px;color:var(--muted)">None yet today</div>';
+}
+
+// Cross-day win-rate rollup from /api/prakash/rollup and /api/ai/rollup
+async function loadPrakashRollup(){ loadEngineRollup('prakash'); }
+async function loadAiRollup(){ loadEngineRollup('ai'); }
+
+async function loadEngineRollup(engine){
+  const el=document.getElementById(engine+'Rollup');
   if(!el) return;
   try{
-    const r=await fetch(apiUrl('api/prakash/rollup?days=30'));
+    const r=await fetch(apiUrl('api/'+engine+'/rollup?days=30'));
     const d=await r.json();
-    prakashRollupLoaded=true;
+    if(engine==='prakash') prakashRollupLoaded=true;
     if(d.error){ el.innerHTML=`<div class="err-box">${escHtml(d.error)}</div>`; return; }
     if(!d.days || d.days.length===0){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">No daily history yet — check back after a full trading day.</div>'; return; }
 
@@ -873,6 +993,56 @@ async function loadPrakashRollup(){
   }catch(e){
     el.innerHTML=`<div class="err-box">Error: ${escHtml(e.message)}</div>`;
   }
+}
+
+// "View All Details" modal — full stock-level list behind the rollup number,
+// so the person can check every entry (symbol, entry/target price, hit or
+// not) rather than just trusting the aggregate percentage.
+async function openTrackRecordDetails(engine){
+  const modal=document.getElementById('trackRecordModal');
+  const title=document.getElementById('trackRecordModalTitle');
+  const body=document.getElementById('trackRecordModalBody');
+  if(!modal||!body) return;
+  title.textContent=(engine==='prakash'?'📊 Prakash':'🤖 AI')+' Track Record — Full Details';
+  body.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted)">Loading…</div>';
+  modal.style.display='flex';
+  try{
+    const r=await fetch(apiUrl('api/'+engine+'/rollup?days=30&details=1'));
+    const d=await r.json();
+    if(d.error){ body.innerHTML=`<div class="err-box">${escHtml(d.error)}</div>`; return; }
+    if(!d.days || d.days.length===0){ body.innerHTML='<div style="color:var(--muted);font-size:13px">No daily history yet.</div>'; return; }
+    let html='';
+    d.days.forEach(day=>{
+      const rate=day.success_rate!==null?day.success_rate+'%':'—';
+      const rc=(day.success_rate||0)>=50?'var(--green)':'var(--red)';
+      html+=`<div style="margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-weight:700;color:#fff;font-size:13px">${escHtml(day.date)}${day.closed?'':' <span style=\"color:var(--orange);font-weight:400;font-size:11px\">(in progress)</span>'}</span>
+          <span style="color:${rc};font-weight:700;font-size:12px">${day.achieved}/${day.total} · ${rate}</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">`;
+      (day.recommendations||[]).forEach(r=>{
+        const achieved=!!r.achieved;
+        const statusColor=achieved?'var(--green)':(r.final_status==='Not Achieved'?'var(--red)':'var(--muted)');
+        const statusText=achieved?`✅ Hit @ ₹${fmtNum(r.achieved_price||0)}${r.achieved_at?' ('+escHtml(r.achieved_at.split(' ')[1]||'')+')':''}`:(r.final_status==='Not Achieved'?'❌ Not achieved':'⏳ Open');
+        const sideColor=r.side==='Buy'?'var(--green)':'var(--red)';
+        html+=`<div style="display:grid;grid-template-columns:70px 60px 1fr 1fr;gap:8px;align-items:center;padding:5px 8px;background:rgba(255,255,255,.03);border-radius:6px;font-size:11px">
+          <span style="color:#fff;font-weight:600">${escHtml(r.symbol)}</span>
+          <span style="color:${sideColor};font-weight:700;text-transform:uppercase">${escHtml(r.side)}</span>
+          <span style="color:var(--muted2)">Entry ₹${fmtNum(r.entry_price)} → Target ₹${fmtNum(r.target_price)}</span>
+          <span style="color:${statusColor};font-weight:600">${statusText}</span>
+        </div>`;
+      });
+      html+='</div></div>';
+    });
+    body.innerHTML=html;
+  }catch(e){
+    body.innerHTML=`<div class="err-box">Error: ${escHtml(e.message)}</div>`;
+  }
+}
+function closeTrackRecordDetails(){
+  const modal=document.getElementById('trackRecordModal');
+  if(modal) modal.style.display='none';
 }
 
 function renderWatchlist(d){
@@ -1965,8 +2135,82 @@ async function saveSignalManual(sym,name,signal,entry,target1,sl,target2){
   }catch(e){alert('Could not save signal: '+e.message);}
 }
 
+// Combined Prakash + AI recommendation log for a given date (defaults to
+// today) — every stock either engine tracked that day, with entry price,
+// target price, and achieved/failed status. Backs both the on-page table
+// and the CSV download.
+let _lastCombinedEod=null;
+async function loadCombinedEodReport(date){
+  const tableEl=document.getElementById('combinedEodTable');
+  const summaryEl=document.getElementById('combinedEodSummary');
+  if(!tableEl) return;
+  tableEl.innerHTML='<div style="color:var(--muted)">Loading…</div>';
+  try{
+    const url=apiUrl('api/eod/combined')+(date?'?date='+encodeURIComponent(date):'');
+    const r=await fetch(url);
+    const d=await r.json();
+    _lastCombinedEod=d;
+    if(d.error){ tableEl.innerHTML=`<div class="err-box">${escHtml(d.error)}</div>`; return; }
+    const rows=d.rows||[];
+    if(summaryEl){
+      const s=d.summary||{};
+      const rate=s.success_rate!==null&&s.success_rate!==undefined?s.success_rate+'%':'—';
+      const rc=(s.success_rate||0)>=50?'var(--green)':'var(--red)';
+      summaryEl.innerHTML=rows.length?`<strong style="color:#fff">${s.achieved}/${s.total}</strong> hit · <strong style="color:${rc}">${rate}</strong> · Prakash: ${s.prakash_total} · AI: ${s.ai_total}`:'';
+    }
+    if(rows.length===0){
+      tableEl.innerHTML='<div style="color:var(--muted)">No Prakash/AI recommendations logged for this date yet.</div>';
+      return;
+    }
+    let html='<div style="display:flex;flex-direction:column;gap:4px;max-height:340px;overflow-y:auto">';
+    rows.forEach(r=>{
+      const achieved=!!r.achieved;
+      const statusColor=achieved?'var(--green)':(r.final_status==='Not Achieved'?'var(--red)':'var(--muted)');
+      const statusText=achieved?`✅ Hit @ ₹${fmtNum(r.achieved_price||0)}`:(r.final_status==='Not Achieved'?'❌ Not achieved':'⏳ Open');
+      const sideColor=r.side==='Buy'?'var(--green)':'var(--red)';
+      html+=`<div style="display:grid;grid-template-columns:70px 60px 60px 1fr 1fr;gap:8px;align-items:center;padding:5px 8px;background:rgba(255,255,255,.03);border-radius:6px">
+        <span style="color:#fff;font-weight:600">${escHtml(r.symbol)}</span>
+        <span style="color:var(--accent2);font-weight:600">${escHtml(r.engine)}</span>
+        <span style="color:${sideColor};font-weight:700;text-transform:uppercase">${escHtml(r.side)}</span>
+        <span style="color:var(--muted2)">Entry ₹${fmtNum(r.entry_price)} → Target ₹${fmtNum(r.target_price)}</span>
+        <span style="color:${statusColor};font-weight:600">${statusText}</span>
+      </div>`;
+    });
+    html+='</div>';
+    tableEl.innerHTML=html;
+  }catch(e){
+    tableEl.innerHTML=`<div class="err-box">Error: ${escHtml(e.message)}</div>`;
+  }
+}
+
+// Builds a CSV client-side from the last loaded combined report and triggers
+// a download — this is the "EOD report with success/failure rate, stock,
+// buy/sell, price, target price" the person can keep for their own records.
+function downloadCombinedEodReport(){
+  const d=_lastCombinedEod;
+  if(!d || !d.rows || d.rows.length===0){ alert('No Prakash/AI recommendations for this date yet.'); return; }
+  const headers=['Date','Engine','Symbol','Side','Entry Price','Target Price','Status','Achieved Price','Entry Time','Achieved Time'];
+  const lines=[headers.join(',')];
+  d.rows.forEach(r=>{
+    const achieved=!!r.achieved;
+    const status=achieved?'Hit':(r.final_status==='Not Achieved'?'Not Achieved':'Open');
+    const row=[d.date, r.engine, r.symbol, r.side, r.entry_price, r.target_price, status, r.achieved_price||'', r.entry_time||'', r.achieved_at||''];
+    lines.push(row.map(v=>{
+      const s=String(v??'');
+      return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+    }).join(','));
+  });
+  const blob=new Blob([lines.join('\n')], {type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=`eod_report_${d.date}.csv`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 async function loadEodReport(date){
   eodLoaded=true;
+  loadCombinedEodReport(date||''); // Prakash + AI recommendation log, independent of the signal-tracker table below
   // Load available dates into picker
   try{
     const dr=await fetch(apiUrl('api/eod/dates'));

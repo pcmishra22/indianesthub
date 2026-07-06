@@ -43,6 +43,18 @@ function getUserRecommendationHistoryPath(string $username): string
     return getUserDataDir() . '/' . ($safe ?: 'default') . '_prakash_history.json';
 }
 
+function getUserAiRecommendationStatePath(string $username): string
+{
+    $safe = preg_replace('/[^a-z0-9._-]/i', '_', trim($username));
+    return getUserDataDir() . '/' . ($safe ?: 'default') . '_ai_state.json';
+}
+
+function getUserAiRecommendationHistoryPath(string $username): string
+{
+    $safe = preg_replace('/[^a-z0-9._-]/i', '_', trim($username));
+    return getUserDataDir() . '/' . ($safe ?: 'default') . '_ai_history.json';
+}
+
 function getUserWatchlistCachePath(string $username): string
 {
     $safe = preg_replace('/[^a-z0-9._-]/i', '_', trim($username));

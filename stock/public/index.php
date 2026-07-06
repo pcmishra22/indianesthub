@@ -32,6 +32,7 @@ require __DIR__ . '/../app/datasources.php'; // yahooQuote(), yahooQuoteBulk(), 
 require __DIR__ . '/../app/indicators.php';  // sma(), ema(), rsi(), macd(), adx(), etc.
 require __DIR__ . '/../app/signals.php';     // generateSignal(), momentumScore(), multiTimeframe(), etc.
 require __DIR__ . '/../app/prakash_recommendations.php';
+require __DIR__ . '/../app/ai_recommendations.php'; // buildAiRecommendations(), aiRollupHistory() — AI signal-engine track record
 
 // ── Function definitions only (no executable routes) — must load before
 //    any file below that might call these functions from a matched route.

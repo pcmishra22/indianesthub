@@ -986,10 +986,12 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
            : (count($buys) / max(1, count($stocks)) <= 0.4 ? 'Bearish' : 'Mixed');
 
     $prakash = buildPrakashRecommendations($stocks, null, null, getCurrentUser());
+    $ai = buildAiRecommendations($stocks, null, null, getCurrentUser());
     // Freeze today's file as Not Achieved for any open target once market
     // close has passed. Cheap no-op check on every request; only actually
     // rewrites the daily file the first time it runs after close each day.
     closePrakashDailyIfNeeded(getCurrentUser());
+    closeAiDailyIfNeeded(getCurrentUser());
 
     return [
         'stocks'          => $stocks,
@@ -1008,6 +1010,7 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
         'warning'         => empty($allQuotes) ? ('Could not fetch live quotes. Sources tried: Stooq, NSE India, Groww, BSE. Market may be closed or sources temporarily unavailable. Try refreshing in a few minutes.') : (count($allQuotes) < 10 ? 'Partial data: only ' . count($allQuotes) . ' quotes fetched. Some stocks may be missing.' : null),
         'custom_watchlist' => $username ? getUserWatchlist($username) : [],
         'prakash_recommendations' => $prakash,
+        'ai_recommendations' => $ai,
     ];
 }
 

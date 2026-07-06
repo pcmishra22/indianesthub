@@ -20,6 +20,13 @@ define('PRAKASH_FAST_MOVER_THRESHOLD_PCT', 1.0);
 // Max number of stocks shown in each of the Buy/Sell boxes.
 define('PRAKASH_MAX_PER_BOX', 5);
 
+// ─── AI Recommendation settings ──────────────────────────────
+// Same locked-in-target scheme as Prakash, but the Buy/Sell box is built
+// from this app's own indicator-driven signal engine (signals.php) instead
+// of rank movement — the "AI recommendation" as distinct from Prakash's.
+define('AI_TARGET_PCT', 1.0);
+define('AI_MAX_PER_BOX', 5);
+
 // ─── Default watchlist symbols ───────────────────────────────
 define('WATCHLIST_SYMBOLS', [
     // ── NIFTY 50 ─────────────────────────────────────────────
