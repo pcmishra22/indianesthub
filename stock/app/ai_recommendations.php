@@ -188,6 +188,10 @@ function buildAiRecommendations(array $stocks, ?string $statePath = null, ?strin
             $symbol = $c['symbol'];
             $livePrice = (float)($c['price'] ?? 0);
 
+            // Skip bad/glitched ticks — same guard as Prakash, see
+            // prakashIsPricePlausible() in prakash_recommendations.php.
+            if (!prakashIsPricePlausible($c)) continue;
+
             if (!isset($recsBySymbol[$symbol])) {
                 $entryPrice = $livePrice;
                 $targetPrice = round($entryPrice * $targetMult, 2);
@@ -198,6 +202,7 @@ function buildAiRecommendations(array $stocks, ?string $statePath = null, ?strin
                     'confidence' => $c['confidence'] ?? null,
                     'entry_price' => $entryPrice,
                     'entry_time' => $now,
+                    'entry_source' => $c['_source'] ?? null,
                     'target_pct' => AI_TARGET_PCT,
                     'target_price' => $targetPrice,
                     'achieved' => false,
@@ -216,6 +221,7 @@ function buildAiRecommendations(array $stocks, ?string $statePath = null, ?strin
                         $rec['achieved'] = true;
                         $rec['achieved_at'] = $now;
                         $rec['achieved_price'] = $livePrice;
+                        $rec['achieved_source'] = $c['_source'] ?? null;
                     }
                 }
                 unset($rec);
@@ -233,6 +239,7 @@ function buildAiRecommendations(array $stocks, ?string $statePath = null, ?strin
     foreach ($tracked as $stock) {
         $symbol = aiNormalizeSymbol((string)($stock['symbol'] ?? ''));
         if (!isset($recsBySymbol[$symbol])) continue;
+        if (!prakashIsPricePlausible($stock)) continue; // ignore bad/glitched tick
         $idx = $recsBySymbol[$symbol];
         $rec = &$daily['recommendations'][$idx];
         if ($rec['achieved']) { unset($rec); continue; }
@@ -243,6 +250,7 @@ function buildAiRecommendations(array $stocks, ?string $statePath = null, ?strin
             $rec['achieved'] = true;
             $rec['achieved_at'] = date('Y-m-d H:i:s');
             $rec['achieved_price'] = $livePrice;
+            $rec['achieved_source'] = $stock['_source'] ?? null;
         }
         unset($rec);
     }

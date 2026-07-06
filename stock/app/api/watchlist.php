@@ -900,6 +900,7 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
                     '52w_low'       => round($quote['fiftyTwoWeekLow'] ?? 0, 2),
                     'bull_factors'  => [],
                     'bear_factors'  => [],
+                    '_source'       => $quote['_source'] ?? null,
                 ];
                 continue;
             }
@@ -971,6 +972,7 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
                 '52w_low'       => round($quote['fiftyTwoWeekLow'] ?? 0, 2),
                 'bull_factors'  => $sig['bullFactors'] ?? [],
                 'bear_factors'  => $sig['bearFactors'] ?? [],
+                '_source'       => $quote['_source'] ?? null,
             ];
         } catch (\Throwable $e) {
             continue;

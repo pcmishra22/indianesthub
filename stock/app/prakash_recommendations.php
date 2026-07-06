@@ -176,14 +176,39 @@ function appendPrakashHistory(array $entry, string $historyPath): void
     file_put_contents($historyPath, json_encode($history, JSON_PRETTY_PRINT));
 }
 
+// ── Bad-tick guard ──────────────────────────────────────────────
+// A single flaky read from one of the fallback data sources (BSE/Stooq/NSE/
+// Groww) can occasionally return a garbage price for one refresh. Because
+// entry price and "target hit" are both locked in permanently the moment
+// they're recorded, one bad tick used to be able to freeze a wrong entry
+// price or falsely mark a target as achieved for the rest of the day.
+// This checks the live price against that stock's own previous close
+// (derived from its reported change_pct) and rejects it if the implied
+// move is bigger than PRAKASH_MAX_PLAUSIBLE_MOVE_PCT — in that case the
+// caller should skip using this tick rather than trust it.
+function prakashIsPricePlausible(array $stock): bool
+{
+    $price = (float)($stock['price'] ?? 0);
+    if ($price <= 0) return false;
+    $changePct = $stock['change_pct'] ?? null;
+    if ($changePct === null) return true; // nothing to compare against, allow it
+    $changePct = (float)$changePct;
+    $prevClose = $changePct > -100 ? $price / (1 + $changePct / 100) : null;
+    if (!$prevClose || $prevClose <= 0) return true; // can't derive a sane baseline, allow it
+    $maxMove = defined('PRAKASH_MAX_PLAUSIBLE_MOVE_PCT') ? PRAKASH_MAX_PLAUSIBLE_MOVE_PCT : 12.0;
+    $impliedMovePct = abs($price - $prevClose) / $prevClose * 100;
+    return $impliedMovePct <= $maxMove;
+}
+
 function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?string $historyPath = null, ?string $username = null): array
 {
     $statePath = $statePath ?? prakashRecommendationStateFile($username);
     $historyPath = $historyPath ?? prakashRecommendationHistoryFile($username);
 
     $tracked = array_values(array_filter($stocks, fn($stock) => is_array($stock)));
-    if (count($tracked) > 20) {
-        $tracked = array_slice($tracked, 0, 20);
+    $maxTracked = defined('PRAKASH_MAX_TRACKED') ? PRAKASH_MAX_TRACKED : 20;
+    if ($maxTracked > 0 && count($tracked) > $maxTracked) {
+        $tracked = array_slice($tracked, 0, $maxTracked);
     }
 
     if (empty($tracked)) {
@@ -357,6 +382,10 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
             $symbol = prakashDisplaySymbol((string)($c['symbol'] ?? ''));
             $livePrice = (float)($c['price'] ?? 0);
 
+            // Skip bad/glitched ticks entirely — don't lock a wrong entry
+            // price and don't let a spurious spike falsely mark a hit.
+            if (!prakashIsPricePlausible($c)) continue;
+
             if (!isset($recsBySymbol[$symbol])) {
                 // First time we've seen this symbol in a box today — lock in
                 // entry price and target for the rest of the day.
@@ -368,6 +397,7 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
                     'reason' => $c['reason'] ?? ($side === 'Buy' ? 'Top Gainer' : 'Top Loser'),
                     'entry_price' => $entryPrice,
                     'entry_time' => $now,
+                    'entry_source' => $c['_source'] ?? null,
                     'target_pct' => PRAKASH_TARGET_PCT,
                     'target_price' => $targetPrice,
                     'achieved' => false,
@@ -388,6 +418,7 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
                         $rec['achieved'] = true;
                         $rec['achieved_at'] = $now;
                         $rec['achieved_price'] = $livePrice;
+                        $rec['achieved_source'] = $c['_source'] ?? null;
                     }
                 }
                 unset($rec);
@@ -405,6 +436,7 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
     foreach ($tracked as $stock) {
         $symbol = prakashDisplaySymbol((string)($stock['symbol'] ?? ''));
         if (!isset($recsBySymbol[$symbol])) continue;
+        if (!prakashIsPricePlausible($stock)) continue; // ignore bad/glitched tick
         $idx = $recsBySymbol[$symbol];
         $rec = &$daily['recommendations'][$idx];
         if ($rec['achieved']) { unset($rec); continue; }
@@ -415,6 +447,7 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
             $rec['achieved'] = true;
             $rec['achieved_at'] = date('Y-m-d H:i:s');
             $rec['achieved_price'] = $livePrice;
+            $rec['achieved_source'] = $stock['_source'] ?? null;
         }
         unset($rec);
     }
