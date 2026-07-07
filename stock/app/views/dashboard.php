@@ -1007,11 +1007,14 @@ function renderEngineTodayLists(engine, rec){
   }
   function row(r){
     const achieved=!!r.achieved;
-    const statusColor=achieved?'var(--green)':'var(--muted)';
-    const statusText=achieved?'✅ Hit':(r.final_status==='Not Achieved'?'❌ Not achieved':'⏳ Open');
+    const statusColor=achieved?'var(--green)':(r.final_status==='Not Achieved'?'var(--red)':'var(--muted)');
+    const statusText=achieved?'✅ Achieved':(r.final_status==='Not Achieved'?'❌ Not achieved':'⏳ Open');
+    const cur=r.current_price ?? r.last_checked_price ?? r.entry_price;
+    const occ=r.occurrence||1;
+    const occBadge=occ>1?` <span style="color:var(--accent2);font-weight:700">· ${occ===2?'2nd':occ===3?'3rd':occ+'th'} pick</span>`:'';
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(255,255,255,.03);border-radius:6px;font-size:11px">
-      <span style="color:#fff;font-weight:600">${escHtml(r.symbol)}</span>
-      <span style="color:var(--muted2)">₹${fmtNum(r.entry_price)} → ₹${fmtNum(r.target_price)}</span>
+      <span style="color:#fff;font-weight:600">${escHtml(r.symbol)}${occBadge}</span>
+      <span style="color:var(--muted2)">₹${fmtNum(r.entry_price)} → Now ₹${fmtNum(cur)} → Target ₹${fmtNum(r.target_price)}</span>
       <span style="color:${statusColor};font-weight:600">${statusText}</span>
     </div>`;
   }
@@ -2279,21 +2282,49 @@ async function loadCombinedEodReport(date){
       tableEl.innerHTML='<div style="color:var(--muted)">No Momentum/AI recommendations logged for this date yet.</div>';
       return;
     }
-    let html='<div style="display:flex;flex-direction:column;gap:4px;max-height:340px;overflow-y:auto">';
+    // Explicit column table so a stock recommended more than once today
+    // (e.g. Titan: Buy → hit, Buy again → hit, now Sell) reads as a clear,
+    // ordered sequence of rows instead of ambiguous free-floating text.
+    // status_label (OPEN / ACHIEVED / NOT ACHIEVED) comes straight from the
+    // server, computed against a live-refreshed price — never re-derived
+    // client-side — so what's shown here can't drift out of sync with it.
+    let html=`<table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.08)">
+        <th style="padding:6px 8px">Stock</th>
+        <th style="padding:6px 8px">Signal</th>
+        <th style="padding:6px 8px">Given By</th>
+        <th style="padding:6px 8px">Recommended</th>
+        <th style="padding:6px 8px">Current</th>
+        <th style="padding:6px 8px">Target</th>
+        <th style="padding:6px 8px">Status</th>
+      </tr></thead><tbody>`;
     rows.forEach(r=>{
       const achieved=!!r.achieved;
-      const statusColor=achieved?'var(--green)':(r.final_status==='Not Achieved'?'var(--red)':'var(--muted)');
-      const statusText=achieved?`✅ Hit @ ₹${fmtNum(r.achieved_price||0)}`:(r.final_status==='Not Achieved'?'❌ Not achieved':'⏳ Open');
+      const label=r.status_label || (achieved?'ACHIEVED':(r.final_status==='Not Achieved'?'NOT ACHIEVED':'OPEN'));
+      const statusColor=label==='ACHIEVED'?'var(--green)':(label==='NOT ACHIEVED'?'var(--red)':'var(--muted)');
+      const statusText=label==='ACHIEVED'?`✅ Achieved${r.achieved_at?' · '+escHtml(r.achieved_at.split(' ')[1]||''):''}`
+        :(label==='NOT ACHIEVED'?'❌ Not achieved':'⏳ Open');
       const sideColor=r.side==='Buy'?'var(--green)':'var(--red)';
-      html+=`<div style="display:grid;grid-template-columns:70px 60px 60px 1fr 1fr;gap:8px;align-items:center;padding:5px 8px;background:rgba(255,255,255,.03);border-radius:6px">
-        <span style="color:#fff;font-weight:600">${escHtml(r.symbol)}</span>
-        <span style="color:var(--accent2);font-weight:600">${escHtml(r.engine)}</span>
-        <span style="color:${sideColor};font-weight:700;text-transform:uppercase">${escHtml(r.side)}</span>
-        <span style="color:var(--muted2)">Entry ₹${fmtNum(r.entry_price)} → Target ₹${fmtNum(r.target_price)}</span>
-        <span style="color:${statusColor};font-weight:600">${statusText}</span>
-      </div>`;
+      const cur=(r.current_price ?? r.last_checked_price ?? r.entry_price ?? 0);
+      const gap=(typeof r.gap_pct==='number')?r.gap_pct:null;
+      const isBuy=r.side==='Buy';
+      const favorable=gap===null?true:(isBuy?gap>=0:gap<=0);
+      const gapColor=favorable?'var(--green)':'var(--red)';
+      const gapStr=gap===null?'':` <span style="color:${gapColor};font-size:10px">(${gap>=0?'+':''}${fmtNum(gap)}%)</span>`;
+      const stale=r.price_live===false?' <span title="Price not refreshed live this check — showing last known price" style="color:var(--orange);font-size:10px">stale</span>':'';
+      const occ=r.occurrence||1;
+      const occBadge=occ>1?` <span style="color:var(--accent2);font-weight:700;font-size:10px">· ${occ===2?'2nd':occ===3?'3rd':occ+'th'} pick</span>`:'';
+      html+=`<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
+        <td style="padding:6px 8px;color:#fff;font-weight:700;white-space:nowrap">${escHtml(r.symbol)}${occBadge}</td>
+        <td style="padding:6px 8px;color:${sideColor};font-weight:700;text-transform:uppercase">${escHtml(r.side)}</td>
+        <td style="padding:6px 8px;color:var(--accent2)">${escHtml(r.engine)}${r.reason?' · '+escHtml(r.reason):''}</td>
+        <td style="padding:6px 8px;color:var(--muted2)">₹${fmtNum(r.entry_price)}</td>
+        <td style="padding:6px 8px;color:var(--muted2);white-space:nowrap">₹${fmtNum(cur)}${gapStr}${stale}</td>
+        <td style="padding:6px 8px;color:var(--muted2)">₹${fmtNum(r.target_price)}</td>
+        <td style="padding:6px 8px;color:${statusColor};font-weight:600;white-space:nowrap">${statusText}</td>
+      </tr>`;
     });
-    html+='</div>';
+    html+='</tbody></table>';
     tableEl.innerHTML=html;
   }catch(e){
     tableEl.innerHTML=`<div class="err-box">Error: ${escHtml(e.message)}</div>`;
@@ -2306,12 +2337,12 @@ async function loadCombinedEodReport(date){
 function downloadCombinedEodReport(){
   const d=_lastCombinedEod;
   if(!d || !d.rows || d.rows.length===0){ alert('No Momentum/AI recommendations for this date yet.'); return; }
-  const headers=['Date','Engine','Symbol','Side','Entry Price','Target Price','Status','Achieved Price','Entry Time','Achieved Time'];
+  const headers=['Date','Engine','Symbol','Pick #','Side','Given By','Entry Price','Current Price','Target Price','Gap %','Status','Achieved Price','Entry Time','Achieved Time'];
   const lines=[headers.join(',')];
   d.rows.forEach(r=>{
-    const achieved=!!r.achieved;
-    const status=achieved?'Hit':(r.final_status==='Not Achieved'?'Not Achieved':'Open');
-    const row=[d.date, r.engine, r.symbol, r.side, r.entry_price, r.target_price, status, r.achieved_price||'', r.entry_time||'', r.achieved_at||''];
+    const label=r.status_label || (r.achieved?'ACHIEVED':(r.final_status==='Not Achieved'?'NOT ACHIEVED':'OPEN'));
+    const cur=(r.current_price ?? r.last_checked_price ?? r.entry_price ?? '');
+    const row=[d.date, r.engine, r.symbol, r.occurrence||1, r.side, r.reason||'', r.entry_price, cur, r.target_price, (r.gap_pct??''), label, r.achieved_price||'', r.entry_time||'', r.achieved_at||''];
     lines.push(row.map(v=>{
       const s=String(v??'');
       return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;

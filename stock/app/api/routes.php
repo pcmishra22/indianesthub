@@ -273,10 +273,38 @@ if ($uri === '/api/ai/rollup') {
 if ($uri === '/api/eod/combined') {
     header('Content-Type: application/json');
     $date = $_GET['date'] ?? date('Y-m-d');
+    $isToday = $date === date('Y-m-d');
     $username = getCurrentUser();
     try {
-        $prakashDaily = loadPrakashDaily(prakashDailyFile($username, $date));
-        $aiDaily = loadPrakashDaily(aiDailyFile($username, $date));
+        // Finalize the day first if market close has already passed and
+        // nobody's Watchlist tab has done it yet — otherwise a report opened
+        // after-hours could still show yesterday's still-open picks as if
+        // they were live, when they should read "Not Achieved".
+        if ($isToday) {
+            closePrakashDailyIfNeeded($username);
+            closeAiDailyIfNeeded($username);
+        }
+
+        $prakashPath = prakashDailyFile($username, $date);
+        $aiPath = aiDailyFile($username, $date);
+        $prakashDaily = loadPrakashDaily($prakashPath);
+        $aiDaily = loadPrakashDaily($aiPath);
+
+        // Always re-check every open entry against a fresh live price before
+        // returning the report — otherwise "current price" is only as fresh
+        // as whenever the Watchlist tab last happened to tick, and a target
+        // hit in the meantime would still show as "Open".
+        $allSymbols = array_merge(
+            array_column($prakashDaily['recommendations'] ?? [], 'symbol'),
+            array_column($aiDaily['recommendations'] ?? [], 'symbol')
+        );
+        $quotesBySymbol = $isToday ? prakashBuildQuoteLookup($allSymbols) : [];
+
+        $prakashChanged = prakashRefreshRowsLive($prakashDaily, $quotesBySymbol);
+        $aiChanged = prakashRefreshRowsLive($aiDaily, $quotesBySymbol);
+        if ($isToday && $prakashChanged) savePrakashDaily($prakashDaily, $prakashPath);
+        if ($isToday && $aiChanged) savePrakashDaily($aiDaily, $aiPath);
+
         $rows = [];
         foreach (($prakashDaily['recommendations'] ?? []) as $r) {
             $rows[] = array_merge($r, ['engine' => 'Prakash']);
@@ -284,6 +312,12 @@ if ($uri === '/api/eod/combined') {
         foreach (($aiDaily['recommendations'] ?? []) as $r) {
             $rows[] = array_merge($r, ['engine' => 'AI']);
         }
+        // Group same-stock rows together, in the order they were opened, so
+        // "Titan bought twice then sold" reads as one clear sequence of 3
+        // rows rather than being scattered/interleaved with other symbols.
+        usort($rows, fn($a, $b) => [$a['symbol'], $a['entry_time'] ?? '']
+            <=> [$b['symbol'], $b['entry_time'] ?? '']);
+
         $achieved = count(array_filter($rows, fn($r) => !empty($r['achieved'])));
         $total = count($rows);
         echo json_encode([

@@ -228,6 +228,105 @@ function savePrakashDaily(array $daily, string $path): void
     file_put_contents($path, json_encode($daily, JSON_PRETTY_PRINT));
 }
 
+// ── Live price refresh for report views ────────────────────────────────
+// Both prakash_daily_*.json and ai_daily_*.json entries only get their
+// price/target/achieved fields updated whenever buildPrakashRecommendations()
+// / buildAiRecommendations() happens to run (i.e. whenever someone has the
+// Watchlist tab open ticking). If nobody has triggered a refresh recently,
+// a report opened straight from the EOD tab would otherwise show a stale
+// "current price" (really: "price as of the last tick") with no indication
+// that it's stale, and — worse — a target that was actually hit in the
+// meantime would sit shown as "Open" until the next unrelated tick.
+//
+// This function re-fetches live quotes for every symbol still open in a
+// day's recommendation list and:
+//   1. always sets 'current_price' to the freshest price we have (live if
+//      available, otherwise the last price we ever saw for it),
+//   2. flags whether that price is actually live this call ('price_live'),
+//   3. re-checks any still-open entry against its target with that live
+//      price and flips it to achieved right away if it has been hit,
+//   4. stamps an unambiguous 'status_label' (OPEN / ACHIEVED / NOT ACHIEVED)
+//      so callers never have to re-derive status from several booleans.
+//
+// Mutates $daily in place and returns true if anything actually changed
+// (i.e. the caller should persist it back to disk).
+function prakashRefreshRowsLive(array &$daily, array $quotesBySymbol): bool
+{
+    $changed = false;
+    $isClosed = (bool)($daily['closed'] ?? false);
+    $now = date('Y-m-d H:i:s');
+
+    foreach ($daily['recommendations'] as &$rec) {
+        if (!is_array($rec)) continue;
+        $symbol = (string)($rec['symbol'] ?? '');
+        $quote  = $quotesBySymbol[$symbol] ?? null;
+        $live   = $quote ? (float)($quote['price'] ?? 0) : 0.0;
+        $havelive = $live > 0 && ($quote['plausible'] ?? true);
+
+        if ($havelive) {
+            if (($rec['current_price'] ?? null) !== $live) $changed = true;
+            $rec['current_price'] = $live;
+            $rec['price_live'] = true;
+        } else {
+            $fallback = $rec['last_checked_price'] ?? $rec['entry_price'] ?? 0.0;
+            $rec['current_price'] = $fallback;
+            $rec['price_live'] = false;
+        }
+
+        if (!$isClosed && !($rec['achieved'] ?? false) && $havelive) {
+            $rec['last_checked_price'] = $live;
+            $hit = ($rec['side'] ?? '') === 'Buy'
+                ? $live >= (float)($rec['target_price'] ?? INF)
+                : $live <= (float)($rec['target_price'] ?? -INF);
+            if ($hit) {
+                $rec['achieved'] = true;
+                $rec['achieved_at'] = $now;
+                $rec['achieved_price'] = $live;
+                $rec['status'] = 'Target Hit';
+                $changed = true;
+            }
+        }
+
+        if (!empty($rec['achieved'])) {
+            $rec['status_label'] = 'ACHIEVED';
+        } elseif ($isClosed) {
+            $rec['status_label'] = 'NOT ACHIEVED';
+        } else {
+            $rec['status_label'] = 'OPEN';
+        }
+
+        $entry = (float)($rec['entry_price'] ?? 0);
+        $rec['gap_pct'] = $entry > 0 ? round(((float)$rec['current_price'] - $entry) / $entry * 100, 2) : null;
+    }
+    unset($rec);
+
+    return $changed;
+}
+
+// Builds a symbol => ['price' => float, 'plausible' => bool] lookup from a
+// bulk-quote result for use with prakashRefreshRowsLive(). $symbols are the
+// plain display symbols (no .NS) as stored in a daily recommendations file.
+function prakashBuildQuoteLookup(array $symbols): array
+{
+    $symbols = array_values(array_unique(array_filter($symbols)));
+    if (empty($symbols)) return [];
+    $withSuffix = array_map(fn($s) => prakashNormalizeSymbol($s), $symbols);
+    $quotes = yahooQuoteBulk($withSuffix);
+
+    $lookup = [];
+    foreach ($symbols as $i => $sym) {
+        $q = $quotes[$withSuffix[$i]] ?? null;
+        if (!$q) continue;
+        $price = (float)($q['regularMarketPrice'] ?? 0);
+        if ($price <= 0) continue;
+        $prevClose = (float)($q['regularMarketPreviousClose'] ?? 0);
+        $changePct = $prevClose > 0 ? (($price - $prevClose) / $prevClose) * 100 : null;
+        $plausible = prakashIsPricePlausible(['price' => $price, 'change_pct' => $changePct]);
+        $lookup[$sym] = ['price' => $price, 'plausible' => $plausible];
+    }
+    return $lookup;
+}
+
 function prakashNormalizeSymbol(string $symbol): string
 {
     $sym = strtoupper(trim($symbol));

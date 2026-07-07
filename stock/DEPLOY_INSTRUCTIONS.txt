@@ -1,111 +1,85 @@
-STOCK ANALYZER — PATCH: env-driven Prakash settings + bad-tick guard
-=====================================================================
+WHAT THIS PATCH FIXES
+======================
+You asked: when a stock like Titan is picked twice for Buy (hitting target
+both times) and then picked for Sell, the report should clearly show all 3
+rows — 2 achieved, 1 open at its own target — with no confusion, and the
+current price should always be tracked live.
+
+I checked the whole recommendation engine (Prakash momentum engine + AI
+engine) and the multi-occurrence logic itself was ALREADY correct — a
+symbol correctly gets a brand-new row (with its own entry price/target)
+every time a fresh signal fires after the previous one is closed out
+(occurrence 1, 2, 3...). I verified this with a direct test (Titan bought
+twice + sold, all 3 rows tracked and resolved independently and correctly).
+
+The real gap was in the REPORT screen (EOD tab → "Momentum+AI Report"):
+
+1. It only showed Entry price + Target price + Status — no "current price"
+   column at all, so you couldn't tell how close a stock was to target.
+2. The current/live price and achieved-status shown there were only ever
+   as fresh as the last time the Watchlist tab happened to auto-refresh.
+   If you opened the EOD report without the Watchlist tab having ticked
+   recently, it could show a target as "Open" even if it had actually
+   already been hit.
+3. Multiple rows for the same stock (occurrence 1, 2, 3) could appear
+   scattered rather than grouped in order, which is exactly the
+   confusion you described.
 
 WHAT CHANGED
-------------
-1. app/config.php
-   - .env loading moved to the TOP of the file (was loading too late
-     before, so getenv() calls used further down never actually saw
-     your .env values).
-   - PRAKASH_TARGET_PCT, AI_TARGET_PCT, PRAKASH_FAST_MOVER_THRESHOLD_PCT,
-     PRAKASH_MAX_PER_BOX, AI_MAX_PER_BOX are now all read from .env
-     (with the same defaults as before if not set).
-   - NEW: PRAKASH_MAX_TRACKED (default 20) — this replaces the old
-     hardcoded "20" cap on how many stocks Prakash ranks/tracks.
-     Set PRAKASH_MAX_TRACKED=40 (or any number) in .env to track more.
-   - NEW: PRAKASH_MAX_PLAUSIBLE_MOVE_PCT (default 12) — sanity guard,
-     see below.
+============
+1. app/prakash_recommendations.php
+   - Added prakashRefreshRowsLive() + prakashBuildQuoteLookup(): fetches a
+     fresh live quote for every symbol in a day's report and re-checks each
+     still-open row against its own target right then, flipping it to
+     achieved immediately if hit. Stamps a clear status_label:
+     OPEN / ACHIEVED / NOT ACHIEVED (no more guessing from booleans).
 
-2. app/prakash_recommendations.php
-   - Hardcoded "20" replaced with the new PRAKASH_MAX_TRACKED constant.
-   - NEW function prakashIsPricePlausible(): before locking in an entry
-     price or marking a target "Hit", the live price is checked against
-     that stock's own previous close (derived from change_pct). If the
-     implied move is bigger than PRAKASH_MAX_PLAUSIBLE_MOVE_PCT, that
-     tick is treated as a bad/glitched read and skipped — it can no
-     longer lock in a wrong entry price or falsely mark a target as hit.
-   - Daily records now also store entry_source / achieved_source
-     (which data provider — bse/stooq/nse/groww — supplied that price),
-     so if something looks off again you can check exactly which source
-     it came from instead of guessing.
+2. app/api/routes.php
+   - /api/eod/combined now: closes out the day first if market close has
+     passed (so it never has to show as "Open" a signal that should read
+     "Not Achieved"), fetches live prices for every tracked symbol, updates
+     achieved/status_label/current_price accordingly, saves it back so the
+     rest of the app stays in sync, and sorts rows by stock+time so repeat
+     picks for the same stock (Buy, Buy, Sell...) sit together in order.
 
-3. app/ai_recommendations.php
-   - Same bad-tick guard and entry_source/achieved_source tracking
-     applied to the AI recommendation engine (it had the identical
-     locking logic as Prakash).
-
-4. app/api/watchlist.php
-   - Each stock's quote source (_source: bse/stooq/nse/groww) is now
-     carried through into the $stocks array so the above can use it.
-
-5. .env.example
-   - Documents all the new/now-configurable variables.
-
-ABOUT THE INFY PRICE ISSUE YOU FLAGGED
----------------------------------------
-The entry/target price was never coming from a "cache" file — it's the
-live price at the moment a stock FIRST enters a Buy/Sell box that day,
-locked in from whichever data source answered first (BSE, then Stooq,
-then NSE, then Groww, in that priority order). Once locked, entry price
-and target never change for the rest of the day — only the "Hit" status
-updates.
-
-Given INFY's entry (Rs 1,057.85) and its "Hit" showing at a target
-(Rs 1,068.43) that's above today's actual high (~Rs 1,053), the most
-likely explanation is a single bad/glitched read from one of the
-fallback providers on one refresh — either at the moment of first
-capture (wrong entry) or a later refresh (false "Hit"). Because both
-values used to be locked in immediately and permanently, one bad tick
-could freeze a wrong number for the whole day with no way to recover
-except waiting for tomorrow's fresh file.
-
-The new prakashIsPricePlausible() guard now catches this case: it
-rejects any single-refresh price that implies more than a ~12% move
-from that stock's previous close (adjust via PRAKASH_MAX_PLAUSIBLE_MOVE_PCT
-in .env) rather than trusting it. It also now stores the source that
-supplied each locked price so future anomalies can be traced instantly
-instead of guessed at.
-
-Note: I don't have access to your live server logs/today's actual
-tracking file, so I could not directly confirm which specific provider
-glitched for INFY today. If you want to confirm root cause instead of
-just guarding against it going forward, you can grab and send me:
-  storage/_prakash_daily_2026-07-06.json     (or under users_data/ for
-  a specific user, e.g. users_data/<username>_prakash_daily_2026-07-06.json)
-That file will now include "entry_source" / "achieved_source" going
-forward, showing exactly which provider (bse/stooq/nse/groww) supplied
-the price that got locked in.
+3. app/views/dashboard.php
+   - The "Momentum+AI Report" is now a real table with the exact columns
+     you asked for: Stock | Signal | Given By | Recommended | Current |
+     Target | Status — plus an occurrence badge ("2nd pick", "3rd pick")
+     on repeat stocks, and a color-coded gap% next to the current price.
+   - The CSV download and the "Top Recommendation for Today" boxes on the
+     Watchlist tab got the same current-price + clear-status treatment.
 
 HOW TO DEPLOY
--------------
-1. Upload these 4 PHP files, overwriting the existing ones at the same
-   paths in your project:
-     app/config.php
-     app/prakash_recommendations.php
-     app/ai_recommendations.php
-     app/api/watchlist.php
+==============
+This patch only touches these 3 files — nothing else in your app needs to
+change, and none of your storage/*.json data will be touched by this zip.
 
-2. Open your LIVE .env file (not .env.example) and add these lines
-   (adjust values as you like):
+1. Upload/overwrite these 3 files on your server, keeping the same paths:
+   app/prakash_recommendations.php
+   app/api/routes.php
+   app/views/dashboard.php
 
-     PRAKASH_TARGET_PCT=1.0
-     PRAKASH_MAX_TRACKED=20
-     PRAKASH_FAST_MOVER_THRESHOLD_PCT=1.0
-     PRAKASH_MAX_PER_BOX=5
-     PRAKASH_MAX_PLAUSIBLE_MOVE_PCT=12.0
-     AI_TARGET_PCT=1.0
-     AI_MAX_PER_BOX=5
+2. No artisan/migration/composer step needed — this is a plain PHP file
+   app, so it's live as soon as the files are uploaded.
 
-   (.env.example is included here for reference only — don't overwrite
-   your real .env, just add these keys to it.)
+3. Open the dashboard → EOD Report tab → check "Momentum+AI Report" shows
+   the new table with a Current price column. If the market is open, give
+   it a few seconds — it fetches live prices when the tab is opened.
 
-3. No artisan/migration commands needed — plain PHP, no framework.
-   No database schema changes either.
-
-4. Test: open the dashboard, confirm Prakash/AI boxes still load and
-   the "Today Buy/Sell" counts look sane. If you set
-   PRAKASH_MAX_TRACKED=40, you should be able to get more than 20
-   tracked recommendations from tomorrow's fresh daily file onward
-   (today's already-locked entries won't change retroactively).
-
-All 4 PHP files pass `php -l` syntax checks.
+TESTING DONE
+============
+- Ran your existing test suite (momentum_score_test.php,
+  momentum_score_integration_test.php, multiuser_watchlist_recommendations_test.php)
+  — all still pass unmodified.
+- prakash_recommendations_test.php: all pass except one pre-existing
+  assertion that fails because of how the test itself groups results by
+  symbol with array_column() — once a symbol gets a 2nd row (occurrence 2),
+  array_column() keeps only the last row per symbol and silently drops the
+  earlier (achieved) one. This is a test-harness artifact, not a real bug —
+  I confirmed with a standalone script that both rows are tracked and
+  resolved correctly. Flagging it here in case you want the test updated
+  later; I left it as-is since fixing test internals wasn't part of the ask.
+- Wrote a standalone script simulating your exact scenario (Titan bought
+  twice + hit target both times, then sold) and confirmed all 3 rows report
+  correctly and independently.
