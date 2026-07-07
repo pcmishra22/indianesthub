@@ -183,9 +183,15 @@ function buildAiRecommendations(array $stocks, ?string $statePath = null, ?strin
 
     $recsBySymbol = [];
     foreach ($daily['recommendations'] as $i => $rec) {
-        $recsBySymbol[$rec['symbol']] = $i;
+        $recsBySymbol[$rec['symbol']][] = $i;
     }
 
+    // A symbol is tracked once PER OPEN POSITION, not once per day — same
+    // scheme as Prakash's engine (see prakash_recommendations.php). If its
+    // most recent entry already hit target, a fresh signal for it starts a
+    // brand-new entry instead of being silently swallowed by the dedup lock,
+    // so e.g. "TITAN Buy @4550→4600 (hit)" and a later "TITAN Buy @4610→4660
+    // (open)" both show up as separate rows for the day.
     $registerBoxEntries = function (array $candidates, string $side) use (&$daily, &$recsBySymbol) {
         $targetMult = $side === 'Buy' ? (1 + AI_TARGET_PCT / 100) : (1 - AI_TARGET_PCT / 100);
         $now = date('Y-m-d H:i:s');
@@ -197,28 +203,20 @@ function buildAiRecommendations(array $stocks, ?string $statePath = null, ?strin
             // prakashIsPricePlausible() in prakash_recommendations.php.
             if (!prakashIsPricePlausible($c)) continue;
 
-            if (!isset($recsBySymbol[$symbol])) {
-                $entryPrice = $livePrice;
-                $targetPrice = round($entryPrice * $targetMult, 2);
-                $daily['recommendations'][] = [
-                    'symbol' => $symbol,
-                    'side' => $side,
-                    'reason' => $c['reason'] ?? ($side === 'Buy' ? 'Buy Signal' : 'Sell Signal'),
-                    'confidence' => $c['confidence'] ?? null,
-                    'entry_price' => $entryPrice,
-                    'entry_time' => $now,
-                    'entry_source' => $c['_source'] ?? null,
-                    'target_pct' => AI_TARGET_PCT,
-                    'target_price' => $targetPrice,
-                    'achieved' => false,
-                    'achieved_at' => null,
-                    'achieved_price' => null,
-                    'last_checked_price' => $livePrice,
-                ];
-                $recsBySymbol[$symbol] = count($daily['recommendations']) - 1;
-            } else {
-                $idx = $recsBySymbol[$symbol];
-                $rec = &$daily['recommendations'][$idx];
+            $indices = $recsBySymbol[$symbol] ?? [];
+            $openIdx = null;
+            foreach ($indices as $i) {
+                if (empty($daily['recommendations'][$i]['achieved'])) { $openIdx = $i; break; }
+            }
+
+            if ($openIdx !== null) {
+                $rec = &$daily['recommendations'][$openIdx];
+                if (($rec['side'] ?? '') !== $side) {
+                    // Already have an open opposite-side position on this
+                    // symbol — don't flip it, just leave it as is.
+                    unset($rec);
+                    continue;
+                }
                 $rec['last_checked_price'] = $livePrice;
                 if (!$rec['achieved']) {
                     $hit = $rec['side'] === 'Buy' ? ($livePrice >= $rec['target_price']) : ($livePrice <= $rec['target_price']);
@@ -230,7 +228,32 @@ function buildAiRecommendations(array $stocks, ?string $statePath = null, ?strin
                     }
                 }
                 unset($rec);
+                continue;
             }
+
+            // No open entry for this symbol (either brand new today, or
+            // every prior entry already hit target) — start a fresh one.
+            $entryPrice = $livePrice;
+            $targetPrice = round($entryPrice * $targetMult, 2);
+            $daily['recommendations'][] = [
+                'symbol' => $symbol,
+                'side' => $side,
+                'reason' => $c['reason'] ?? ($side === 'Buy' ? 'Buy Signal' : 'Sell Signal'),
+                'confidence' => $c['confidence'] ?? null,
+                'entry_price' => $entryPrice,
+                'entry_time' => $now,
+                'entry_source' => $c['_source'] ?? null,
+                'target_pct' => AI_TARGET_PCT,
+                'target_price' => $targetPrice,
+                'achieved' => false,
+                'achieved_at' => null,
+                'achieved_price' => null,
+                'last_checked_price' => $livePrice,
+                // How many times this symbol has been recommended today,
+                // including this one — lets the UI label repeats ("2nd pick").
+                'occurrence' => count($indices) + 1,
+            ];
+            $recsBySymbol[$symbol][] = count($daily['recommendations']) - 1;
         }
     };
 
@@ -240,14 +263,18 @@ function buildAiRecommendations(array $stocks, ?string $statePath = null, ?strin
     // Re-check every already-tracked symbol today against this refresh's
     // live price, even if it fell out of today's box (still-open targets
     // shouldn't stop being checked just because the stock isn't top-ranked
-    // by confidence anymore).
+    // by confidence anymore). Only the symbol's OPEN entry (if any) is
+    // touched — earlier, already-achieved entries stay untouched as history.
     foreach ($tracked as $stock) {
         $symbol = aiNormalizeSymbol((string)($stock['symbol'] ?? ''));
         if (!isset($recsBySymbol[$symbol])) continue;
         if (!prakashIsPricePlausible($stock)) continue; // ignore bad/glitched tick
-        $idx = $recsBySymbol[$symbol];
-        $rec = &$daily['recommendations'][$idx];
-        if ($rec['achieved']) { unset($rec); continue; }
+        $openIdx = null;
+        foreach ($recsBySymbol[$symbol] as $i) {
+            if (empty($daily['recommendations'][$i]['achieved'])) { $openIdx = $i; break; }
+        }
+        if ($openIdx === null) continue;
+        $rec = &$daily['recommendations'][$openIdx];
         $livePrice = (float)($stock['price'] ?? 0);
         $rec['last_checked_price'] = $livePrice;
         $hit = $rec['side'] === 'Buy' ? ($livePrice >= $rec['target_price']) : ($livePrice <= $rec['target_price']);

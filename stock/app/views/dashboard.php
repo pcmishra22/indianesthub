@@ -1067,8 +1067,15 @@ function trackRecordRow(r){
   const favorable=isBuy?gap>=0:gap<=0;
   const gapColor=favorable?'var(--green)':'var(--red)';
   const gapStr=`${gap>=0?'+':''}${fmtNum(gap)}%`;
-  return `<div style="display:grid;grid-template-columns:74px 1fr 1fr 1fr 100px;gap:8px;align-items:center;padding:6px 10px;background:rgba(255,255,255,.03);border-radius:6px;font-size:11px;white-space:nowrap">
-    <span style="color:#fff;font-weight:700;overflow:hidden;text-overflow:ellipsis">${escHtml(r.symbol)}</span>
+  // A symbol can be recommended more than once in a day — once its prior
+  // pick hits target, a fresh signal opens a new entry rather than being
+  // silently merged into the old one. `occurrence` (1st, 2nd, 3rd…) labels
+  // which pick this is so re-recommendations read as "hit, then picked
+  // again" instead of looking like a duplicate/inconsistency.
+  const occ=r.occurrence||1;
+  const occBadge=occ>1?` <span style="color:var(--accent2);font-weight:700">· ${occ===2?'2nd':occ===3?'3rd':occ+'th'} pick</span>`:'';
+  return `<div style="display:grid;grid-template-columns:120px 1fr 1fr 1fr 100px;gap:8px;align-items:center;padding:6px 10px;background:rgba(255,255,255,.03);border-radius:6px;font-size:11px;white-space:nowrap">
+    <span style="color:#fff;font-weight:700;overflow:hidden;text-overflow:ellipsis">${escHtml(r.symbol)}${occBadge}</span>
     <span style="color:var(--muted2)">Entry ₹${fmtNum(entry)}</span>
     <span style="color:${gapColor};font-weight:700">Now ₹${fmtNum(cur)} <span style="font-weight:400">(${gapStr})</span></span>
     <span style="color:var(--muted2)">Target ₹${fmtNum(r.target_price)}</span>
@@ -1093,8 +1100,12 @@ async function openTrackRecordDetails(engine){
       const rate=day.success_rate!==null?day.success_rate+'%':'—';
       const rc=(day.success_rate||0)>=50?'var(--green)':'var(--red)';
       const recs=day.recommendations||[];
-      const buys=recs.filter(r=>r.side==='Buy');
-      const sells=recs.filter(r=>r.side==='Sell');
+      // Group repeats of the same symbol together (symbol, then 1st/2nd/3rd
+      // pick in order) instead of leaving them scattered by whenever each
+      // was registered during the day.
+      const bySymbolThenOcc=(a,b)=> a.symbol===b.symbol ? (a.occurrence||1)-(b.occurrence||1) : a.symbol.localeCompare(b.symbol);
+      const buys=recs.filter(r=>r.side==='Buy').sort(bySymbolThenOcc);
+      const sells=recs.filter(r=>r.side==='Sell').sort(bySymbolThenOcc);
       html+=`<div style="margin-bottom:18px;min-width:560px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span style="font-weight:700;color:#fff;font-size:13px">${escHtml(day.date)}${day.closed?'':' <span style=\"color:var(--orange);font-weight:400;font-size:11px\">(in progress)</span>'}</span>

@@ -1141,9 +1141,12 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
         $daily = ['date' => $todayStr, 'recommendations' => [], 'closed' => false];
     }
 
+    // Map symbol => list of indices into $daily['recommendations'] (a symbol
+    // can have MORE THAN ONE entry per day now — see $registerRecommendation
+    // below for why).
     $recsBySymbol = [];
     foreach ($daily['recommendations'] as $i => $rec) {
-        $recsBySymbol[$rec['symbol']] = $i;
+        $recsBySymbol[$rec['symbol']][] = $i;
     }
 
     $now = date('Y-m-d H:i:s');
@@ -1173,6 +1176,11 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
     $headlineBuyCandidate = $isInitial ? $topGainer : (!empty($momentumUp) ? $hydrateMomentumPick($momentumUp[0]) : $topGainer);
     $headlineSellCandidate = $isInitial ? $topLoser : (!empty($momentumDown) ? $hydrateMomentumPick($momentumDown[0]) : $topLoser);
 
+    // A symbol is tracked once PER OPEN POSITION, not once per day. If its
+    // most recent entry already hit target (or was closed), a fresh signal
+    // for it starts a brand-new entry — so "Titan buy @4550→4600 hit, then
+    // buy @4610→4660" shows up as TWO rows today instead of the second
+    // signal being silently swallowed by the first one's dedup lock.
     $registerRecommendation = function (?array $candidate, string $side, string $reason, ?float $confidence = null) use (&$daily, &$recsBySymbol, $now) {
         if (!$candidate) return;
         $targetMult = $side === 'Buy' ? (1 + PRAKASH_TARGET_PCT / 100) : (1 - PRAKASH_TARGET_PCT / 100);
@@ -1181,10 +1189,20 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
 
         if (!prakashIsPricePlausible($candidate)) return;
 
-        if (isset($recsBySymbol[$symbol])) {
-            $idx = $recsBySymbol[$symbol];
-            $rec = &$daily['recommendations'][$idx];
+        $indices = $recsBySymbol[$symbol] ?? [];
+        // Find this symbol's currently OPEN entry, if any (there is at most
+        // one open entry per symbol at a time — a new one only ever gets
+        // created once the prior one is no longer open).
+        $openIdx = null;
+        foreach ($indices as $i) {
+            if (empty($daily['recommendations'][$i]['achieved'])) { $openIdx = $i; break; }
+        }
+
+        if ($openIdx !== null) {
+            $rec = &$daily['recommendations'][$openIdx];
             if (($rec['side'] ?? '') !== $side) {
+                // Already have an open opposite-side position on this
+                // symbol — don't flip it, just leave it as is.
                 unset($rec);
                 return;
             }
@@ -1202,6 +1220,8 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
             return;
         }
 
+        // No open entry for this symbol (either it's brand new today, or
+        // every prior entry already hit target) — start a fresh one.
         $entryPrice = (float)$livePrice;
         $targetPrice = (float)round($entryPrice * $targetMult, 2);
         $daily['recommendations'][] = [
@@ -1219,8 +1239,11 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
             'achieved_at' => null,
             'achieved_price' => null,
             'last_checked_price' => $entryPrice,
+            // How many times this symbol has been recommended today,
+            // including this one — lets the UI label repeats ("2nd pick").
+            'occurrence' => count($indices) + 1,
         ];
-        $recsBySymbol[$symbol] = count($daily['recommendations']) - 1;
+        $recsBySymbol[$symbol][] = count($daily['recommendations']) - 1;
     };
 
     // ── Register recommendations into the day's tracked file ──────────
@@ -1284,13 +1307,19 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
     // Also re-check every already-tracked symbol today against the live
     // price we have this refresh, even if it fell out of the box (e.g. a
     // momentum pick from a previous refresh isn't in this refresh's box
-    // but still has an open target).
+    // but still has an open target). Only the symbol's OPEN entry (if any)
+    // is touched — earlier, already-achieved entries for the same symbol
+    // stay untouched as a historical record.
     foreach ($tracked as $stock) {
         $symbol = prakashDisplaySymbol((string)($stock['symbol'] ?? ''));
         if (!isset($recsBySymbol[$symbol])) continue;
         if (!prakashIsPricePlausible($stock)) continue; // ignore bad/glitched tick
-        $idx = $recsBySymbol[$symbol];
-        $rec = &$daily['recommendations'][$idx];
+        $openIdx = null;
+        foreach ($recsBySymbol[$symbol] as $i) {
+            if (empty($daily['recommendations'][$i]['achieved'])) { $openIdx = $i; break; }
+        }
+        if ($openIdx === null) continue;
+        $rec = &$daily['recommendations'][$openIdx];
         if ($rec['achieved'] || ($rec['status'] ?? '') === 'Target Hit') { unset($rec); continue; }
         $livePrice = (float)($stock['price'] ?? 0);
         $rec['last_checked_price'] = $livePrice;
