@@ -34,14 +34,14 @@ class CityDataDiscoveryService
         $normalizedCity = $this->normalizeCity($city);
 
         return match ($type) {
-            'builder' => [
-                'candidates' => $this->discoverBusinesses($normalizedCity, 'real estate builders and developers'),
-                'notice'     => null,
-            ],
-            'agent' => [
-                'candidates' => $this->discoverBusinesses($normalizedCity, 'real estate agents and property dealers'),
-                'notice'     => null,
-            ],
+            'builder' => (function () {
+                $res = $this->discoverAndDiagnose($normalizedCity, 'builder');
+                return $res;
+            })(),
+            'agent' => (function () {
+                $res = $this->discoverAndDiagnose($normalizedCity, 'agent');
+                return $res;
+            })(),
             'property' => [
                 'candidates' => $this->discoverProperties($normalizedCity),
                 'notice'     => 'Live property-listing data cannot be auto-crawled from third-party portals '
@@ -143,6 +143,111 @@ class CityDataDiscoveryService
         // Limit results to prevent overwhelming the UI
         return array_slice($results, 0, 50);
     }
+
+    protected function discoverAndDiagnose(string $city, string $type): array
+    {
+        // type: builder | agent
+        $queryPrefix = $type === 'builder'
+            ? 'real estate builders and developers'
+            : 'real estate agents and property dealers';
+
+        $notice = null;
+
+        // 1) Try discovery with normal geocoding
+        $candidates = $this->discoverBusinesses($city, $queryPrefix);
+
+        if (!empty($candidates)) {
+            return ['candidates' => $candidates, 'notice' => null];
+        }
+
+        // 2) If empty, attempt a city-specific fallback center for Tricity
+        //    (Zirakpur is often inconsistently geocoded by free Nominatim results).
+        $fallback = $this->getFallbackCoordinatesForCity($city);
+        if ($fallback) {
+            [$lat, $lon] = $fallback;
+            $radius = 10000;
+
+            $query = $this->buildOverpassQueryFromCoordinates($city, $queryPrefix, $lat, $lon, $radius);
+            $elements = $this->queryOverpass($query);
+
+            $results = [];
+            foreach ($elements as $element) {
+                $candidate = $this->mapOsmElementToCandidate($element, $city);
+                if ($candidate) {
+                    $results[] = $candidate;
+                }
+            }
+
+            $results = array_slice($results, 0, 50);
+            if (!empty($results)) {
+                return ['candidates' => $results, 'notice' => 'No matches found using geocoding. Showing results using a fallback search center near ' . ucfirst($city) . '.'];
+            }
+        }
+
+        // 3) Final user-facing explanation
+        $notice = 'No candidates found for "' . $city . '". This can happen if Overpass/Nominatim is rate-limited or if the city name does not match OpenStreetMap data. Try again later or enter a nearby locality (e.g., Mohali/Chandigarh for Zirakpur).';
+
+        return ['candidates' => [], 'notice' => $notice];
+    }
+
+    protected function getFallbackCoordinatesForCity(string $city): ?array
+    {
+        // Approximate centers for common Tricity searches.
+        $map = [
+            'zirakpur' => [30.6646, 76.7929],
+            'mohali' => [30.6785, 76.7230],
+            'chandigarh' => [30.7333, 76.7794],
+            'panchkula' => [30.7056, 76.8585],
+            'derabassi' => [30.6630, 76.7140],
+            'kharar' => [30.7490, 76.6500],
+            'kharar mohali' => [30.7490, 76.6500],
+            'pune' => [18.5204, 73.8567],
+        ];
+
+        return $map[$city] ?? null;
+    }
+
+    protected function buildOverpassQueryFromCoordinates(string $city, string $queryPrefix, float $lat, float $lon, int $radius): string
+    {
+        $query = '[out:json][timeout:25];\n';
+        $query .= '( \n';
+
+        if (strpos(strtolower($queryPrefix), 'builder') !== false ||
+            strpos(strtolower($queryPrefix), 'developer') !== false) {
+            $query .= '  node["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  way["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  relation["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  node["shop"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  way["shop"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  relation["shop"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  node["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  way["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  relation["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+        } elseif (strpos(strtolower($queryPrefix), 'agent') !== false ||
+                 strpos(strtolower($queryPrefix), 'dealer') !== false) {
+            $query .= '  node["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  way["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  relation["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  node["shop"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  way["shop"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  relation["shop"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  node["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  way["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  relation["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+        } else {
+            $query .= '  node["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  way["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            $query .= '  relation["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+        }
+
+        $query .= ');\n';
+        $query .= 'out center;\n';
+
+        error_log("Overpass fallback query for $city ($queryPrefix): center=($lat,$lon), radius=$radius");
+
+        return $query;
+    }
+
 
     protected function buildOverpassQuery(string $city, string $queryPrefix): string
     {
