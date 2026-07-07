@@ -186,20 +186,64 @@ function getCurrentUser(): string
     return trim((string)($_SESSION['user'] ?? ''));
 }
 
+function getDefaultWatchlistSymbols(): array
+{
+    $defaults = defined('WATCHLIST_SYMBOLS') ? WATCHLIST_SYMBOLS : [];
+    if (!empty($defaults)) {
+        return array_values(array_unique(array_filter(array_map(function ($item) {
+            if (!is_string($item)) return null;
+            $trimmed = trim($item);
+            return $trimmed === '' ? null : strtoupper($trimmed);
+        }, $defaults))));
+    }
+    return [];
+}
+
 function getUserWatchlist(string $username): array
 {
     $path = getUserWatchlistPath($username);
     if (!file_exists($path)) {
-        $default = defined('WATCHLIST_SYMBOLS') ? WATCHLIST_SYMBOLS : [];
-        $saved = [];
-        if (!empty($default)) {
-            $saved = array_values(array_unique($default));
-        }
+        $saved = getDefaultWatchlistSymbols();
         file_put_contents($path, json_encode($saved));
         return $saved;
     }
     $decoded = json_decode((string)file_get_contents($path), true);
-    return is_array($decoded) ? array_values(array_filter($decoded, fn($item) => is_string($item) && trim($item) !== '')) : [];
+    $normalized = is_array($decoded) ? array_values(array_filter($decoded, fn($item) => is_string($item) && trim($item) !== '')) : [];
+    if (empty($normalized)) {
+        $normalized = getDefaultWatchlistSymbols();
+        file_put_contents($path, json_encode($normalized));
+    }
+    return array_values(array_unique(array_map(fn($item) => strtoupper(trim((string)$item)), $normalized)));
+}
+
+function getUserWatchlistMeta(string $username, ?bool $pathExistedBefore = null): array
+{
+    $path = getUserWatchlistPath($username);
+    $pathExists = file_exists($path);
+    if ($pathExistedBefore !== null) {
+        $pathExists = $pathExistedBefore;
+    }
+
+    if (!$pathExists) {
+        $watchlist = getUserWatchlist($username);
+        return [
+            'watchlist_source' => 'default',
+            'used_default_fallback' => true,
+            'watchlist_path' => $path,
+            'watchlist_count' => count($watchlist),
+        ];
+    }
+
+    $decoded = json_decode((string)file_get_contents($path), true);
+    $normalized = is_array($decoded) ? array_values(array_filter($decoded, fn($item) => is_string($item) && trim($item) !== '')) : [];
+    $watchlist = array_values(array_unique(array_map(fn($item) => strtoupper(trim((string)$item)), $normalized)));
+    $usedDefault = empty($watchlist) || count($watchlist) === 0;
+    return [
+        'watchlist_source' => $usedDefault ? 'default' : 'custom',
+        'used_default_fallback' => $usedDefault,
+        'watchlist_path' => $path,
+        'watchlist_count' => count($watchlist),
+    ];
 }
 
 function saveUserWatchlist(string $username, array $watchlist): void

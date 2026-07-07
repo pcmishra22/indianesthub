@@ -65,8 +65,11 @@ if ($uri === '/api/watchlist/remove' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 if ($uri === '/api/watchlist/list') {
     header('Content-Type: application/json');
     $username = getCurrentUser();
+    $path = $username ? getUserWatchlistPath($username) : '';
+    $pathExists = $path !== '' && file_exists($path);
     $wl = $username ? getUserWatchlist($username) : [];
-    echo json_encode(['watchlist' => $wl]);
+    $meta = $username ? getUserWatchlistMeta($username, $pathExists) : ['watchlist_source' => 'default', 'used_default_fallback' => true, 'watchlist_count' => count($wl)];
+    echo json_encode(['watchlist' => $wl, 'meta' => $meta]);
     exit;
 }
 if ($uri === '/api/watchlist/reset' && $_SERVER['REQUEST_METHOD'] === 'POST') {

@@ -273,6 +273,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="rbar-bg"><div class="rbar-fill" id="rbar" style="width:100%"></div></div>
     <button class="btn btn-outline" onclick="wlPage=1;loadWatchlist()" style="padding:5px 12px;font-size:12px" id="refreshBtn">🔄 Refresh</button>
     <button class="btn btn-outline" onclick="clearYahooCache()" style="padding:5px 12px;font-size:12px;color:var(--orange);border-color:var(--orange)" id="clearCacheBtn" title="Clear data cache and reload">🗑️ Clear Cache</button>
+    <span id="watchlistSourceBadge" style="font-size:11px;padding:4px 8px;border-radius:999px;background:rgba(0,114,255,.12);border:1px solid rgba(0,114,255,.25);color:var(--a2)">Loading…</span>
     <div id="cacheNote" style="font-size:11px;color:var(--muted)"></div>
   </div>
 
@@ -664,7 +665,11 @@ async function loadWatchlist(force=false){
     const wlRes=await fetch(apiUrl('api/watchlist/list'));
     const wlData=await wlRes.json();
     let symbols=wlData.watchlist||[];
+    const watchlistMeta=wlData.meta||{};
     if(!symbols.length) symbols=['RELIANCE.NS','TCS.NS','HDFCBANK.NS','INFY.NS','ICICIBANK.NS'];
+    const sourceLabel = watchlistMeta.used_default_fallback ? 'Default universe' : 'Custom watchlist';
+    const sourceBadge = document.getElementById('watchlistSourceBadge');
+    if(sourceBadge){ sourceBadge.textContent = sourceLabel; }
 
     // Step 2: identify current-page symbols for priority fetch
     const PAGE=20;

@@ -44,17 +44,19 @@ class CityDataDiscoveryService
      */
     public function discover(string $type, string $city): array
     {
+        $normalizedCity = $this->normalizeCity($city);
+
         return match ($type) {
             'builder' => [
-                'candidates' => $this->discoverBusinesses($city, 'real estate builders and developers in'),
+                'candidates' => $this->discoverBusinesses($normalizedCity, 'real estate builders and developers in'),
                 'notice'     => null,
             ],
             'agent' => [
-                'candidates' => $this->discoverBusinesses($city, 'real estate agents and property dealers in'),
+                'candidates' => $this->discoverBusinesses($normalizedCity, 'real estate agents and property dealers in'),
                 'notice'     => null,
             ],
             'property' => [
-                'candidates' => $this->discoverProperties($city),
+                'candidates' => $this->discoverProperties($normalizedCity),
                 'notice'     => 'Live property-listing data cannot be auto-crawled from third-party portals '
                     . '(it would violate their Terms of Service). Use the CSV import option below, or wire a '
                     . 'licensed listings feed into CityDataDiscoveryService::discoverProperties().',
@@ -62,6 +64,47 @@ class CityDataDiscoveryService
             default => ['candidates' => [], 'notice' => 'Unknown type.'],
         };
     }
+
+    protected function normalizeCity(string $city): string
+    {
+        $city = trim($city);
+        $city = str_replace(['-', '_'], ' ', $city);
+        $city = preg_replace('/\s+/', ' ', $city);
+
+        // If admin passes a hyphenated slug (e.g. "zirakpur-city"), prefer the first token.
+        // This makes queries like "real estate builders ... in zirakpur" much more reliable.
+        $parts = explode(' ', $city);
+        $first = $parts[0] ?? $city;
+
+        return strtolower($first);
+    }
+
+    protected function googleTextSearch(string $query, ?string $pageToken = null): array
+    {
+        $params = $pageToken
+            ? ['pagetoken' => $pageToken, 'key' => $this->apiKey]
+            : ['query' => $query, 'key' => $this->apiKey];
+
+        if ($pageToken) {
+            // Google requires a short delay before a next_page_token becomes usable.
+            sleep(2);
+        }
+
+        $response = Http::get('https://maps.googleapis.com/maps/api/place/textsearch/json', $params);
+        return $response->json() ?? [];
+    }
+
+    protected function googlePlaceDetails(string $placeId): array
+    {
+        $response = Http::get('https://maps.googleapis.com/maps/api/place/details/json', [
+            'place_id' => $placeId,
+            'fields'   => 'formatted_phone_number,website',
+            'key'      => $this->apiKey,
+        ]);
+
+        return $response->json()['result'] ?? [];
+    }
+
 
     protected function discoverBusinesses(string $city, string $queryPrefix): array
     {
@@ -71,34 +114,46 @@ class CityDataDiscoveryService
             );
         }
 
-        $query = "{$queryPrefix} {$city}";
-        $results = [];
-        $pageToken = null;
-        $pagesFetched = 0;
+        $queryCandidates = [
+            "{$queryPrefix} {$city}",
+            // Retry with explicit country context when the admin passes a slug/city token.
+            "{$queryPrefix} {$city}, India",
+        ];
 
-        do {
-            $params = $pageToken
-                ? ['pagetoken' => $pageToken, 'key' => $this->apiKey]
-                : ['query' => $query, 'key' => $this->apiKey];
+        foreach ($queryCandidates as $query) {
+            $results = [];
+            $pageToken = null;
+            $pagesFetched = 0;
 
-            if ($pageToken) {
-                // Google requires a short delay before a next_page_token becomes usable.
-                sleep(2);
+            do {
+                $data = $this->googleTextSearch($query, $pageToken);
+
+                $status = $data['status'] ?? null;
+                if ($status && $status !== 'OK' && $status !== 'ZERO_RESULTS') {
+                    $message = 'Google Places error: ' . $status;
+                    if (!empty($data['error_message'])) {
+                        $message .= ' — ' . $data['error_message'];
+                    }
+                    throw new \RuntimeException($message);
+                }
+
+                foreach ($data['results'] ?? [] as $place) {
+                    $results[] = $this->mapPlaceToCandidate($place, $city);
+                }
+
+                $pageToken = $data['next_page_token'] ?? null;
+                $pagesFetched++;
+            } while ($pageToken && $pagesFetched < 3); // Places API caps at 3 pages (~60 results) per query
+
+            // If we found anything, stop retrying.
+            if (!empty($results)) {
+                return $results;
             }
+        }
 
-            $response = Http::get('https://maps.googleapis.com/maps/api/place/textsearch/json', $params);
-            $data = $response->json() ?? [];
-
-            foreach ($data['results'] ?? [] as $place) {
-                $results[] = $this->mapPlaceToCandidate($place, $city);
-            }
-
-            $pageToken = $data['next_page_token'] ?? null;
-            $pagesFetched++;
-        } while ($pageToken && $pagesFetched < 3); // Places API caps at 3 pages (~60 results) per query
-
-        return $results;
+        return [];
     }
+
 
     protected function mapPlaceToCandidate(array $place, string $city): array
     {

@@ -43,6 +43,25 @@ define('PRAKASH_MAX_TRACKED', (int)(getenv('PRAKASH_MAX_TRACKED') ?: 20));
 // genuine fast-moving days getting rejected.
 define('PRAKASH_MAX_PLAUSIBLE_MOVE_PCT', (float)(getenv('PRAKASH_MAX_PLAUSIBLE_MOVE_PCT') ?: 12.0));
 
+// How many of the top gainers / top losers the spec wants us to track for
+// strong-presence (5 consecutive iterations) and new-entry detection.
+// PRAKASH_MAX_PER_BOX above is the display cap on the Buy/Sell boxes (5);
+// PRAKASH_TOP_N is the internal ceiling used for the spec's "Top 10
+// Gainers" / "Top 10 Losers" detection layer. They are intentionally
+// separate — a stock at rank 6 should still count toward strong-presence
+// across the day even though it doesn't fit in the visible box.
+define('PRAKASH_TOP_N', (int)(getenv('PRAKASH_TOP_N') ?: 10));
+
+// Confidence-score weights for the Buy/Sell candidate ranking. Kept in one
+// place so the formula is auditable. Each sub-score is normalized to 0..1
+// first, multiplied by its weight, and the weighted sum is clamped to
+// 0..100 and rounded to 1 decimal before being attached to a candidate.
+define('PRAKASH_CONFIDENCE_W_CONSECUTIVE', (int)(getenv('PRAKASH_CONFIDENCE_W_CONSECUTIVE') ?: 40)); // iterations in top 10 / 5
+define('PRAKASH_CONFIDENCE_W_RANK_MOVE',   (int)(getenv('PRAKASH_CONFIDENCE_W_RANK_MOVE')   ?: 25)); // |rank Δ| vs. worst-case
+define('PRAKASH_CONFIDENCE_W_MAGNITUDE',   (int)(getenv('PRAKASH_CONFIDENCE_W_MAGNITUDE')   ?: 20)); // min(|%change|, cap) / cap
+define('PRAKASH_CONFIDENCE_W_NEW_ENTRY',   (int)(getenv('PRAKASH_CONFIDENCE_W_NEW_ENTRY')   ?: 15)); // new-entry boost
+define('PRAKASH_CONFIDENCE_MAGNITUDE_CAP', (float)(getenv('PRAKASH_CONFIDENCE_MAGNITUDE_CAP') ?: 5.0)); // |%change| that scores 1.0
+
 // ─── AI Recommendation settings ──────────────────────────────
 // Same locked-in-target scheme as Prakash, but the Buy/Sell box is built
 // from this app's own indicator-driven signal engine (signals.php) instead

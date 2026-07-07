@@ -1,0 +1,36 @@
+{
+    "date": "2026-07-06",
+    "recommendations": [
+        {
+            "symbol": "AAA",
+            "side": "Buy",
+            "reason": "Top Gainer",
+            "entry_price": 100,
+            "entry_time": "2026-07-06 18:17:55",
+            "entry_source": null,
+            "target_pct": 1,
+            "target_price": 101,
+            "status": "Active",
+            "achieved": false,
+            "achieved_at": null,
+            "achieved_price": null,
+            "last_checked_price": 100
+        },
+        {
+            "symbol": "BBB",
+            "side": "Sell",
+            "reason": "Top Loser",
+            "entry_price": 95,
+            "entry_time": "2026-07-06 18:17:55",
+            "entry_source": null,
+            "target_pct": 1,
+            "target_price": 94.05,
+            "status": "Active",
+            "achieved": false,
+            "achieved_at": null,
+            "achieved_price": null,
+            "last_checked_price": 95
+        }
+    ],
+    "closed": false
+}

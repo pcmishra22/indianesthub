@@ -1,0 +1,11 @@
+{
+    "updated": "2026-07-06 18:17:55",
+    "ranks": {
+        "AAA.NS": 1,
+        "BBB.NS": 2
+    },
+    "changes": {
+        "AAA.NS": 2.5,
+        "BBB.NS": -1.5
+    }
+}
