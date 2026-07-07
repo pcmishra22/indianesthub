@@ -401,7 +401,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <!-- Prakash intraday Buy/Sell boxes with entry price + 1% target + achieved status -->
   <div class="panel" style="margin-bottom:16px;padding:14px 16px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-      <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0">🎯 Prakash Intraday Recommendations</h3>
+      <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0">🎯 Momentum Intraday Recommendations</h3>
       <div id="prakashDailySummary" style="font-size:12px;color:var(--muted)"></div>
     </div>
     <div id="prakashBoxes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
@@ -411,7 +411,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <!-- Prakash Track Record: cross-day win-rate rollup -->
   <div class="panel" style="margin-bottom:16px;padding:14px 16px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-      <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0">📊 Prakash Track Record</h3>
+      <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0">📊 Momentum Track Record</h3>
       <div style="display:flex;gap:8px">
         <button class="btn btn-outline" onclick="openTrackRecordDetails('prakash')" style="padding:5px 12px;font-size:11px">🔍 View All Details</button>
         <button class="btn btn-outline" onclick="loadPrakashRollup()" style="padding:5px 12px;font-size:11px">🔄 Refresh</button>
@@ -451,7 +451,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0 0 10px">⭐ Top Recommendation for Today</h3>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px">
       <div>
-        <div style="font-size:12px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">🎯 Prakash</div>
+        <div style="font-size:12px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">🎯 Momentum</div>
         <div style="font-size:11px;color:var(--green);font-weight:700;margin-bottom:4px">Today Buy</div>
         <div id="prakashTodayBuy" style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px"></div>
         <div style="font-size:11px;color:var(--red);font-weight:700;margin-bottom:4px">Today Sell</div>
@@ -552,7 +552,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <option value="">Today</option>
       </select>
       <button class="btn btn-primary" onclick="loadEodReport()" style="padding:7px 16px">🔄 Refresh</button>
-      <button class="btn btn-outline" onclick="downloadCombinedEodReport()" style="padding:7px 16px">⬇ Download Prakash+AI Report (CSV)</button>
+      <button class="btn btn-outline" onclick="downloadCombinedEodReport()" style="padding:7px 16px">⬇ Download Momentum+AI Report (CSV)</button>
     </div>
   </div>
 
@@ -561,7 +561,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
        it succeeded or failed, for the person's own EOD understanding. -->
   <div class="panel" id="combinedEodPanel" style="margin-bottom:16px;padding:14px 16px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
-      <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0">🗂 Prakash + AI Recommendation Log</h3>
+      <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0">🗂 Momentum + AI Recommendation Log</h3>
       <div id="combinedEodSummary" style="font-size:12px;color:var(--muted)"></div>
     </div>
     <div id="combinedEodTable" style="font-size:12px"><div style="color:var(--muted)">Loading…</div></div>
@@ -1042,7 +1042,7 @@ async function openTrackRecordDetails(engine){
   const title=document.getElementById('trackRecordModalTitle');
   const body=document.getElementById('trackRecordModalBody');
   if(!modal||!body) return;
-  title.textContent=(engine==='prakash'?'📊 Prakash':'🤖 AI')+' Track Record — Full Details';
+  title.textContent=(engine==='prakash'?'📊 Momentum':'🤖 AI')+' Track Record — Full Details';
   body.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted)">Loading…</div>';
   modal.style.display='flex';
   try{
@@ -2195,10 +2195,10 @@ async function loadCombinedEodReport(date){
       const s=d.summary||{};
       const rate=s.success_rate!==null&&s.success_rate!==undefined?s.success_rate+'%':'—';
       const rc=(s.success_rate||0)>=50?'var(--green)':'var(--red)';
-      summaryEl.innerHTML=rows.length?`<strong style="color:#fff">${s.achieved}/${s.total}</strong> hit · <strong style="color:${rc}">${rate}</strong> · Prakash: ${s.prakash_total} · AI: ${s.ai_total}`:'';
+      summaryEl.innerHTML=rows.length?`<strong style="color:#fff">${s.achieved}/${s.total}</strong> hit · <strong style="color:${rc}">${rate}</strong> · Momentum: ${s.prakash_total} · AI: ${s.ai_total}`:'';
     }
     if(rows.length===0){
-      tableEl.innerHTML='<div style="color:var(--muted)">No Prakash/AI recommendations logged for this date yet.</div>';
+      tableEl.innerHTML='<div style="color:var(--muted)">No Momentum/AI recommendations logged for this date yet.</div>';
       return;
     }
     let html='<div style="display:flex;flex-direction:column;gap:4px;max-height:340px;overflow-y:auto">';
@@ -2227,7 +2227,7 @@ async function loadCombinedEodReport(date){
 // buy/sell, price, target price" the person can keep for their own records.
 function downloadCombinedEodReport(){
   const d=_lastCombinedEod;
-  if(!d || !d.rows || d.rows.length===0){ alert('No Prakash/AI recommendations for this date yet.'); return; }
+  if(!d || !d.rows || d.rows.length===0){ alert('No Momentum/AI recommendations for this date yet.'); return; }
   const headers=['Date','Engine','Symbol','Side','Entry Price','Target Price','Status','Achieved Price','Entry Time','Achieved Time'];
   const lines=[headers.join(',')];
   d.rows.forEach(r=>{

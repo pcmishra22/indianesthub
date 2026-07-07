@@ -1,0 +1,4 @@
+# Storage folder
+/storage/
+# Storage backup files
+/storage_prakash_daily_*.json
