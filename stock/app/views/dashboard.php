@@ -405,6 +405,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <div id="prakashDailySummary" style="font-size:12px;color:var(--muted)"></div>
     </div>
     <div id="prakashBoxes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
+    <div id="prakashTopPicks"></div>
   </div>
 
   <!-- Prakash Track Record: cross-day win-rate rollup -->
@@ -918,6 +919,8 @@ function renderEngineBoxes(engine, rec){
     const statusColor=achieved?'var(--green)':'var(--muted)';
     const statusText=achieved?`✅ Target hit${achievedAt?' @ '+achievedAt.split(' ')[1]:''}`:'⏳ Open';
     const sideColor=isBuy?'var(--green)':'var(--red)';
+    const hasScore=entry.stars!==undefined && entry.stars!==null;
+    const starsHtml=hasScore?`<div style="font-size:11px;color:${sideColor};margin-top:3px" title="Momentum point score: ${fmtNum(entry.point_score)}">${'⭐'.repeat(entry.stars)||'—'} ${escHtml(entry.tier||'')} (${fmtNum(entry.point_score)} pts)</div>`:'';
     return `<div style="background:linear-gradient(135deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1px solid var(--border);border-radius:10px;padding:10px 12px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
         <span style="font-size:14px;font-weight:700;color:#fff">${symbol}</span>
@@ -926,6 +929,7 @@ function renderEngineBoxes(engine, rec){
       <div style="font-size:11px;color:var(--muted);margin-bottom:3px">${escHtml(entry.reason||'')}</div>
       <div style="font-size:12px;color:var(--muted2)">Entry: ₹${fmtNum(entryPrice)}${targetPrice?` → Target: ₹${fmtNum(targetPrice)}`:''}</div>
       <div style="font-size:11px;color:${statusColor};margin-top:4px;font-weight:600">${statusText}</div>
+      ${starsHtml}
     </div>`;
   }
 
@@ -933,6 +937,36 @@ function renderEngineBoxes(engine, rec){
   const sellBox=rec.sell_box||[];
   if(buyBox.length===0 && sellBox.length===0){el.innerHTML='<div style="font-size:12px;color:var(--muted)">No box entries yet — waiting for next refresh</div>';return;}
   el.innerHTML = buyBox.map(e=>boxCard(e,'Buy')).join('') + sellBox.map(e=>boxCard(e,'Sell')).join('');
+  renderEngineTopPicks(engine, rec);
+}
+
+// "Pick of the Day" — Top 5 Buy + Top 5 Sell across the WHOLE tracked
+// universe, ranked by the point-score Momentum Ranking Engine (see
+// app/momentum_score.php), not just whichever 5 made this refresh's
+// momentum/new-entry box. Populated from rec.top5_buy / rec.top5_sell.
+function renderEngineTopPicks(engine, rec){
+  const el=document.getElementById(engine+'TopPicks');
+  if(!el) return;
+  const top5Buy=rec?.top5_buy||[];
+  const top5Sell=rec?.top5_sell||[];
+  if(top5Buy.length===0 && top5Sell.length===0){el.innerHTML='';return;}
+
+  function pickRow(p,side){
+    const sideColor=side==='Buy'?'var(--green)':'var(--red)';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(255,255,255,.03);border-radius:6px;font-size:11px;gap:8px">
+      <span style="color:#fff;font-weight:700;min-width:70px">${escHtml(p.symbol)}</span>
+      <span style="color:var(--muted2)">₹${fmtNum(p.price)} · ${fmtNum(p.percentage_change)}%</span>
+      <span style="color:${sideColor};font-weight:600;text-align:right">${'⭐'.repeat(p.stars)||'—'} ${escHtml(p.tier)} · ${fmtNum(p.score)} pts</span>
+    </div>`;
+  }
+  const buyCol=`<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🏆 Top ${top5Buy.length} Buy</div>` +
+    (top5Buy.length?top5Buy.map(p=>pickRow(p,'Buy')).join(''):'<div style="font-size:11px;color:var(--muted)">No candidates yet</div>');
+  const sellCol=`<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🏆 Top ${top5Sell.length} Sell</div>` +
+    (top5Sell.length?top5Sell.map(p=>pickRow(p,'Sell')).join(''):'<div style="font-size:11px;color:var(--muted)">No candidates yet</div>');
+  el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:12px">
+    <div style="display:flex;flex-direction:column;gap:5px">${buyCol}</div>
+    <div style="display:flex;flex-direction:column;gap:5px">${sellCol}</div>
+  </div>`;
 }
 
 // "Top Recommendation for Today": every distinct stock the engine has put in

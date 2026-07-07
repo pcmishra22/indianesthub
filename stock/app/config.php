@@ -62,6 +62,32 @@ define('PRAKASH_CONFIDENCE_W_MAGNITUDE',   (int)(getenv('PRAKASH_CONFIDENCE_W_MA
 define('PRAKASH_CONFIDENCE_W_NEW_ENTRY',   (int)(getenv('PRAKASH_CONFIDENCE_W_NEW_ENTRY')   ?: 15)); // new-entry boost
 define('PRAKASH_CONFIDENCE_MAGNITUDE_CAP', (float)(getenv('PRAKASH_CONFIDENCE_MAGNITUDE_CAP') ?: 5.0)); // |%change| that scores 1.0
 
+// ─── Momentum Ranking Engine (point-score) settings ──────────
+// A second, additive scoring layer on top of Prakash's confidence score.
+// Instead of a single 0..100 confidence, this scores every tracked stock
+// on 9 independent signals (rank, top-N membership, consistency, rank
+// improvement, breakout, volume spike, price confirmation, acceleration,
+// volatility) and sums them into a point score that can exceed 100 —
+// mirroring the "⭐⭐⭐⭐⭐ Strong Buy / ⭐⭐⭐⭐ Buy / ⭐⭐⭐ Watch / Ignore"
+// tiering. See app/momentum_score.php for the implementation.
+define('MS_POINTS_RANK',                  (float)(getenv('MS_POINTS_RANK') ?: 20));   // Signal 1: rank #1 / last
+define('MS_POINTS_TOPN',                  (float)(getenv('MS_POINTS_TOPN') ?: 10));   // Signal 2: in Top-N gainers/losers
+define('MS_POINTS_CONSISTENCY',           (float)(getenv('MS_POINTS_CONSISTENCY') ?: 40)); // Signal 3: full lookback in Top-N
+define('MS_POINTS_PER_RANK_STEP',         (float)(getenv('MS_POINTS_PER_RANK_STEP') ?: 5)); // Signal 4: per rank improved/worsened
+define('MS_POINTS_BREAKOUT',              (float)(getenv('MS_POINTS_BREAKOUT') ?: 25));  // Signal 5: new Top-N entry
+define('MS_POINTS_VOLUME',                (float)(getenv('MS_POINTS_VOLUME') ?: 20));   // Signal 6: volume spike
+define('MS_VOLUME_SPIKE_RATIO',           (float)(getenv('MS_VOLUME_SPIKE_RATIO') ?: 2.0)); // matches volumeAnalysis()'s own "spike" cutoff
+define('MS_POINTS_PRICE_CONFIRM_STRONG',  (float)(getenv('MS_POINTS_PRICE_CONFIRM_STRONG') ?: 15)); // Signal 7: price + %change both confirming
+define('MS_POINTS_PRICE_CONFIRM_WEAK',    (float)(getenv('MS_POINTS_PRICE_CONFIRM_WEAK') ?: 5));  // Signal 7: only one confirms
+define('MS_POINTS_ACCELERATION',          (float)(getenv('MS_POINTS_ACCELERATION') ?: 15));  // Signal 8: cap on acceleration bonus
+define('MS_ACCELERATION_SCALE',           (float)(getenv('MS_ACCELERATION_SCALE') ?: 10));  // Signal 8: points per (%-change unit of 2nd derivative)
+define('MS_VOLATILITY_FLIP_THRESHOLD',    (int)(getenv('MS_VOLATILITY_FLIP_THRESHOLD') ?: 2)); // Signal 9: sign flips within the window to count as "unstable"
+define('MS_POINTS_VOLATILITY_PENALTY',    (float)(getenv('MS_POINTS_VOLATILITY_PENALTY') ?: 15)); // Signal 9: penalty subtracted when unstable
+define('MS_TIER_STRONG',                  (float)(getenv('MS_TIER_STRONG') ?: 100)); // score > this -> 5 stars "Strong Buy/Sell"
+define('MS_TIER_ACTIONABLE',              (float)(getenv('MS_TIER_ACTIONABLE') ?: 80)); // score >= this -> 4 stars "Buy/Sell"
+define('MS_TIER_WATCH',                   (float)(getenv('MS_TIER_WATCH') ?: 60)); // score >= this -> 3 stars "Watch"; below -> "Ignore"
+define('MS_TOP_PICKS_COUNT',              (int)(getenv('MS_TOP_PICKS_COUNT') ?: 5)); // "Top 5 Buy" / "Top 5 Sell" pick-of-the-day list size
+
 // ─── AI Recommendation settings ──────────────────────────────
 // Same locked-in-target scheme as Prakash, but the Buy/Sell box is built
 // from this app's own indicator-driven signal engine (signals.php) instead

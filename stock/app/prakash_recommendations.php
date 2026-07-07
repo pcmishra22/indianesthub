@@ -5,6 +5,12 @@ if (!defined('STORAGE')) {
     define('STORAGE', dirname(__DIR__) . '/storage');
 }
 
+// The point-score Momentum Ranking Engine layer (Signals 6-9 + tiering)
+// lives in its own file so it can be unit-tested independently, but this
+// file is the only caller — require_once here means load order in
+// public/index.php or a standalone test doesn't matter.
+require_once __DIR__ . '/momentum_score.php';
+
 // Internal base-path resolver so this file can be loaded standalone
 // (e.g. from the unit test which doesn't go through users.php) without
 // "undefined function getStorageBasePath" crashes. When users.php is
@@ -298,20 +304,47 @@ function savePrakashRankHistory(array $history, string $path): void
 // Append a new iteration and prune to the lookback window. A new trading
 // day (history['date'] != today) wipes the window — spec calls for a fresh
 // initial iteration.
-function appendPrakashRankIteration(array $ranks, string $path): array
+//
+// $changes and $prices are optional symbol => value maps (percentage
+// change and live price respectively) captured at the same instant as
+// $ranks. They feed the point-score engine's price-confirmation,
+// acceleration, and volatility signals, which all need a short time
+// series rather than just the latest rank.
+function appendPrakashRankIteration(array $ranks, string $path, array $changes = [], array $prices = []): array
 {
     $history = loadPrakashRankHistory($path);
     $history['date'] = date('Y-m-d');
     $history['iterations'][] = [
-        'ts'    => date('H:i:s'),
-        'epoch' => time(),
-        'ranks' => $ranks,
+        'ts'     => date('H:i:s'),
+        'epoch'  => time(),
+        'ranks'  => $ranks,
+        'changes'=> $changes,
+        'prices' => $prices,
     ];
     if (count($history['iterations']) > PRAKASH_MOMENTUM_LOOKBACK) {
         $history['iterations'] = array_slice($history['iterations'], -PRAKASH_MOMENTUM_LOOKBACK);
     }
     savePrakashRankHistory($history, $path);
     return $history;
+}
+
+// Builds an oldest -> newest series for one symbol out of a per-iteration
+// field ('ranks', 'changes', or 'prices') across the stored rank-history
+// window, appending the current refresh's own value on the end (since
+// $rankHistory as returned by appendPrakashRankIteration already includes
+// the just-appended iteration, this is simply "read every iteration").
+// Missing iterations for a symbol (it wasn't tracked/present that refresh)
+// are skipped rather than gapped with a placeholder.
+function prakashFieldSeries(array $rankHistory, string $symbol, string $field): array
+{
+    $series = [];
+    foreach ($rankHistory['iterations'] ?? [] as $iter) {
+        $values = is_array($iter[$field] ?? null) ? $iter[$field] : [];
+        if (array_key_exists($symbol, $values)) {
+            $series[] = $values[$symbol];
+        }
+    }
+    return $series;
 }
 
 // ── Top-N Gainers / Losers helpers ────────────────────────────
@@ -647,6 +680,8 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
             'rank_movement_sell'  => null,
             'buy_box'             => [],
             'sell_box'            => [],
+            'top5_buy'            => [],
+            'top5_sell'           => [],
             'daily_summary'       => null,
             'tracked_count'       => 0,
             'iteration'           => 0,
@@ -661,12 +696,14 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
 
     $currentRanks = [];
     $currentChanges = [];
+    $currentPrices = [];
     $stocksBySymbol = [];
     foreach ($tracked as $index => $stock) {
         $symbol = prakashNormalizeSymbol((string)($stock['symbol'] ?? ''));
         if ($symbol !== '') {
             $currentRanks[$symbol] = $index + 1;
             $currentChanges[$symbol] = (float)($stock['change_pct'] ?? 0);
+            $currentPrices[$symbol] = (float)($stock['price'] ?? 0);
             $stocksBySymbol[$symbol] = $stock;
         }
     }
@@ -744,7 +781,7 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
     // we read momentum — that way the current refresh's ranks are part of
     // the trend the detector sees, and a stock that's been moving up
     // *into* this refresh can fire on it. ──
-    $rankHistory = appendPrakashRankIteration($currentRanks, $rankHistPath);
+    $rankHistory = appendPrakashRankIteration($currentRanks, $rankHistPath, $currentChanges, $currentPrices);
     $iterationNumber = count($rankHistory['iterations']);
     $isInitial = $iterationNumber <= 1;
 
@@ -763,6 +800,87 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
     $newEntries = prakashDetectNewEntries($topGainersList, $topLosersList, $topSeenPath);
     $newEntryBuySymbols  = $newEntries['buy'];
     $newEntrySellSymbols = $newEntries['sell'];
+
+    // ── Point-score Momentum Ranking Engine (Signals 1-9) ──────────────
+    // Runs for every tracked stock, independent of whether it made the
+    // momentum/new-entry candidate lists below. This is the additive
+    // "sum every signal into a point total, then bucket into star tiers"
+    // scoring the spec describes, layered on top of (not replacing)
+    // Prakash's existing 0..100 confidence score above.
+    $topGainersSet = array_flip($topGainersList);
+    $topLosersSet  = array_flip($topLosersList);
+    $newEntryBuySet  = array_flip($newEntryBuySymbols);
+    $newEntrySellSet = array_flip($newEntrySellSymbols);
+    $totalTrackedCount = count($tracked);
+
+    $pointScores = []; // symbol => ['Buy' => [...msScoreStock result...], 'Sell' => [...]]
+    foreach ($currentRanks as $symbol => $rank) {
+        $stock = $stocksBySymbol[$symbol] ?? null;
+        if (!$stock) continue;
+        $volRatio = isset($stock['vol_ratio']) && is_numeric($stock['vol_ratio']) ? (float)$stock['vol_ratio'] : null;
+        $rankSeries   = prakashFieldSeries($rankHistory, $symbol, 'ranks');
+        $changeSeries = prakashFieldSeries($rankHistory, $symbol, 'changes');
+        $priceSeries  = prakashFieldSeries($rankHistory, $symbol, 'prices');
+        $consecutiveTopN = prakashConsecutiveTopNCount($symbol, $rankHistory, (int)$rank, $topN);
+
+        $baseCtx = [
+            'rank' => (int)$rank,
+            'totalCount' => $totalTrackedCount,
+            'consecutive' => $consecutiveTopN,
+            'lookback' => PRAKASH_MOMENTUM_LOOKBACK,
+            'volRatio' => $volRatio,
+            'rankSeries' => $rankSeries,
+            'changeSeries' => $changeSeries,
+            'priceSeries' => $priceSeries,
+        ];
+
+        $pointScores[$symbol] = [
+            'Buy' => msScoreStock($baseCtx + [
+                'inTopN' => isset($topGainersSet[$symbol]),
+                'isNewEntry' => isset($newEntryBuySet[$symbol]),
+            ], 'Buy'),
+            'Sell' => msScoreStock($baseCtx + [
+                'inTopN' => isset($topLosersSet[$symbol]),
+                'isNewEntry' => isset($newEntrySellSet[$symbol]),
+            ], 'Sell'),
+        ];
+    }
+
+    // "Pick of the Day": Top 5 Buy + Top 5 Sell across the *whole* tracked
+    // universe, ranked by point score — not just the momentum/new-entry
+    // box below, so a stock with a strong point score but no fresh
+    // momentum trigger this exact refresh still surfaces here.
+    $topPicksCount = (int)(defined('MS_TOP_PICKS_COUNT') ? MS_TOP_PICKS_COUNT : 5);
+    $buyPicks = [];
+    $sellPicks = [];
+    foreach ($pointScores as $symbol => $sides) {
+        $stock = $stocksBySymbol[$symbol] ?? null;
+        if (!$stock) continue;
+        $buyPicks[] = [
+            'symbol' => $symbol,
+            'price' => (float)($stock['price'] ?? 0),
+            'percentage_change' => (float)($stock['change_pct'] ?? 0),
+            'rank' => $currentRanks[$symbol] ?? null,
+            'score' => $sides['Buy']['score'],
+            'stars' => $sides['Buy']['stars'],
+            'tier' => $sides['Buy']['tier'],
+            'signals' => $sides['Buy']['signals'],
+        ];
+        $sellPicks[] = [
+            'symbol' => $symbol,
+            'price' => (float)($stock['price'] ?? 0),
+            'percentage_change' => (float)($stock['change_pct'] ?? 0),
+            'rank' => $currentRanks[$symbol] ?? null,
+            'score' => $sides['Sell']['score'],
+            'stars' => $sides['Sell']['stars'],
+            'tier' => $sides['Sell']['tier'],
+            'signals' => $sides['Sell']['signals'],
+        ];
+    }
+    usort($buyPicks, fn($a, $b) => $b['score'] <=> $a['score']);
+    usort($sellPicks, fn($a, $b) => $b['score'] <=> $a['score']);
+    $top5Buy  = array_slice($buyPicks, 0, $topPicksCount);
+    $top5Sell = array_slice($sellPicks, 0, $topPicksCount);
 
     // ── Build the Buy/Sell candidate sets for this refresh. ──
     //
@@ -934,6 +1052,30 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
         }
     }
     // (No global state to clean up — confidence helper captures by value.)
+
+    // Attach the point-score engine's output to every box entry, so the
+    // dashboard can show both Prakash's existing 0..100 confidence AND
+    // the spec's star-tier point score side by side.
+    foreach ($buyCandidates as &$c) {
+        $sym = $c['symbol'] ?? '';
+        $ps = $pointScores[$sym]['Buy'] ?? null;
+        if ($ps) {
+            $c['point_score'] = $ps['score'];
+            $c['stars'] = $ps['stars'];
+            $c['tier'] = $ps['tier'];
+        }
+    }
+    unset($c);
+    foreach ($sellCandidates as &$c) {
+        $sym = $c['symbol'] ?? '';
+        $ps = $pointScores[$sym]['Sell'] ?? null;
+        if ($ps) {
+            $c['point_score'] = $ps['score'];
+            $c['stars'] = $ps['stars'];
+            $c['tier'] = $ps['tier'];
+        }
+    }
+    unset($c);
 
     // ── Rank-based Top Gainer / Top Loser signal ──────────────────────
     // Runs on EVERY iteration (including the initial one), independent
@@ -1420,6 +1562,8 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
         ) : null,
         'buy_box'   => $buyCandidates,
         'sell_box'  => $sellCandidates,
+        'top5_buy'  => $top5Buy,
+        'top5_sell' => $top5Sell,
         'momentum_up'   => $momentumUp,
         'momentum_down' => $momentumDown,
         'daily_summary' => $dailySummary,

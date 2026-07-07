@@ -1,0 +1,29 @@
+{
+    "date": "2026-07-07",
+    "gainers": {
+        "Q1.NS": true,
+        "Q2.NS": true,
+        "Q3.NS": true,
+        "Q4.NS": true,
+        "Q5.NS": true,
+        "Q6.NS": true,
+        "Q7.NS": true,
+        "Q8.NS": true,
+        "Q9.NS": true,
+        "Q10.NS": true,
+        "GLITCH.NS": true
+    },
+    "losers": {
+        "FLOOR2.NS": true,
+        "GLITCH.NS": true,
+        "Q11.NS": true,
+        "Q10.NS": true,
+        "Q9.NS": true,
+        "Q8.NS": true,
+        "Q7.NS": true,
+        "Q6.NS": true,
+        "Q5.NS": true,
+        "Q4.NS": true,
+        "Q3.NS": true
+    }
+}

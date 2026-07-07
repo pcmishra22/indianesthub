@@ -1,22 +1,42 @@
 [
     {
-        "timestamp": "2026-07-06 18:13:06",
-        "datetime": "2026-07-06 18:13:06",
-        "stock_symbol": "A",
+        "timestamp": "2026-07-07 09:08:09",
+        "datetime": "2026-07-07 09:08:09",
+        "stock_symbol": "Q1",
         "recommendation": "Buy",
-        "percentage_change": 2,
+        "percentage_change": 8.5,
         "price": 100,
         "reason": "Initial Top Gainer",
         "iteration": 1
     },
     {
-        "timestamp": "2026-07-06 18:13:06",
-        "datetime": "2026-07-06 18:13:06",
-        "stock_symbol": "B",
+        "timestamp": "2026-07-07 09:08:09",
+        "datetime": "2026-07-07 09:08:09",
+        "stock_symbol": "FLOOR2",
         "recommendation": "Sell",
-        "percentage_change": -2,
+        "percentage_change": -8.5,
         "price": 100,
         "reason": "Initial Top Loser",
         "iteration": 1
+    },
+    {
+        "timestamp": "2026-07-07 09:08:09",
+        "datetime": "2026-07-07 09:08:09",
+        "stock_symbol": "GLITCH",
+        "recommendation": "Buy",
+        "percentage_change": 15,
+        "price": 130,
+        "reason": "Current Top Gainer (Rank #1)",
+        "iteration": 2
+    },
+    {
+        "timestamp": "2026-07-07 09:08:09",
+        "datetime": "2026-07-07 09:08:09",
+        "stock_symbol": "FLOOR2",
+        "recommendation": "Sell",
+        "percentage_change": -8.5,
+        "price": 100,
+        "reason": "Current Top Loser (Rank Last)",
+        "iteration": 2
     }
 ]
