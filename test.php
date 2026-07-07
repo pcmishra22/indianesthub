@@ -1,2 +1,0 @@
-<?php
-echo "STOCK OK";
