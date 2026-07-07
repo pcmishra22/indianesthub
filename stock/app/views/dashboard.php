@@ -470,9 +470,12 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <!-- Track Record detail modal: full stock-level list behind the rollup
        numbers (task: "so user can see and trust on this data") -->
   <div id="trackRecordModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center;padding:20px">
-    <div style="background:var(--panel,#171923);border:1px solid var(--border);border-radius:12px;max-width:820px;width:100%;max-height:85vh;display:flex;flex-direction:column">
+    <div style="background:var(--panel,#171923);border:1px solid var(--border);border-radius:12px;max-width:900px;width:100%;max-height:85vh;display:flex;flex-direction:column">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)">
-        <h3 id="trackRecordModalTitle" style="font-size:.95rem;font-weight:700;color:#fff;margin:0">Track Record Details</h3>
+        <div>
+          <h3 id="trackRecordModalTitle" style="font-size:.95rem;font-weight:700;color:#fff;margin:0">Track Record Details</h3>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px">Every stock recommended each day, split by Buy/Sell, with entry → current → target price</div>
+        </div>
         <button class="btn btn-outline" onclick="closeTrackRecordDetails()" style="padding:4px 10px;font-size:12px">✕ Close</button>
       </div>
       <div id="trackRecordModalBody" style="padding:14px 18px;overflow-y:auto"></div>
@@ -1016,7 +1019,12 @@ async function loadEngineRollup(engine){
 
     const overallRate=d.overall_success_rate!==null?d.overall_success_rate+'%':'—';
     const rateColor=(d.overall_success_rate||0)>=50?'var(--green)':'var(--red)';
-    let html=`<div style="margin-bottom:12px;font-size:13px;color:var(--muted2)">Last ${d.days.length} day(s): <strong style="color:#fff">${d.overall_achieved}/${d.overall_total}</strong> targets hit · <strong style="color:${rateColor}">${overallRate}</strong> overall success rate</div>`;
+    // "Last N day(s)" = the number of days that actually have a saved
+    // recommendation log so far (up to 30 requested), not literally "today".
+    // Today's in-progress day counts as one of them, so until the app has
+    // run for multiple trading days this reads "Last 1 day(s)" — it grows
+    // by one each additional trading day the app runs.
+    let html=`<div style="margin-bottom:12px;font-size:13px;color:var(--muted2)" title="Counts every trading day that has a saved recommendation log so far, including today's in-progress day">Last ${d.days.length} day(s): <strong style="color:#fff">${d.overall_achieved}/${d.overall_total}</strong> targets hit · <strong style="color:${rateColor}">${overallRate}</strong> overall success rate</div>`;
     html+='<div style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto">';
     d.days.forEach(day=>{
       const rate=day.success_rate!==null?day.success_rate+'%':'—';
@@ -1035,8 +1043,38 @@ async function loadEngineRollup(engine){
 }
 
 // "View All Details" modal — full stock-level list behind the rollup number,
-// so the person can check every entry (symbol, entry/target price, hit or
-// not) rather than just trusting the aggregate percentage.
+// so the person can check every entry (symbol, entry/current/target price,
+// hit or not) rather than just trusting the aggregate percentage.
+//
+// Recommendations are grouped into a Buy column and a Sell column (instead
+// of one mixed chronological list) so this view lines up with the "Top 5
+// Buy / Top 5 Sell" boxes above it, and each row shows the live/current
+// price alongside entry + target so you don't have to do the mental math.
+function trackRecordCurrentPrice(r){
+  // Prefer the price at the moment the target was hit; otherwise the most
+  // recent live price this entry was checked against; fall back to entry.
+  if (r.achieved) return r.achieved_price ?? r.last_checked_price ?? r.entry_price ?? 0;
+  return r.last_checked_price ?? r.entry_price ?? 0;
+}
+function trackRecordRow(r){
+  const isBuy=r.side==='Buy';
+  const achieved=!!r.achieved;
+  const statusColor=achieved?'var(--green)':(r.final_status==='Not Achieved'?'var(--red)':'var(--muted)');
+  const statusText=achieved?`✅ Hit${r.achieved_at?' · '+escHtml(r.achieved_at.split(' ')[1]||''):''}`:(r.final_status==='Not Achieved'?'❌ Not achieved':'⏳ Open');
+  const cur=trackRecordCurrentPrice(r);
+  const entry=r.entry_price||0;
+  const gap=entry?(cur-entry)/entry*100:0;
+  const favorable=isBuy?gap>=0:gap<=0;
+  const gapColor=favorable?'var(--green)':'var(--red)';
+  const gapStr=`${gap>=0?'+':''}${fmtNum(gap)}%`;
+  return `<div style="display:grid;grid-template-columns:74px 1fr 1fr 1fr 100px;gap:8px;align-items:center;padding:6px 10px;background:rgba(255,255,255,.03);border-radius:6px;font-size:11px;white-space:nowrap">
+    <span style="color:#fff;font-weight:700;overflow:hidden;text-overflow:ellipsis">${escHtml(r.symbol)}</span>
+    <span style="color:var(--muted2)">Entry ₹${fmtNum(entry)}</span>
+    <span style="color:${gapColor};font-weight:700">Now ₹${fmtNum(cur)} <span style="font-weight:400">(${gapStr})</span></span>
+    <span style="color:var(--muted2)">Target ₹${fmtNum(r.target_price)}</span>
+    <span style="color:${statusColor};font-weight:600;text-align:right">${statusText}</span>
+  </div>`;
+}
 async function openTrackRecordDetails(engine){
   const modal=document.getElementById('trackRecordModal');
   const title=document.getElementById('trackRecordModalTitle');
@@ -1050,30 +1088,32 @@ async function openTrackRecordDetails(engine){
     const d=await r.json();
     if(d.error){ body.innerHTML=`<div class="err-box">${escHtml(d.error)}</div>`; return; }
     if(!d.days || d.days.length===0){ body.innerHTML='<div style="color:var(--muted);font-size:13px">No daily history yet.</div>'; return; }
-    let html='';
+    let html='<div style="overflow-x:auto">';
     d.days.forEach(day=>{
       const rate=day.success_rate!==null?day.success_rate+'%':'—';
       const rc=(day.success_rate||0)>=50?'var(--green)':'var(--red)';
-      html+=`<div style="margin-bottom:16px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      const recs=day.recommendations||[];
+      const buys=recs.filter(r=>r.side==='Buy');
+      const sells=recs.filter(r=>r.side==='Sell');
+      html+=`<div style="margin-bottom:18px;min-width:560px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
           <span style="font-weight:700;color:#fff;font-size:13px">${escHtml(day.date)}${day.closed?'':' <span style=\"color:var(--orange);font-weight:400;font-size:11px\">(in progress)</span>'}</span>
           <span style="color:${rc};font-weight:700;font-size:12px">${day.achieved}/${day.total} · ${rate}</span>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:4px">`;
-      (day.recommendations||[]).forEach(r=>{
-        const achieved=!!r.achieved;
-        const statusColor=achieved?'var(--green)':(r.final_status==='Not Achieved'?'var(--red)':'var(--muted)');
-        const statusText=achieved?`✅ Hit @ ₹${fmtNum(r.achieved_price||0)}${r.achieved_at?' ('+escHtml(r.achieved_at.split(' ')[1]||'')+')':''}`:(r.final_status==='Not Achieved'?'❌ Not achieved':'⏳ Open');
-        const sideColor=r.side==='Buy'?'var(--green)':'var(--red)';
-        html+=`<div style="display:grid;grid-template-columns:70px 60px 1fr 1fr;gap:8px;align-items:center;padding:5px 8px;background:rgba(255,255,255,.03);border-radius:6px;font-size:11px">
-          <span style="color:#fff;font-weight:600">${escHtml(r.symbol)}</span>
-          <span style="color:${sideColor};font-weight:700;text-transform:uppercase">${escHtml(r.side)}</span>
-          <span style="color:var(--muted2)">Entry ₹${fmtNum(r.entry_price)} → Target ₹${fmtNum(r.target_price)}</span>
-          <span style="color:${statusColor};font-weight:600">${statusText}</span>
         </div>`;
-      });
-      html+='</div></div>';
+      if(buys.length){
+        html+=`<div style="font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin:6px 0 4px">🟢 Buy (${buys.length})</div>
+          <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px">${buys.map(trackRecordRow).join('')}</div>`;
+      }
+      if(sells.length){
+        html+=`<div style="font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin:6px 0 4px">🔴 Sell (${sells.length})</div>
+          <div style="display:flex;flex-direction:column;gap:4px">${sells.map(trackRecordRow).join('')}</div>`;
+      }
+      if(!buys.length && !sells.length){
+        html+='<div style="font-size:11px;color:var(--muted)">No recommendations recorded.</div>';
+      }
+      html+='</div>';
     });
+    html+='</div>';
     body.innerHTML=html;
   }catch(e){
     body.innerHTML=`<div class="err-box">Error: ${escHtml(e.message)}</div>`;
