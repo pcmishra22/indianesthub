@@ -69,10 +69,8 @@ class CityDataDiscoveryService
     protected function queryOverpass(string $query): array
     {
         try {
-            $response = Http::withTimeout(30)
-                ->post($this->overpassUrl, [
-                    'data' => $query
-                ]);
+            $response = Http::timeout(30)
+                ->post($this->overpassUrl, $query);
 
             if ($response->failed()) {
                 throw new \RuntimeException('Overpass API request failed: ' . $response->status());
@@ -84,10 +82,11 @@ class CityDataDiscoveryService
                 throw new \RuntimeException('Overpass API error: ' . $data['error']);
             }
 
-            return $data['elements'] ?? [];
+            $elements = $data['elements'] ?? [];
+            error_log("Overpass returned " . count($elements) . " elements");
+            return $elements;
         } catch (\Exception $e) {
             // Log the error but return empty results to avoid breaking the flow
-            // In a production app, you'd want to log this properly
             \Log::warning('Overpass API error: ' . $e->getMessage());
             return [];
         }
@@ -97,7 +96,7 @@ class CityDataDiscoveryService
     {
         try {
             // Use Nominatim to get coordinates for the city
-            $response = Http::withTimeout(10)
+            $response = Http::timeout(10)
                 ->get($this->nominatimUrl . '/search', [
                     'q' => $city . ', India',
                     'format' => 'json',
@@ -112,6 +111,7 @@ class CityDataDiscoveryService
                     $lat = $data[0]['lat'] ?? null;
                     $lon = $data[0]['lon'] ?? null;
                     if ($lat !== null && $lon !== null) {
+                        error_log("Geocoded $city: lat=$lat, lon=$lon");
                         return [(float)$lat, (float)$lon];
                     }
                 }
@@ -192,10 +192,13 @@ class CityDataDiscoveryService
             $query .= ');\n';
             $query .= 'out center; // Include center coordinates for ways and relations\n';
 
+            error_log("Overpass query for $city ($queryPrefix):\n$query");
+
             return $query;
         } else {
             // Fallback: if we can't geocode the city, return an empty query
             // This will result in no results but won't break the application
+            error_log("Could not geocode $city, returning empty query");
             return '[out:json][timeout:5];\nout;';
         }
     }
