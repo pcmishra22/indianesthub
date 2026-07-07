@@ -38,7 +38,7 @@ class CityDataImportController extends Controller
             'admin_id' => optional($request->user())->id,
             'city'     => $validated['city'],
             'type'     => $validated['type'],
-            'source'   => $validated['type'] === 'property' ? 'manual_csv' : 'google_places',
+            'source'   => $validated['type'] === 'property' ? 'manual_csv' : 'openstreetmap',
             'status'   => 'pending',
             'payload'  => $result['candidates'],
         ]);

@@ -35,8 +35,13 @@ function aiRecommendationHistoryFile(?string $username = null): string
 function aiDailyFile(?string $username = null, ?string $date = null): string
 {
     $date = $date ?: date('Y-m-d');
-    $prefix = $username ? (getUserDataDir() . '/' . preg_replace('/[^a-z0-9._-]/i', '_', trim($username))) : getStorageBasePath();
-    return $prefix . '_ai_daily_' . $date . '.json';
+    if ($username) {
+        $prefix = getUserDataDir() . '/' . preg_replace('/[^a-z0-9._-]/i', '_', trim($username));
+        return $prefix . '_ai_daily_' . $date . '.json';
+    }
+    // No-username fallback: must live INSIDE storage/, not as a sibling
+    // file next to it (same bug fixed in prakashDailyFile()).
+    return getStorageBasePath() . '/ai_daily_' . $date . '.json';
 }
 
 // Call on each refresh (or via cron once after close). Freezes any still-open

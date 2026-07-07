@@ -62,8 +62,14 @@ function prakashRankHistoryFile(?string $username = null): string
 function prakashDailyFile(?string $username = null, ?string $date = null): string
 {
     $date = $date ?: date('Y-m-d');
-    $prefix = $username ? (getUserDataDir() . '/' . preg_replace('/[^a-z0-9._-]/i', '_', trim($username))) : getStorageBasePath();
-    return $prefix . '_prakash_daily_' . $date . '.json';
+    if ($username) {
+        $prefix = getUserDataDir() . '/' . preg_replace('/[^a-z0-9._-]/i', '_', trim($username));
+        return $prefix . '_prakash_daily_' . $date . '.json';
+    }
+    // No-username fallback: must live INSIDE storage/, not as a sibling
+    // file next to it (missing '/' here used to produce a stray
+    // "storage_prakash_daily_YYYY-MM-DD.json" file at the repo root).
+    return getStorageBasePath() . '/prakash_daily_' . $date . '.json';
 }
 
 // Market open / close times (IST).
@@ -929,6 +935,56 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
     }
     // (No global state to clean up — confidence helper captures by value.)
 
+    // ── Rank-based Top Gainer / Top Loser signal ──────────────────────
+    // Runs on EVERY iteration (including the initial one), independent
+    // of the 5-iteration momentum system above. Whichever stock is
+    // currently in position #1 (top gainer) or the last position (top
+    // loser) after sorting by change_pct fires as an immediate Buy/Sell.
+    // Unlike momentum, this has no lookback requirement and no "once
+    // per day" dedup on the signal itself — if the *same* stock keeps
+    // holding #1 across many refreshes in a row it keeps firing every
+    // time. (The underlying daily entry-price/target tracking still
+    // only locks in once per symbol via registerRecommendation's
+    // existing dedup — this only affects the box/history feed.)
+    $rankBuyCandidate = null;
+    $rankSellCandidate = null;
+    if ($topGainer) {
+        $sym = prakashNormalizeSymbol((string)($topGainer['symbol'] ?? ''));
+        if ($sym !== '') {
+            $rankBuyCandidate = [
+                'symbol' => $sym,
+                'price' => (float)($topGainer['price'] ?? 0),
+                'percentage_change' => (float)($topGainer['change_pct'] ?? 0),
+                'reason' => $isInitial ? 'Initial Top Gainer' : 'Current Top Gainer (Rank #1)',
+                'strength' => 0,
+                'confidence' => $isInitial ? 0.0 : $computeConfidence($sym, 'Buy', empty($buyCandidateSources[$sym])),
+            ];
+            // Surface it in the display box too if it isn't already there
+            // (from momentum or new-entry) and there's room under the cap.
+            if (!isset($buyCandidateSources[$sym]) && count($buyCandidates) < $boxCap) {
+                $buyCandidates[] = $rankBuyCandidate;
+                $buyCandidateSources[$sym] = 'rank';
+            }
+        }
+    }
+    if ($topLoser) {
+        $sym = prakashNormalizeSymbol((string)($topLoser['symbol'] ?? ''));
+        if ($sym !== '') {
+            $rankSellCandidate = [
+                'symbol' => $sym,
+                'price' => (float)($topLoser['price'] ?? 0),
+                'percentage_change' => (float)($topLoser['change_pct'] ?? 0),
+                'reason' => $isInitial ? 'Initial Top Loser' : 'Current Top Loser (Rank Last)',
+                'strength' => 0,
+                'confidence' => $isInitial ? 0.0 : $computeConfidence($sym, 'Sell', empty($sellCandidateSources[$sym])),
+            ];
+            if (!isset($sellCandidateSources[$sym]) && count($sellCandidates) < $boxCap) {
+                $sellCandidates[] = $rankSellCandidate;
+                $sellCandidateSources[$sym] = 'rank';
+            }
+        }
+    }
+
     // ── Intraday target + status tracking ────────────────────────────
     // Only the actual headline Buy/Sell recommendation gets logged for the
     // day. The larger buy/sell boxes are still returned for display, but a
@@ -1058,6 +1114,27 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
                 'Sell',
                 $c['reason'] ?? 'Momentum Sell',
                 isset($c['confidence']) ? (float)$c['confidence'] : null
+            );
+        }
+        // The rank-based signal (current #1 / current last position) is
+        // registered unconditionally here too, even if the display box
+        // was already full and it didn't get a slot above — dedup inside
+        // registerRecommendation makes this a no-op price refresh if it
+        // was already tracked from the box loop just above.
+        if ($rankBuyCandidate) {
+            $registerRecommendation(
+                ['symbol' => $rankBuyCandidate['symbol'], 'price' => $rankBuyCandidate['price'], 'change_pct' => $rankBuyCandidate['percentage_change'] ?? null],
+                'Buy',
+                $rankBuyCandidate['reason'],
+                (float)($rankBuyCandidate['confidence'] ?? 0.0)
+            );
+        }
+        if ($rankSellCandidate) {
+            $registerRecommendation(
+                ['symbol' => $rankSellCandidate['symbol'], 'price' => $rankSellCandidate['price'], 'change_pct' => $rankSellCandidate['percentage_change'] ?? null],
+                'Sell',
+                $rankSellCandidate['reason'],
+                (float)($rankSellCandidate['confidence'] ?? 0.0)
             );
         }
     }
@@ -1261,6 +1338,34 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
                 'iteration' => $iterationNumber,
             ];
         }
+        // Rank-based signal: fires every single iteration for whichever
+        // stock is currently #1 (top gainer) / last (top loser) by
+        // %change — even if it's the exact same stock as last refresh,
+        // and even if it already fired above as a momentum pick. This is
+        // the plain "sort by %change, top = Buy, bottom = Sell, every
+        // iteration" rule running independently alongside momentum.
+        if ($rankBuyCandidate) {
+            $historyEntries[] = [
+                'timestamp' => $timestamp, 'datetime' => $timestamp,
+                'stock_symbol' => prakashDisplaySymbol($rankBuyCandidate['symbol']),
+                'recommendation' => 'Buy',
+                'percentage_change' => $rankBuyCandidate['percentage_change'],
+                'price' => $rankBuyCandidate['price'],
+                'reason' => $rankBuyCandidate['reason'],
+                'iteration' => $iterationNumber,
+            ];
+        }
+        if ($rankSellCandidate) {
+            $historyEntries[] = [
+                'timestamp' => $timestamp, 'datetime' => $timestamp,
+                'stock_symbol' => prakashDisplaySymbol($rankSellCandidate['symbol']),
+                'recommendation' => 'Sell',
+                'percentage_change' => $rankSellCandidate['percentage_change'],
+                'price' => $rankSellCandidate['price'],
+                'reason' => $rankSellCandidate['reason'],
+                'iteration' => $iterationNumber,
+            ];
+        }
     }
 
     foreach ($historyEntries as $entry) {
@@ -1291,6 +1396,18 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
             'recommendation' => 'Sell',
             'reason' => 'Top Loser',
         ],
+        'rank_buy_recommendation' => $rankBuyCandidate ? array_merge($rankBuyCandidate, [
+            'recommendation' => 'Buy',
+            'recommended_entry_price' => $dailyRecBySymbol[prakashDisplaySymbol($rankBuyCandidate['symbol'])]['entry_price'] ?? $rankBuyCandidate['price'],
+            'target_price' => $dailyRecBySymbol[prakashDisplaySymbol($rankBuyCandidate['symbol'])]['target_price'] ?? null,
+            'current_status' => $dailyRecBySymbol[prakashDisplaySymbol($rankBuyCandidate['symbol'])]['status'] ?? 'Active',
+        ]) : null,
+        'rank_sell_recommendation' => $rankSellCandidate ? array_merge($rankSellCandidate, [
+            'recommendation' => 'Sell',
+            'recommended_entry_price' => $dailyRecBySymbol[prakashDisplaySymbol($rankSellCandidate['symbol'])]['entry_price'] ?? $rankSellCandidate['price'],
+            'target_price' => $dailyRecBySymbol[prakashDisplaySymbol($rankSellCandidate['symbol'])]['target_price'] ?? null,
+            'current_status' => $dailyRecBySymbol[prakashDisplaySymbol($rankSellCandidate['symbol'])]['status'] ?? 'Active',
+        ]) : null,
         'rank_movement_buy' => $rankMovementBuy ? array_merge(
             ['symbol' => $rankMovementBuy['symbol']],
             $rankMovementBuy,

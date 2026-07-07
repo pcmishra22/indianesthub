@@ -4,6 +4,8 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Log;
 
 /**
  * CityDataDiscoveryService
@@ -11,32 +13,17 @@ use Illuminate\Support\Str;
  * Finds candidate real-world businesses for a given city so an admin can
  * review and confirm them before they're written into the database.
  *
- * IMPORTANT — what this does and doesn't do:
- *
- * - Builders & Agents: uses the Google Places API (Text Search + Place
- *   Details), which is a legitimate, ToS-compliant, paid API designed
- *   exactly for "find businesses of type X in city Y". Requires your own
- *   Google Cloud API key with the Places API enabled — see setup notes
- *   at the bottom of this file.
- *
- * - Properties (individual for-sale listings): there is no general,
- *   ToS-compliant public API for pulling live listings off portals like
- *   99acres / MagicBricks / Housing.com. Scraping those sites directly
- *   would violate their Terms of Service and their anti-bot protections,
- *   so this service does not do that. discoverProperties() intentionally
- *   returns an empty result with an explanatory message. If you have (or
- *   can license) a legitimate listings data feed — an MLS-style API, a
- *   paid data-provider contract, or your own dealer-submitted feed — wire
- *   it in here and the rest of the review/confirm pipeline works unchanged.
- *   In the meantime, use the CSV import path for properties.
+ * Uses OpenStreetMap Overpass API as a free alternative to Google Places.
  */
 class CityDataDiscoveryService
 {
-    protected ?string $apiKey;
+    protected ?string $overpassUrl;
+    protected ?string $nominatimUrl;
 
     public function __construct()
     {
-        $this->apiKey = config('services.google_places.key');
+        $this->overpassUrl = config('openstreetmap.overpass_url', 'https://overpass-api.de/api/interpreter');
+        $this->nominatimUrl = config('openstreetmap.nominatim_url', 'https://nominatim.openstreetmap.org');
     }
 
     /**
@@ -48,11 +35,11 @@ class CityDataDiscoveryService
 
         return match ($type) {
             'builder' => [
-                'candidates' => $this->discoverBusinesses($normalizedCity, 'real estate builders and developers in'),
+                'candidates' => $this->discoverBusinesses($normalizedCity, 'real estate builders and developers'),
                 'notice'     => null,
             ],
             'agent' => [
-                'candidates' => $this->discoverBusinesses($normalizedCity, 'real estate agents and property dealers in'),
+                'candidates' => $this->discoverBusinesses($normalizedCity, 'real estate agents and property dealers'),
                 'notice'     => null,
             ],
             'property' => [
@@ -79,137 +66,219 @@ class CityDataDiscoveryService
         return strtolower($first);
     }
 
-    protected function googleTextSearch(string $query, ?string $pageToken = null): array
+    protected function queryOverpass(string $query): array
     {
-        $params = $pageToken
-            ? ['pagetoken' => $pageToken, 'key' => $this->apiKey]
-            : ['query' => $query, 'key' => $this->apiKey];
+        try {
+            $response = Http::withTimeout(30)
+                ->post($this->overpassUrl, [
+                    'data' => $query
+                ]);
 
-        if ($pageToken) {
-            // Google requires a short delay before a next_page_token becomes usable.
-            sleep(2);
+            if ($response->failed()) {
+                throw new \RuntimeException('Overpass API request failed: ' . $response->status());
+            }
+
+            $data = $response->json();
+
+            if (isset($data['error'])) {
+                throw new \RuntimeException('Overpass API error: ' . $data['error']);
+            }
+
+            return $data['elements'] ?? [];
+        } catch (\Exception $e) {
+            // Log the error but return empty results to avoid breaking the flow
+            // In a production app, you'd want to log this properly
+            \Log::warning('Overpass API error: ' . $e->getMessage());
+            return [];
         }
-
-        $response = Http::get('https://maps.googleapis.com/maps/api/place/textsearch/json', $params);
-        return $response->json() ?? [];
     }
 
-    protected function googlePlaceDetails(string $placeId): array
+    protected function getCityCoordinates(string $city): ?array
     {
-        $response = Http::get('https://maps.googleapis.com/maps/api/place/details/json', [
-            'place_id' => $placeId,
-            'fields'   => 'formatted_phone_number,website',
-            'key'      => $this->apiKey,
-        ]);
+        try {
+            // Use Nominatim to get coordinates for the city
+            $response = Http::withTimeout(10)
+                ->get($this->nominatimUrl . '/search', [
+                    'q' => $city . ', India',
+                    'format' => 'json',
+                    'limit' => 1,
+                    'addressdetails' => 1,
+                    'bounded' => 1
+                ]);
 
-        return $response->json()['result'] ?? [];
+            if ($response->successful()) {
+                $data = $response->json();
+                if (!empty($data)) {
+                    $lat = $data[0]['lat'] ?? null;
+                    $lon = $data[0]['lon'] ?? null;
+                    if ($lat !== null && $lon !== null) {
+                        return [(float)$lat, (float)$lon];
+                    }
+                }
+            }
+
+            return null;
+        } catch (\Exception $e) {
+            // If geocoding fails, we'll fall back to a less precise search
+            \Log::warning('Nominatim geocoding failed for city "' . $city . '": ' . $e->getMessage());
+            return null;
+        }
     }
-
 
     protected function discoverBusinesses(string $city, string $queryPrefix): array
     {
-        if (!$this->apiKey) {
-            throw new \RuntimeException(
-                'GOOGLE_PLACES_API_KEY is not configured. Add it to .env and config/services.php to enable discovery.'
-            );
-        }
+        // Build Overpass QL query to find relevant businesses
+        $query = $this->buildOverpassQuery($city, $queryPrefix);
 
-        $queryCandidates = [
-            "{$queryPrefix} {$city}",
-            // Retry with explicit country context when the admin passes a slug/city token.
-            "{$queryPrefix} {$city}, India",
-        ];
+        $elements = $this->queryOverpass($query);
+        $results = [];
 
-        foreach ($queryCandidates as $query) {
-            $results = [];
-            $pageToken = null;
-            $pagesFetched = 0;
-
-            do {
-                $data = $this->googleTextSearch($query, $pageToken);
-
-                $status = $data['status'] ?? null;
-                if ($status && $status !== 'OK' && $status !== 'ZERO_RESULTS') {
-                    $message = 'Google Places error: ' . $status;
-                    if (!empty($data['error_message'])) {
-                        $message .= ' — ' . $data['error_message'];
-                    }
-                    throw new \RuntimeException($message);
-                }
-
-                foreach ($data['results'] ?? [] as $place) {
-                    $results[] = $this->mapPlaceToCandidate($place, $city);
-                }
-
-                $pageToken = $data['next_page_token'] ?? null;
-                $pagesFetched++;
-            } while ($pageToken && $pagesFetched < 3); // Places API caps at 3 pages (~60 results) per query
-
-            // If we found anything, stop retrying.
-            if (!empty($results)) {
-                return $results;
+        foreach ($elements as $element) {
+            $candidate = $this->mapOsmElementToCandidate($element, $city);
+            if ($candidate) {
+                $results[] = $candidate;
             }
         }
 
-        return [];
+        // Limit results to prevent overwhelming the UI
+        return array_slice($results, 0, 50);
+    }
+
+    protected function buildOverpassQuery(string $city, string $queryPrefix): string
+    {
+        // Get coordinates for the city
+        $coordinates = $this->getCityCoordinates($city);
+
+        if ($coordinates) {
+            [$lat, $lon] = $coordinates;
+            // Define a reasonable search radius (about 10km radius)
+            $radius = 10000; // meters
+
+            $query = '[out:json][timeout:25];\n';
+            $query .= '( \n';
+
+            // Define what we're looking for based on the query prefix
+            if (strpos(strtolower($queryPrefix), 'builder') !== false ||
+                strpos(strtolower($queryPrefix), 'developer') !== false) {
+                // Real estate builders and developers
+                $query .= '  node["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  way["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  relation["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  node["shop"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  way["shop"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  relation["shop"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  node["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  way["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  relation["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            } elseif (strpos(strtolower($queryPrefix), 'agent') !== false ||
+                     strpos(strtolower($queryPrefix), 'dealer') !== false) {
+                // Real estate agents and property dealers
+                $query .= '  node["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  way["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  relation["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  node["shop"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  way["shop"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  relation["shop"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  node["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  way["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  relation["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            } else {
+                // Default to estate agents
+                $query .= '  node["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  way["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+                $query .= '  relation["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
+            }
+
+            $query .= ');\n';
+            $query .= 'out center; // Include center coordinates for ways and relations\n';
+
+            return $query;
+        } else {
+            // Fallback: if we can't geocode the city, return an empty query
+            // This will result in no results but won't break the application
+            return '[out:json][timeout:5];\nout;';
+        }
     }
 
 
-    protected function mapPlaceToCandidate(array $place, string $city): array
+    protected function mapOsmElementToCandidate(array $element, string $city): ?array
     {
-        $details = $this->fetchPlaceDetails($place['place_id'] ?? null);
+        // Extract basic information
+        $tags = $element['tags'] ?? [];
 
-        $name = $place['name'] ?? 'Unknown';
-
-        return [
-            'source'          => 'google_places',
-            'source_place_id' => $place['place_id'] ?? null,
-            'name'            => $name,
-            'company_name'    => $name,
-            'phone'           => $details['formatted_phone_number'] ?? null,
-            'website'         => $details['website'] ?? null,
-            'address'         => $place['formatted_address'] ?? null,
-            'city'            => $city,
-            'rating'          => $place['rating'] ?? null,
-            'latitude'        => $place['geometry']['location']['lat'] ?? null,
-            'longitude'       => $place['geometry']['location']['lng'] ?? null,
-        ];
-    }
-
-    protected function fetchPlaceDetails(?string $placeId): array
-    {
-        if (!$placeId || !$this->apiKey) {
-            return [];
+        // Get name
+        $name = $tags['name'] ?? null;
+        if (!$name) {
+            // Try alternative name fields
+            $name = $tags['official_name'] ?? $tags['brand'] ?? $tags['operator'] ?? null;
         }
 
-        $response = Http::get('https://maps.googleapis.com/maps/api/place/details/json', [
-            'place_id' => $placeId,
-            'fields'   => 'formatted_phone_number,website',
-            'key'      => $this->apiKey,
-        ]);
+        if (!$name) {
+            // Skip if no name
+            return null;
+        }
 
-        return $response->json()['result'] ?? [];
+        // Get coordinates
+        $lat = null;
+        $lon = null;
+
+        if (isset($element['lat']) && isset($element['lon'])) {
+            $lat = $element['lat'];
+            $lon = $element['lon'];
+        } elseif (isset($element['center']['lat']) && isset($element['center']['lon'])) {
+            // For ways and relations, the center is provided
+            $lat = $element['center']['lat'];
+            $lon = $element['center']['lon'];
+        }
+
+        if ($lat === null || $lon === null) {
+            // Skip if no coordinates
+            return null;
+        }
+
+        // Get address components
+        $addressParts = [];
+        if ($tags['house_number'] ?? false) {
+            $addressParts[] = $tags['house_number'];
+        }
+        if ($tags['street'] ?? false) {
+            $addressParts[] = $tags['street'];
+        }
+        if ($tags['postcode'] ?? false) {
+            $addressParts[] = $tags['postcode'];
+        }
+        if ($tags['city'] ?? false) {
+            $addressParts[] = $tags['city'];
+        }
+
+        $address = implode(', ', array_filter($addressParts));
+        if (!$address) {
+            $address = $tags['address'] ?? null;
+        }
+
+        // Get contact info
+        $phone = $tags['phone'] ?? $tags['contact:phone'] ?? $tags['telephone'] ?? null;
+        $website = $tags['website'] ?? $tags['contact:website'] ?? $tags['url'] ?? null;
+
+        return [
+            'source'          => 'openstreetmap',
+            'source_place_id' => $element['id'] ?? null,
+            'name'            => $name,
+            'company_name'    => $name,
+            'phone'           => $phone,
+            'website'         => $website,
+            'address'         => $address,
+            'city'            => $city,
+            'rating'          => null, // OSM doesn't typically have ratings
+            'latitude'        => $lat,
+            'longitude'       => $lon,
+        ];
     }
 
     protected function discoverProperties(string $city): array
     {
+        // Properties (individual listings) are not available from OSM in a reliable way
+        // This would require scraping real estate portals which violates their ToS
         return [];
     }
 }
-
-/**
- * SETUP NOTES
- * -----------
- * 1. Enable "Places API" in Google Cloud Console and generate an API key.
- * 2. Add to .env:      GOOGLE_PLACES_API_KEY=your_key_here
- * 3. Add to config/services.php:
- *      'google_places' => [
- *          'key' => env('GOOGLE_PLACES_API_KEY'),
- *      ],
- * 4. Google Places is a paid API beyond a monthly free credit — check current
- *    pricing before running this against many cities.
- * 5. Google Places does not return business email addresses (they aren't
- *    public business data). Imported builder/agent records get a placeholder
- *    email and no password login; have the admin edit the real email in once
- *    confirmed, or reach out to the business directly.
- */

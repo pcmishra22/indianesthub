@@ -858,8 +858,8 @@ function renderEngineRecommendations(engine, rec){
       const buy=rec.buy_recommendation||rec.top_gainer||null;
       const sell=rec.sell_recommendation||rec.top_loser||null;
       const cardStyle='background:linear-gradient(135deg,rgba(255,255,255,.06),rgba(255,255,255,.03));border:1px solid var(--border);border-radius:12px;padding:12px 14px;min-height:120px';
-      const buyTitle=isPrakash?(buy?.reason==='Rank Movement Up'?'Rank Movement Buy':'Top Buy by Prakash'):(buy?.reason||'Top Buy — AI');
-      const sellTitle=isPrakash?(sell?.reason==='Rank Movement Down'?'Rank Movement Sell':'Top Sell by Prakash'):(sell?.reason||'Top Sell — AI');
+      const buyTitle=isPrakash?(buy?.reason==='Rank Movement Up'?'Rank Movement Buy':'Momentum Buy Pick'):(buy?.reason||'Top Buy — AI');
+      const sellTitle=isPrakash?(sell?.reason==='Rank Movement Down'?'Rank Movement Sell':'Momentum Sell Pick'):(sell?.reason||'Top Sell — AI');
 
       const buyHtml=`<div style="${cardStyle}">
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px">${escHtml(buyTitle)}</div>

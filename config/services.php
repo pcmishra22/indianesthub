@@ -39,4 +39,9 @@ return [
         'key' => env('GOOGLE_PLACES_API_KEY'),
     ],
 
+    'openstreetmap' => [
+        'overpass_url' => env('OSM_OVERPASS_URL', 'https://overpass-api.de/api/interpreter'),
+        'nominatim_url' => env('OSM_NOMINATIM_URL', 'https://nominatim.openstreetmap.org'),
+    ],
+
 ];
