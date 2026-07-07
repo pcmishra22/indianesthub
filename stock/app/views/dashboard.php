@@ -886,6 +886,11 @@ function renderEngineRecommendations(engine, rec){
   }
   renderEngineBoxes(engine, rec);
   renderEngineTodayLists(engine, rec);
+  // Keep the Track Record rollup in lockstep with the boxes: every time we
+  // get a fresh recommendation payload (initial load, the 5-min watchlist
+  // refresh, or a manual refresh), re-pull the rollup too, instead of only
+  // loading it once when the Leaders tab first opens.
+  if(rec) loadEngineRollup(engine);
 }
 
 // Renders the up-to-5-stock Buy/Sell boxes with locked-in entry price,
@@ -919,6 +924,17 @@ function renderEngineBoxes(engine, rec){
     const targetPrice=trackedDaily?.target_price ?? null;
     const achieved=trackedDaily?.achieved || false;
     const achievedAt=trackedDaily?.achieved_at || null;
+    const entryTime=trackedDaily?.entry_time ? (trackedDaily.entry_time.split(' ')[1]||'') : '';
+    // Live/current price: while the pick is still open, this is the most
+    // recent tick price it's been checked against; once it hits target,
+    // this is the price it hit at — so the card always shows where the
+    // stock actually is right now, not just where it started.
+    const currentPrice=achieved
+      ? (trackedDaily?.achieved_price ?? trackedDaily?.last_checked_price ?? entryPrice)
+      : (trackedDaily?.last_checked_price ?? entry.price ?? entryPrice);
+    const gapPct=entryPrice ? (currentPrice-entryPrice)/entryPrice*100 : 0;
+    const favorable=isBuy?gapPct>=0:gapPct<=0;
+    const gapColor=favorable?'var(--green)':'var(--red)';
     const statusColor=achieved?'var(--green)':'var(--muted)';
     const statusText=achieved?`✅ Target hit${achievedAt?' @ '+achievedAt.split(' ')[1]:''}`:'⏳ Open';
     const sideColor=isBuy?'var(--green)':'var(--red)';
@@ -930,7 +946,9 @@ function renderEngineBoxes(engine, rec){
         <span style="font-size:10px;font-weight:700;color:${sideColor};text-transform:uppercase">${side}</span>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:3px">${escHtml(entry.reason||'')}</div>
-      <div style="font-size:12px;color:var(--muted2)">Entry: ₹${fmtNum(entryPrice)}${targetPrice?` → Target: ₹${fmtNum(targetPrice)}`:''}</div>
+      <div style="font-size:12px;color:var(--muted2)">Entry: ₹${fmtNum(entryPrice)}${entryTime?` <span style="color:var(--muted)">@ ${escHtml(entryTime)}</span>`:''}</div>
+      <div style="font-size:12px;color:${gapColor};font-weight:700;margin-top:2px">Current: ₹${fmtNum(currentPrice)} <span style="font-weight:400">(${gapPct>=0?'+':''}${fmtNum(gapPct)}%)</span></div>
+      ${targetPrice?`<div style="font-size:12px;color:var(--muted2);margin-top:2px">Target: ₹${fmtNum(targetPrice)}</div>`:''}
       <div style="font-size:11px;color:${statusColor};margin-top:4px;font-weight:600">${statusText}</div>
       ${starsHtml}
     </div>`;
@@ -1007,6 +1025,14 @@ function renderEngineTodayLists(engine, rec){
 async function loadPrakashRollup(){ loadEngineRollup('prakash'); }
 async function loadAiRollup(){ loadEngineRollup('ai'); }
 
+// yyyy-mm-dd for "right now" in the exchange's timezone, so we can tell
+// whether the only day in the rollup is today (vs. some other single day).
+function todayDateStrIST(){
+  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).formatToParts(new Date());
+  const get=t=>parts.find(p=>p.type===t)?.value||'';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
 async function loadEngineRollup(engine){
   const el=document.getElementById(engine+'Rollup');
   if(!el) return;
@@ -1019,12 +1045,13 @@ async function loadEngineRollup(engine){
 
     const overallRate=d.overall_success_rate!==null?d.overall_success_rate+'%':'—';
     const rateColor=(d.overall_success_rate||0)>=50?'var(--green)':'var(--red)';
-    // "Last N day(s)" = the number of days that actually have a saved
-    // recommendation log so far (up to 30 requested), not literally "today".
-    // Today's in-progress day counts as one of them, so until the app has
-    // run for multiple trading days this reads "Last 1 day(s)" — it grows
-    // by one each additional trading day the app runs.
-    let html=`<div style="margin-bottom:12px;font-size:13px;color:var(--muted2)" title="Counts every trading day that has a saved recommendation log so far, including today's in-progress day">Last ${d.days.length} day(s): <strong style="color:#fff">${d.overall_achieved}/${d.overall_total}</strong> targets hit · <strong style="color:${rateColor}">${overallRate}</strong> overall success rate</div>`;
+    // The rollup only has ONE day so far, and that day IS today — in that
+    // case say "Today" rather than the more general "Last N day(s)", since
+    // there's nothing else being aggregated yet. Once a second trading day
+    // shows up, it goes back to "Last N day(s)" to reflect the real range.
+    const onlyToday = d.days.length===1 && d.days[0]?.date===todayDateStrIST();
+    const rangeLabel = onlyToday ? 'Today' : `Last ${d.days.length} day(s)`;
+    let html=`<div style="margin-bottom:12px;font-size:13px;color:var(--muted2)" title="Counts every trading day that has a saved recommendation log so far, including today's in-progress day">${rangeLabel}: <strong style="color:#fff">${d.overall_achieved}/${d.overall_total}</strong> targets hit · <strong style="color:${rateColor}">${overallRate}</strong> overall success rate</div>`;
     html+='<div style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto">';
     d.days.forEach(day=>{
       const rate=day.success_rate!==null?day.success_rate+'%':'—';
