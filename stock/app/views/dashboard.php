@@ -903,6 +903,14 @@ function renderEngineRecommendations(engine, rec){
   const isPrakash=engine==='prakash';
   if(el){
     if(!rec){ el.innerHTML=''; }
+    else if(rec.market_open===false){
+      // Market is shut — a "current top gainer/loser" card would just be
+      // showing frozen closing prices, which reads as if it were a live
+      // pick when nothing is actually happening. Say so plainly instead.
+      el.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:12px;border:1px dashed var(--border2);border-radius:12px">
+        🌙 Market is closed — live picks resume during trading hours (9:10 AM – 3:30 PM IST)
+      </div>`;
+    }
     else{
       const buy=rec.buy_recommendation||rec.top_gainer||null;
       const sell=rec.sell_recommendation||rec.top_loser||null;
@@ -1016,6 +1024,12 @@ function renderEngineBoxes(engine, rec){
 function renderEngineTopPicks(engine, rec){
   const el=document.getElementById(engine+'TopPicks');
   if(!el) return;
+  if(rec && rec.market_open===false){
+    el.innerHTML=`<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px;border:1px dashed var(--border2);border-radius:12px;margin-top:12px">
+      🌙 Market is closed — Top 5 Buy/Sell rankings resume during trading hours (9:10 AM – 3:30 PM IST)
+    </div>`;
+    return;
+  }
   const top5Buy=rec?.top5_buy||[];
   const top5Sell=rec?.top5_sell||[];
   if(top5Buy.length===0 && top5Sell.length===0){el.innerHTML='';return;}
@@ -1090,36 +1104,38 @@ async function loadEngineRollup(engine){
   const el=document.getElementById(engine+'Rollup');
   if(!el) return;
   try{
-    const r=await fetch(apiUrl('api/'+engine+'/rollup?days=30'));
+    // Only today — a passively-shown panel that quietly included yesterday
+    // (or older) made it unclear whether what's on screen is today's actual
+    // performance or carried-over history. Full day-by-day history is a
+    // deliberate, explicit look-up now: the EOD Report tab.
+    const r=await fetch(apiUrl('api/'+engine+'/rollup?days=1'));
     const d=await r.json();
     if(engine==='prakash') prakashRollupLoaded=true;
     if(d.error){ el.innerHTML=`<div class="err-box">${escHtml(d.error)}</div>`; return; }
-    if(!d.days || d.days.length===0){ el.innerHTML='<div style="font-size:12px;color:var(--muted)">No daily history yet — check back after a full trading day.</div>'; return; }
-
-    const overallRate=d.overall_success_rate!==null?d.overall_success_rate+'%':'—';
-    const rateColor=(d.overall_success_rate||0)>=50?'var(--green)':'var(--red)';
-    // The rollup only has ONE day so far, and that day IS today — in that
-    // case say "Today" rather than the more general "Last N day(s)", since
-    // there's nothing else being aggregated yet. Once a second trading day
-    // shows up, it goes back to "Last N day(s)" to reflect the real range.
-    const onlyToday = d.days.length===1 && d.days[0]?.date===todayDateStrIST();
-    const rangeLabel = onlyToday ? 'Today' : `Last ${d.days.length} day(s)`;
-    let html=`<div style="margin-bottom:12px;font-size:13px;color:var(--muted2)" title="Counts every trading day that has a saved recommendation log so far, including today's in-progress day">${rangeLabel}: <strong style="color:#fff">${d.overall_achieved}/${d.overall_total}</strong> targets hit · <strong style="color:${rateColor}">${overallRate}</strong> overall success rate</div>`;
-    html+='<div style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto">';
-    d.days.forEach(day=>{
-      const rate=day.success_rate!==null?day.success_rate+'%':'—';
-      const rc=(day.success_rate||0)>=50?'var(--green)':'var(--red)';
-      html+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(255,255,255,.03);border-radius:6px;font-size:12px">
-        <span style="color:var(--muted2)">${escHtml(day.date)}${day.closed?'':' <span style=\"color:var(--orange)\">(in progress)</span>'}</span>
-        <span style="color:#fff">${day.achieved}/${day.total}</span>
-        <span style="color:${rc};font-weight:600">${rate}</span>
-      </div>`;
-    });
-    html+='</div>';
-    el.innerHTML=html;
+    const today=(d.days||[])[0];
+    if(!today || today.date!==todayDateStrIST()){
+      el.innerHTML=`<div style="font-size:12px;color:var(--muted)">No recommendations logged yet today.</div>`;
+      return;
+    }
+    const rate=today.success_rate!==null?today.success_rate+'%':'—';
+    const rateColor=(today.success_rate||0)>=50?'var(--green)':'var(--red)';
+    el.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <div style="font-size:13px;color:var(--muted2)">
+        Today${today.closed?'':' <span style="color:var(--orange)">(in progress)</span>'}:
+        <strong style="color:#fff">${today.achieved}/${today.total}</strong> targets hit ·
+        <strong style="color:${rateColor}">${rate}</strong>
+      </div>
+      <button class="btn btn-outline" style="padding:4px 10px;font-size:10px" onclick="goToEodReport()">See full history in EOD Report →</button>
+    </div>`;
   }catch(e){
     el.innerHTML=`<div class="err-box">Error: ${escHtml(e.message)}</div>`;
   }
+}
+function goToEodReport(){
+  closeTrackRecordDetails();
+  const btn=document.querySelector('.nb[onclick*="eodreport"]');
+  showTab('eodreport', btn);
+  loadEodReport();
 }
 
 // "View All Details" modal — full stock-level list behind the rollup number,
@@ -1167,44 +1183,48 @@ async function openTrackRecordDetails(engine){
   const title=document.getElementById('trackRecordModalTitle');
   const body=document.getElementById('trackRecordModalBody');
   if(!modal||!body) return;
-  title.textContent=(engine==='prakash'?'📊 Momentum':'🤖 AI')+' Track Record — Full Details';
+  title.textContent=(engine==='prakash'?'📊 Momentum':'🤖 AI')+" Track Record — Today's Details";
   body.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted)">Loading…</div>';
   modal.style.display='flex';
   try{
-    const r=await fetch(apiUrl('api/'+engine+'/rollup?days=30&details=1'));
+    // Today only, on purpose — this is a quick "what happened today so
+    // far" look-up without leaving the Leaders tab. Multi-day history
+    // belongs in the EOD Report tab, linked below, where it can be
+    // filtered/tracked live rather than dumped as a long scrolling list.
+    const r=await fetch(apiUrl('api/'+engine+'/rollup?days=1&details=1'));
     const d=await r.json();
     if(d.error){ body.innerHTML=`<div class="err-box">${escHtml(d.error)}</div>`; return; }
-    if(!d.days || d.days.length===0){ body.innerHTML='<div style="color:var(--muted);font-size:13px">No daily history yet.</div>'; return; }
-    let html='<div style="overflow-x:auto">';
-    d.days.forEach(day=>{
-      const rate=day.success_rate!==null?day.success_rate+'%':'—';
-      const rc=(day.success_rate||0)>=50?'var(--green)':'var(--red)';
-      const recs=day.recommendations||[];
-      // Group repeats of the same symbol together (symbol, then 1st/2nd/3rd
-      // pick in order) instead of leaving them scattered by whenever each
-      // was registered during the day.
-      const bySymbolThenOcc=(a,b)=> a.symbol===b.symbol ? (a.occurrence||1)-(b.occurrence||1) : a.symbol.localeCompare(b.symbol);
-      const buys=recs.filter(r=>r.side==='Buy').sort(bySymbolThenOcc);
-      const sells=recs.filter(r=>r.side==='Sell').sort(bySymbolThenOcc);
-      html+=`<div style="margin-bottom:18px;min-width:560px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-weight:700;color:#fff;font-size:13px">${escHtml(day.date)}${day.closed?'':' <span style=\"color:var(--orange);font-weight:400;font-size:11px\">(in progress)</span>'}</span>
-          <span style="color:${rc};font-weight:700;font-size:12px">${day.achieved}/${day.total} · ${rate}</span>
-        </div>`;
-      if(buys.length){
-        html+=`<div style="font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin:6px 0 4px">🟢 Buy (${buys.length})</div>
-          <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px">${buys.map(trackRecordRow).join('')}</div>`;
-      }
-      if(sells.length){
-        html+=`<div style="font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin:6px 0 4px">🔴 Sell (${sells.length})</div>
-          <div style="display:flex;flex-direction:column;gap:4px">${sells.map(trackRecordRow).join('')}</div>`;
-      }
-      if(!buys.length && !sells.length){
-        html+='<div style="font-size:11px;color:var(--muted)">No recommendations recorded.</div>';
-      }
-      html+='</div>';
-    });
-    html+='</div>';
+    const day=(d.days||[])[0];
+    const linkHtml=`<div style="text-align:center;margin-top:14px">
+      <button class="btn btn-outline" style="padding:6px 14px;font-size:11px" onclick="goToEodReport()">See full multi-day history in EOD Report →</button>
+    </div>`;
+    if(!day || day.date!==todayDateStrIST()){
+      body.innerHTML='<div style="color:var(--muted);font-size:13px">No recommendations logged yet today.</div>'+linkHtml;
+      return;
+    }
+    const rate=day.success_rate!==null?day.success_rate+'%':'—';
+    const rc=(day.success_rate||0)>=50?'var(--green)':'var(--red)';
+    const recs=day.recommendations||[];
+    const bySymbolThenOcc=(a,b)=> a.symbol===b.symbol ? (a.occurrence||1)-(b.occurrence||1) : a.symbol.localeCompare(b.symbol);
+    const buys=recs.filter(r=>r.side==='Buy').sort(bySymbolThenOcc);
+    const sells=recs.filter(r=>r.side==='Sell').sort(bySymbolThenOcc);
+    let html='<div style="overflow-x:auto"><div style="min-width:560px">';
+    html+=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span style="font-weight:700;color:#fff;font-size:13px">${escHtml(day.date)}${day.closed?'':' <span style=\"color:var(--orange);font-weight:400;font-size:11px\">(in progress)</span>'}</span>
+      <span style="color:${rc};font-weight:700;font-size:12px">${day.achieved}/${day.total} · ${rate}</span>
+    </div>`;
+    if(buys.length){
+      html+=`<div style="font-size:10px;color:var(--green);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin:6px 0 4px">🟢 Buy (${buys.length})</div>
+        <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px">${buys.map(trackRecordRow).join('')}</div>`;
+    }
+    if(sells.length){
+      html+=`<div style="font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin:6px 0 4px">🔴 Sell (${sells.length})</div>
+        <div style="display:flex;flex-direction:column;gap:4px">${sells.map(trackRecordRow).join('')}</div>`;
+    }
+    if(!buys.length && !sells.length){
+      html+='<div style="font-size:11px;color:var(--muted)">No recommendations recorded.</div>';
+    }
+    html+='</div></div>'+linkHtml;
     body.innerHTML=html;
   }catch(e){
     body.innerHTML=`<div class="err-box">Error: ${escHtml(e.message)}</div>`;

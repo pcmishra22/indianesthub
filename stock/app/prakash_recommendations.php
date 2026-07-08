@@ -1671,6 +1671,7 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
 
     return [
         'updated_at' => $timestamp,
+        'market_open' => prakashIsMarketHours(),
         'buy_recommendation'  => $buyRecommendation,
         'sell_recommendation' => $sellRecommendation,
         'top_gainer' => [

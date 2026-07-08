@@ -337,6 +337,7 @@ function buildAiRecommendations(array $stocks, ?string $statePath = null, ?strin
 
     return [
         'updated_at' => $timestamp,
+        'market_open' => prakashIsMarketHours(),
         'buy_recommendation' => $topBuy ? array_merge($topBuy, ['recommendation' => 'Buy']) : null,
         'sell_recommendation' => $topSell ? array_merge($topSell, ['recommendation' => 'Sell']) : null,
         'buy_box' => $buyCandidates,
