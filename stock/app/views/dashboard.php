@@ -1098,9 +1098,9 @@ function renderEngineTopPicks(engine, rec){
     const sideColor=side==='Buy'?'var(--green)':'var(--red)';
     const hasSwing=(p.signals?.swing_score||0)>0;
     const swingBadge=hasSwing?` <span style="color:${sideColor}" title="${side==='Buy'?'Higher-High / Higher-Low':'Lower-High / Lower-Low'} price structure">${side==='Buy'?'📈HH-HL':'📉LH-LL'}</span>`:'';
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(255,255,255,.03);border-radius:6px;font-size:11px;gap:8px">
-      <span style="color:#fff;font-weight:700;min-width:70px">${escHtml(p.symbol)}${swingBadge}</span>
-      <span style="color:var(--muted2)">₹${fmtNum(p.price)} · ${fmtNum(p.percentage_change)}%</span>
+    return `<div style="display:grid;grid-template-columns:76px 1fr auto;gap:8px;align-items:center;padding:6px 10px;background:rgba(255,255,255,.03);border-radius:6px;font-size:11px;white-space:nowrap">
+      <span style="color:#fff;font-weight:700;overflow:hidden;text-overflow:ellipsis">${escHtml(p.symbol)}${swingBadge}</span>
+      <span style="color:var(--muted2);overflow:hidden;text-overflow:ellipsis">₹${fmtNum(p.price)} · ${fmtNum(p.percentage_change)}%</span>
       <span style="color:${sideColor};font-weight:600;text-align:right">${'⭐'.repeat(p.stars)||'—'} ${escHtml(p.tier)} · ${fmtNum(p.score)} pts</span>
     </div>`;
   }
@@ -1206,7 +1206,8 @@ async function loadEngineRollup(engine){
         <strong style="color:${rateColor}">${rate}</strong>
       </div>
       <button class="btn btn-outline" style="padding:4px 10px;font-size:10px" onclick="goToEodReport()">See full history in EOD Report →</button>
-    </div>`;
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-top:6px">Counts only picks that got an official entry price + target (the boxes and "Current Top Gainer/Loser" cards above) — the Leaderboard further up shows more candidates by score, but not all of them turn into a locked-in, tracked trade</div>`;
   }catch(e){
     el.innerHTML=`<div class="err-box">Error: ${escHtml(e.message)}</div>`;
   }
