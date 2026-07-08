@@ -7,6 +7,16 @@ declare(strict_types=1);
  * glue, kept together since each block is short.
  */
 
+// Every API response here is a live snapshot (quotes, recommendations,
+// market-hours state) that must never be served from a stale cache — a
+// browser or intermediate proxy caching a "market closed, no data" (or
+// vice versa) response even for a few minutes would directly reproduce
+// the "is this today's or yesterday's data" confusion this app works hard
+// to avoid elsewhere. Blanket no-store for every /api/* route, set once
+// here rather than repeated on each handler.
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+
 if ($uri === '/api/watchlist') {
     header('Content-Type: application/json');
     try { echo json_encode(apiWatchlist()); } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }

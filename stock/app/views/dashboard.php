@@ -909,6 +909,15 @@ function renderEngineRecommendations(engine, rec){
       // pick when nothing is actually happening. Say so plainly instead.
       el.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:12px;border:1px dashed var(--border2);border-radius:12px">
         🌙 Market is closed — live picks resume during trading hours (9:10 AM – 3:30 PM IST)
+        ${rec.updated_at?`<div style="margin-top:4px;font-size:10px">Last checked: ${escHtml(rec.updated_at)}</div>`:''}
+      </div>`;
+    }
+    else if(!isRecFromToday(rec)){
+      // Shouldn't normally happen (server sends no-store headers), but if a
+      // stale payload ever does slip through, say so explicitly rather than
+      // silently showing yesterday's pick as if it were live.
+      el.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--orange);font-size:12px;border:1px dashed var(--orange);border-radius:12px">
+        ⚠ Showing data from ${escHtml(rec.updated_at.split(' ')[0])}, not today (${todayDateStrIST()}). Refresh the page.
       </div>`;
     }
     else{
@@ -1030,6 +1039,12 @@ function renderEngineTopPicks(engine, rec){
     </div>`;
     return;
   }
+  if(rec && !isRecFromToday(rec)){
+    el.innerHTML=`<div style="text-align:center;padding:16px;color:var(--orange);font-size:12px;border:1px dashed var(--orange);border-radius:12px;margin-top:12px">
+      ⚠ Showing data from ${escHtml(rec.updated_at.split(' ')[0])}, not today (${todayDateStrIST()}). Refresh the page.
+    </div>`;
+    return;
+  }
   const top5Buy=rec?.top5_buy||[];
   const top5Sell=rec?.top5_sell||[];
   if(top5Buy.length===0 && top5Sell.length===0){el.innerHTML='';return;}
@@ -1098,6 +1113,16 @@ function todayDateStrIST(){
   const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).formatToParts(new Date());
   const get=t=>parts.find(p=>p.type===t)?.value||'';
   return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+// Defense-in-depth: even with server-side no-cache headers, if a browser,
+// extension, or intermediary somehow serves a stale recommendation payload,
+// this catches it by comparing the payload's own updated_at date against
+// what today actually is — so a stale response reads as "no data" rather
+// than silently passing off as current.
+function isRecFromToday(rec){
+  if(!rec || !rec.updated_at) return true; // no timestamp to check — don't block
+  return rec.updated_at.split(' ')[0] === todayDateStrIST();
 }
 
 async function loadEngineRollup(engine){
