@@ -879,8 +879,14 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
     // ── Append the current iteration to the rank-history window BEFORE
     // we read momentum — that way the current refresh's ranks are part of
     // the trend the detector sees, and a stock that's been moving up
-    // *into* this refresh can fire on it. ──
-    $rankHistory = appendPrakashRankIteration($currentRanks, $rankHistPath, $currentChanges, $currentPrices);
+    // *into* this refresh can fire on it. Only done during trading hours:
+    // a pre/post-market call must not consume a lookback slot or flip
+    // $isInitial using non-trading prices — it just reads whatever's
+    // already there instead. ──
+    $marketHoursNow = prakashIsMarketHours();
+    $rankHistory = $marketHoursNow
+        ? appendPrakashRankIteration($currentRanks, $rankHistPath, $currentChanges, $currentPrices)
+        : loadPrakashRankHistory($rankHistPath);
     $iterationNumber = count($rankHistory['iterations']);
     $isInitial = $iterationNumber <= 1;
 
@@ -890,15 +896,20 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
     // detector fires a Buy/Sell signal exactly once per symbol per day
     // the first time a stock enters the Top N. The seen-set is persisted
     // per-user (and globally for the no-username case) so a stock that
-    // re-enters the Top N later in the day doesn't re-fire.
+    // re-enters the Top N later in the day doesn't re-fire. Same
+    // trading-hours gate as above — don't mark anything "seen" from a
+    // pre/post-market snapshot.
     $topN = (int)(defined('PRAKASH_TOP_N') ? PRAKASH_TOP_N : 10);
     $topNLists = prakashTopGainersLosers($tracked, $topN);
     $topGainersList = $topNLists['gainers'];
     $topLosersList  = $topNLists['losers'];
     $topSeenPath = $topSeenPath ?? prakashTopSeenFile($username);
-    $newEntries = prakashDetectNewEntries($topGainersList, $topLosersList, $topSeenPath);
+    $newEntries = $marketHoursNow
+        ? prakashDetectNewEntries($topGainersList, $topLosersList, $topSeenPath)
+        : ['buy' => [], 'sell' => []];
     $newEntryBuySymbols  = $newEntries['buy'];
     $newEntrySellSymbols = $newEntries['sell'];
+
 
     // ── Point-score Momentum Ranking Engine (Signals 1-9) ──────────────
     // Runs for every tracked stock, independent of whether it made the
@@ -1380,6 +1391,12 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
     // box, rather than only the highest-confidence entry, is what actually
     // lets "Pick of the Day" be a list of multiple concurrent Buy/Sell
     // opportunities, per the spec, rather than a single rotating pick.
+    // Recommendations are an intraday-only product: no new picks, and no
+    // target-hit evaluation, outside 9:10 AM - 3:30 PM IST. Without this
+    // gate, someone loading the page before open (on pre-market/previous-
+    // close quotes) or after close would silently write fresh "recommendations"
+    // into today's log using data that was never really a live intraday move.
+    if ($marketHoursNow) {
     if ($isInitial) {
         $registerRecommendation($headlineBuyCandidate, 'Buy', $buyHeadlineReason, 0.0);
         $registerRecommendation($headlineSellCandidate, 'Sell', $sellHeadlineReason, 0.0);
@@ -1452,6 +1469,7 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
         }
         unset($rec);
     }
+    } // end prakashIsMarketHours() gate
 
     savePrakashDaily($daily, $dailyPath);
 
@@ -1658,20 +1676,22 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
         }
     }
 
-    foreach ($historyEntries as $entry) {
-        appendPrakashHistory($entry, $historyPath);
-    }
+    if ($marketHoursNow) {
+        foreach ($historyEntries as $entry) {
+            appendPrakashHistory($entry, $historyPath);
+        }
 
-    savePrakashState([
-        'updated' => $timestamp,
-        'date'    => $todayStr,
-        'ranks'   => $currentRanks,
-        'changes' => $currentChanges,
-    ], $statePath);
+        savePrakashState([
+            'updated' => $timestamp,
+            'date'    => $todayStr,
+            'ranks'   => $currentRanks,
+            'changes' => $currentChanges,
+        ], $statePath);
+    }
 
     return [
         'updated_at' => $timestamp,
-        'market_open' => prakashIsMarketHours(),
+        'market_open' => $marketHoursNow,
         'buy_recommendation'  => $buyRecommendation,
         'sell_recommendation' => $sellRecommendation,
         'top_gainer' => [

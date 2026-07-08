@@ -257,6 +257,10 @@ function buildAiRecommendations(array $stocks, ?string $statePath = null, ?strin
         }
     };
 
+    // Recommendations are an intraday-only product: no new picks, and no
+    // target-hit evaluation, outside 9:10 AM - 3:30 PM IST — see the matching
+    // gate in buildPrakashRecommendations() for why.
+    if (prakashIsMarketHours()) {
     $registerBoxEntries($buyCandidates, 'Buy');
     $registerBoxEntries($sellCandidates, 'Sell');
 
@@ -286,6 +290,7 @@ function buildAiRecommendations(array $stocks, ?string $statePath = null, ?strin
         }
         unset($rec);
     }
+    } // end prakashIsMarketHours() gate
 
     savePrakashDaily($daily, $dailyPath);
 
@@ -326,11 +331,13 @@ function buildAiRecommendations(array $stocks, ?string $statePath = null, ?strin
             'reason' => $c['reason'],
         ];
     }
-    foreach ($historyEntries as $entry) {
-        appendPrakashHistory($entry, $historyPath); // generic append, works for any history file
-    }
+    if (prakashIsMarketHours()) {
+        foreach ($historyEntries as $entry) {
+            appendPrakashHistory($entry, $historyPath); // generic append, works for any history file
+        }
 
-    savePrakashState(['updated' => $timestamp, 'ranks' => []], $statePath);
+        savePrakashState(['updated' => $timestamp, 'ranks' => []], $statePath);
+    }
 
     $topBuy = $buyCandidates[0] ?? null;
     $topSell = $sellCandidates[0] ?? null;
