@@ -1,85 +1,83 @@
-WHAT THIS PATCH FIXES
-======================
-You asked: when a stock like Titan is picked twice for Buy (hitting target
-both times) and then picked for Sell, the report should clearly show all 3
-rows — 2 achieved, 1 open at its own target — with no confusion, and the
-current price should always be tracked live.
+WHAT'S IN THIS PATCH
+=====================
+Two rounds of fixes, all tested (151 backend checks + 14 frontend logic
+checks, all passing):
 
-I checked the whole recommendation engine (Prakash momentum engine + AI
-engine) and the multi-occurrence logic itself was ALREADY correct — a
-symbol correctly gets a brand-new row (with its own entry price/target)
-every time a fresh signal fires after the previous one is closed out
-(occurrence 1, 2, 3...). I verified this with a direct test (Titan bought
-twice + sold, all 3 rows tracked and resolved independently and correctly).
+ROUND 1 — EOD Report clarity (Titan bought twice, then sold)
+--------------------------------------------------------------
+Your multi-occurrence tracking (a stock getting a fresh Buy/Sell row each
+time a new signal fires after the last one closed) was already correct —
+verified with a standalone script simulating exactly your scenario. The
+report SCREEN was the gap: no current-price column, current price only as
+fresh as the last Watchlist tick, and repeat rows for one stock could
+appear scattered instead of grouped. Rebuilt the "Momentum+AI Report" (EOD
+tab) as a trader-focused view:
+  - KPI cards up top: Open / Achieved / Not Achieved / Success Rate
+  - Filter chips: All/Open/Achieved/Not Achieved, and Both Engines/Momentum/AI
+  - Each pick is now a card with a visual progress bar from entry → target
+    with a marker for the live current price, colored green/red by whether
+    it's moving favorably
+  - Repeat picks for one stock show an occurrence badge ("2nd pick", "3rd
+    pick") and are sorted together — open positions first (closest to
+    target first), then most-recently-achieved, then not-achieved
+  - Current price is now always live-refreshed against the actual quote
+    when the report loads, not just whatever the last Watchlist tick saw
 
-The real gap was in the REPORT screen (EOD tab → "Momentum+AI Report"):
+ROUND 2 — the screenshot you sent (Titan in BOTH Top 5 Buy and Top 5 Sell)
+----------------------------------------------------------------------------
+Real bug, now fixed. Every tracked stock was being scored twice —
+independently as a hypothetical Buy candidate and as a hypothetical Sell
+candidate — and the Top 5 Buy / Top 5 Sell leaderboards were each just
+"top 5 by that side's score," with nothing stopping the same stock (like
+Titan) from scoring decently on both sides and landing in both lists at
+once. That's not an actionable signal — you can't buy and sell the same
+stock on the same tick. Fixed so each stock is placed on whichever side it
+scores strictly higher on; ties break toward whichever extreme rank it
+currently holds (top gainer → Buy, top loser → Sell). Added a dedicated
+regression test simulating a choppy "Titan-style" stock that scores on
+both sides, confirming it now only ever appears on one list.
 
-1. It only showed Entry price + Target price + Status — no "current price"
-   column at all, so you couldn't tell how close a stock was to target.
-2. The current/live price and achieved-status shown there were only ever
-   as fresh as the last time the Watchlist tab happened to auto-refresh.
-   If you opened the EOD report without the Watchlist tab having ticked
-   recently, it could show a target as "Open" even if it had actually
-   already been hit.
-3. Multiple rows for the same stock (occurrence 1, 2, 3) could appear
-   scattered rather than grouped in order, which is exactly the
-   confusion you described.
+Also added: a live "as of HH:MM:SS" timestamp on the Top 5 Buy/Sell
+leaderboard headers and on the big Buy/Sell headline cards, so you can see
+how fresh a given ranking actually is.
 
-WHAT CHANGED
-============
-1. app/prakash_recommendations.php
-   - Added prakashRefreshRowsLive() + prakashBuildQuoteLookup(): fetches a
-     fresh live quote for every symbol in a day's report and re-checks each
-     still-open row against its own target right then, flipping it to
-     achieved immediately if hit. Stamps a clear status_label:
-     OPEN / ACHIEVED / NOT ACHIEVED (no more guessing from booleans).
+Login/session: reviewed users.php + auth.php end to end. Didn't find a
+functional bug in sign-in/sign-up — passwords are properly hashed with
+password_hash()/password_verify(). Did find one thing worth hardening:
+the session ID wasn't being regenerated after a successful login/signup,
+which is a mild session-fixation risk (an attacker who got a victim to use
+a known session ID before login could inherit their post-login session).
+Fixed — session_regenerate_id() now runs right after auth succeeds. If you
+were seeing a different, specific login problem (e.g. getting logged out
+unexpectedly, or a particular error), tell me what you're actually seeing
+and I'll dig into that specifically.
 
-2. app/api/routes.php
-   - /api/eod/combined now: closes out the day first if market close has
-     passed (so it never has to show as "Open" a signal that should read
-     "Not Achieved"), fetches live prices for every tracked symbol, updates
-     achieved/status_label/current_price accordingly, saves it back so the
-     rest of the app stays in sync, and sorts rows by stock+time so repeat
-     picks for the same stock (Buy, Buy, Sell...) sit together in order.
-
-3. app/views/dashboard.php
-   - The "Momentum+AI Report" is now a real table with the exact columns
-     you asked for: Stock | Signal | Given By | Recommended | Current |
-     Target | Status — plus an occurrence badge ("2nd pick", "3rd pick")
-     on repeat stocks, and a color-coded gap% next to the current price.
-   - The CSV download and the "Top Recommendation for Today" boxes on the
-     Watchlist tab got the same current-price + clear-status treatment.
+FILES CHANGED (6 total)
+=========================
+app/prakash_recommendations.php   — live price refresh helpers + Top5 Buy/Sell mutual exclusivity + updated_at timestamp
+app/ai_recommendations.php        — updated_at timestamp
+app/api/routes.php                — /api/eod/combined: live price refresh, day finalization, chronological grouping
+app/views/dashboard.php           — new trader-focused report UI, Top5 timestamp, headline card timestamp
+app/auth.php                      — session_regenerate_id() after login/register
+tests/prakash_recommendations_test.php        — fixed 2 pre-existing test-harness bugs (array_column silently dropping repeat-occurrence rows)
+tests/momentum_score_integration_test.php     — updated for the new Buy/Sell mutual-exclusivity behavior + added a Titan-style regression test
 
 HOW TO DEPLOY
 ==============
-This patch only touches these 3 files — nothing else in your app needs to
-change, and none of your storage/*.json data will be touched by this zip.
-
-1. Upload/overwrite these 3 files on your server, keeping the same paths:
-   app/prakash_recommendations.php
-   app/api/routes.php
-   app/views/dashboard.php
-
-2. No artisan/migration/composer step needed — this is a plain PHP file
-   app, so it's live as soon as the files are uploaded.
-
-3. Open the dashboard → EOD Report tab → check "Momentum+AI Report" shows
-   the new table with a Current price column. If the market is open, give
-   it a few seconds — it fetches live prices when the tab is opened.
+Upload these 6 files to the same paths on your server (tests/ files are
+optional — only needed if you run the test suite yourself via `php
+tests/whatever_test.php`). No artisan/migration/composer step needed.
 
 TESTING DONE
 ============
-- Ran your existing test suite (momentum_score_test.php,
+- Full backend suite: 151 checks across all 4 test files, all passing
+  (php tests/prakash_recommendations_test.php, momentum_score_test.php,
   momentum_score_integration_test.php, multiuser_watchlist_recommendations_test.php)
-  — all still pass unmodified.
-- prakash_recommendations_test.php: all pass except one pre-existing
-  assertion that fails because of how the test itself groups results by
-  symbol with array_column() — once a symbol gets a 2nd row (occurrence 2),
-  array_column() keeps only the last row per symbol and silently drops the
-  earlier (achieved) one. This is a test-harness artifact, not a real bug —
-  I confirmed with a standalone script that both rows are tracked and
-  resolved correctly. Flagging it here in case you want the test updated
-  later; I left it as-is since fixing test internals wasn't part of the ask.
-- Wrote a standalone script simulating your exact scenario (Titan bought
-  twice + hit target both times, then sold) and confirmed all 3 rows report
-  correctly and independently.
+- New regression test added specifically for the "one stock scores on both
+  Buy and Sell sides" scenario from your screenshot
+- Standalone script confirming the Titan buy-buy-sell EOD tracking scenario
+  resolves all 3 rows correctly and independently
+- Extracted and syntax-checked the dashboard's JS with Node
+- Wrote 14 isolated unit tests for the new report's filtering/sorting/
+  progress-bar math (all passing) since that logic can't run through PHP's
+  test runner

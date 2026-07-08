@@ -346,14 +346,19 @@ $o2 = prakashTestRun([
     ['symbol' => 'ABC', 'price' => 101.5, 'change_pct' =>  3.5],
     ['symbol' => 'XYZ', 'price' => 200.0, 'change_pct' => -2.0],
 ], $statePath, $historyPath, $rankHistoryPath, $topSeenPath);
-$entries = array_column($o2['daily_summary']['recommendations'], null, 'symbol');
-prakashTestAssert(($entries['ABC']['status'] ?? '') === 'Target Hit', 'ABC status=Target Hit when live price ≥ target');
-prakashTestAssert(($entries['ABC']['achieved'] ?? false) === true, 'ABC achieved=true');
-prakashTestAssert(($entries['ABC']['achieved_price'] ?? null) === 101.5, 'ABC achieved_price=101.5');
+// ABC's target got hit on this same refresh (100 -> 101.5 crosses 101), and
+// since ABC is still the top gainer it also opens a brand-new 2nd occurrence
+// immediately — so look up the FIRST occurrence specifically rather than
+// array_column()-by-symbol, which would silently keep only the last row.
+$abcEntries = array_values(array_filter($o2['daily_summary']['recommendations'], fn($r) => $r['symbol'] === 'ABC'));
+$firstAbc = $abcEntries[0] ?? [];
+prakashTestAssert(($firstAbc['status'] ?? '') === 'Target Hit', 'ABC status=Target Hit when live price ≥ target');
+prakashTestAssert(($firstAbc['achieved'] ?? false) === true, 'ABC achieved=true');
+prakashTestAssert(($firstAbc['achieved_price'] ?? null) === 101.5, 'ABC achieved_price=101.5');
 
 // Entry/target price must not move once locked in.
-prakashTestAssert(($entries['ABC']['entry_price']  ?? null) === 100.0, 'ABC entry_price locked at 100.0');
-prakashTestAssert(($entries['ABC']['target_price'] ?? null) === 101.0, 'ABC target_price locked at 101.0');
+prakashTestAssert(($firstAbc['entry_price']  ?? null) === 100.0, 'ABC entry_price locked at 100.0');
+prakashTestAssert(($firstAbc['target_price'] ?? null) === 101.0, 'ABC target_price locked at 101.0');
 
 echo "── Sell-side target Hit when price falls to target ─────────────\n";
 prakashTestReset($statePath, $historyPath, $rankHistoryPath, $topSeenPath);
@@ -368,9 +373,11 @@ $o2 = prakashTestRun([
     ['symbol' => 'XYZ', 'price' => 197.5, 'change_pct' => -3.2],
 ], $statePath, $historyPath, $rankHistoryPath, $topSeenPath);
 $entries = array_column($o2['daily_summary']['recommendations'], null, 'symbol');
-prakashTestAssert(($entries['XYZ']['side'] ?? '') === 'Sell', 'XYZ is a Sell recommendation');
-prakashTestAssert(($entries['XYZ']['status'] ?? '') === 'Target Hit', 'XYZ status=Target Hit when Sell target reached (price ≤ target)');
-prakashTestAssert(($entries['XYZ']['target_price'] ?? null) === 198.0, 'XYZ target_price = 198.0 (entry 200 × 0.99)');
+$xyzEntries = array_values(array_filter($o2['daily_summary']['recommendations'], fn($r) => $r['symbol'] === 'XYZ'));
+$firstXyz = $xyzEntries[0] ?? [];
+prakashTestAssert(($firstXyz['side'] ?? '') === 'Sell', 'XYZ is a Sell recommendation');
+prakashTestAssert(($firstXyz['status'] ?? '') === 'Target Hit', 'XYZ status=Target Hit when Sell target reached (price ≤ target)');
+prakashTestAssert(($firstXyz['target_price'] ?? null) === 198.0, 'XYZ target_price = 198.0 (entry 200 × 0.99)');
 
 echo "── No new box entries for stocks already in daily file ─────────\n";
 prakashTestReset($statePath, $historyPath, $rankHistoryPath, $topSeenPath);

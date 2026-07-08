@@ -949,32 +949,52 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
     // universe, ranked by point score — not just the momentum/new-entry
     // box below, so a stock with a strong point score but no fresh
     // momentum trigger this exact refresh still surfaces here.
+    //
+    // A stock is scored independently for both sides (its Buy-side score
+    // and Sell-side score use different signal formulas, so both can come
+    // out non-trivial for a choppy/volatile stock), but showing the SAME
+    // stock in both the Buy leaderboard and the Sell leaderboard at once
+    // is not an actionable signal for a trader — you can't act on "buy
+    // this AND sell this right now" for one stock. So each stock is only
+    // ever placed on the side it scores strictly higher on; a tie falls
+    // back to whichever side currently holds the leaderboard-extreme rank
+    // (top gainer -> Buy, top loser -> Sell) to break it deterministically.
     $topPicksCount = (int)(defined('MS_TOP_PICKS_COUNT') ? MS_TOP_PICKS_COUNT : 5);
     $buyPicks = [];
     $sellPicks = [];
     foreach ($pointScores as $symbol => $sides) {
         $stock = $stocksBySymbol[$symbol] ?? null;
         if (!$stock) continue;
-        $buyPicks[] = [
-            'symbol' => $symbol,
-            'price' => (float)($stock['price'] ?? 0),
-            'percentage_change' => (float)($stock['change_pct'] ?? 0),
-            'rank' => $currentRanks[$symbol] ?? null,
-            'score' => $sides['Buy']['score'],
-            'stars' => $sides['Buy']['stars'],
-            'tier' => $sides['Buy']['tier'],
-            'signals' => $sides['Buy']['signals'],
-        ];
-        $sellPicks[] = [
-            'symbol' => $symbol,
-            'price' => (float)($stock['price'] ?? 0),
-            'percentage_change' => (float)($stock['change_pct'] ?? 0),
-            'rank' => $currentRanks[$symbol] ?? null,
-            'score' => $sides['Sell']['score'],
-            'stars' => $sides['Sell']['stars'],
-            'tier' => $sides['Sell']['tier'],
-            'signals' => $sides['Sell']['signals'],
-        ];
+        $buyScore = $sides['Buy']['score'];
+        $sellScore = $sides['Sell']['score'];
+        if ($buyScore === $sellScore) {
+            $dominant = isset($topGainersSet[$symbol]) ? 'Buy' : (isset($topLosersSet[$symbol]) ? 'Sell' : 'Buy');
+        } else {
+            $dominant = $buyScore > $sellScore ? 'Buy' : 'Sell';
+        }
+        if ($dominant === 'Buy') {
+            $buyPicks[] = [
+                'symbol' => $symbol,
+                'price' => (float)($stock['price'] ?? 0),
+                'percentage_change' => (float)($stock['change_pct'] ?? 0),
+                'rank' => $currentRanks[$symbol] ?? null,
+                'score' => $sides['Buy']['score'],
+                'stars' => $sides['Buy']['stars'],
+                'tier' => $sides['Buy']['tier'],
+                'signals' => $sides['Buy']['signals'],
+            ];
+        } else {
+            $sellPicks[] = [
+                'symbol' => $symbol,
+                'price' => (float)($stock['price'] ?? 0),
+                'percentage_change' => (float)($stock['change_pct'] ?? 0),
+                'rank' => $currentRanks[$symbol] ?? null,
+                'score' => $sides['Sell']['score'],
+                'stars' => $sides['Sell']['stars'],
+                'tier' => $sides['Sell']['tier'],
+                'signals' => $sides['Sell']['signals'],
+            ];
+        }
     }
     usort($buyPicks, fn($a, $b) => $b['score'] <=> $a['score']);
     usort($sellPicks, fn($a, $b) => $b['score'] <=> $a['score']);
@@ -1650,6 +1670,7 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
     ], $statePath);
 
     return [
+        'updated_at' => $timestamp,
         'buy_recommendation'  => $buyRecommendation,
         'sell_recommendation' => $sellRecommendation,
         'top_gainer' => [

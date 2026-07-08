@@ -180,6 +180,25 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .rbar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:4px;transition:width 1s linear}
 .err-box{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:var(--r);padding:20px;color:var(--red2);font-size:13px;line-height:1.7}
 .source-badge{font-size:10px;color:var(--green);background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.15);padding:2px 8px;border-radius:8px}
+/* ── EOD recommendation report: filter chips + position cards ── */
+.eod-chip{background:var(--panel2);border:1px solid var(--border2);color:var(--muted2);font-size:11px;font-weight:600;padding:6px 12px;border-radius:20px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.eod-chip:hover{border-color:var(--accent2);color:#fff}
+.eod-chip.active{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#fff}
+.eod-card{background:rgba(255,255,255,.025);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+.eod-card.is-achieved{border-left:3px solid var(--green)}
+.eod-card.is-open{border-left:3px solid var(--orange)}
+.eod-card.is-not_achieved{border-left:3px solid var(--red);opacity:.75}
+.eod-side-pill{font-size:10px;font-weight:800;letter-spacing:.4px;padding:2px 8px;border-radius:6px;text-transform:uppercase}
+.eod-side-pill.buy{background:rgba(16,185,129,.12);color:var(--green2)}
+.eod-side-pill.sell{background:rgba(239,68,68,.12);color:var(--red2)}
+.eod-engine-pill{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(0,198,255,.1);color:var(--accent2)}
+.eod-progress-track{position:relative;height:6px;background:rgba(255,255,255,.07);border-radius:4px;margin:8px 0 4px}
+.eod-progress-fill{position:absolute;top:0;height:100%;border-radius:4px}
+.eod-progress-tick{position:absolute;top:-3px;width:2px;height:12px;background:var(--muted2);border-radius:1px}
+.eod-progress-marker{position:absolute;top:-4px;width:14px;height:14px;border-radius:50%;border:2px solid var(--bg);transform:translateX(-50%)}
+@media(max-width:680px){
+  .eod-chip{font-size:10px;padding:5px 10px}
+}
 /* ── Mobile responsive ── */
 @media(max-width:680px){
   .topbar{padding:0 10px}
@@ -567,6 +586,32 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0">🗂 Momentum + AI Recommendation Log</h3>
       <div id="combinedEodSummary" style="font-size:12px;color:var(--muted)"></div>
     </div>
+
+    <!-- At-a-glance KPIs: what a trader checks first — how many are still
+         live, how many won, how many missed, overall hit rate. -->
+    <div class="kpi-row" id="combinedEodKpis" style="display:none;margin-bottom:12px">
+      <div class="kpi orange"><div class="kpi-label">Open ⏳</div><div class="kpi-val" id="ceodOpen">—</div><div class="kpi-sub">still in play</div></div>
+      <div class="kpi green"><div class="kpi-label">Achieved ✅</div><div class="kpi-val" id="ceodAchieved">—</div><div class="kpi-sub">target hit</div></div>
+      <div class="kpi red"><div class="kpi-label">Not Achieved ❌</div><div class="kpi-val" id="ceodNotAchieved">—</div><div class="kpi-sub">day closed, missed</div></div>
+      <div class="kpi" style="border-top:3px solid #a78bfa"><div class="kpi-label">Success Rate</div><div class="kpi-val" id="ceodRate">—</div><div class="kpi-sub">of resolved picks</div></div>
+    </div>
+
+    <!-- Filters — a trader almost always wants "what's open right now" first,
+         then can flip to the win/loss history. -->
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap" id="ceodStatusFilter">
+        <button class="eod-chip active" data-filter="all" onclick="setEodFilter('status','all')">All</button>
+        <button class="eod-chip" data-filter="open" onclick="setEodFilter('status','open')">⏳ Open</button>
+        <button class="eod-chip" data-filter="achieved" onclick="setEodFilter('status','achieved')">✅ Achieved</button>
+        <button class="eod-chip" data-filter="not_achieved" onclick="setEodFilter('status','not_achieved')">❌ Not Achieved</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap" id="ceodEngineFilter">
+        <button class="eod-chip active" data-filter="all" onclick="setEodFilter('engine','all')">Both Engines</button>
+        <button class="eod-chip" data-filter="Prakash" onclick="setEodFilter('engine','Prakash')">📊 Momentum</button>
+        <button class="eod-chip" data-filter="AI" onclick="setEodFilter('engine','AI')">🤖 AI</button>
+      </div>
+    </div>
+
     <div id="combinedEodTable" style="font-size:12px"><div style="color:var(--muted)">Loading…</div></div>
   </div>
 
@@ -865,12 +910,14 @@ function renderEngineRecommendations(engine, rec){
       const buyTitle=isPrakash?(buy?.reason==='Rank Movement Up'?'Rank Movement Buy':'Momentum Buy Pick'):(buy?.reason||'Top Buy — AI');
       const sellTitle=isPrakash?(sell?.reason==='Rank Movement Down'?'Rank Movement Sell':'Momentum Sell Pick'):(sell?.reason||'Top Sell — AI');
 
+      const asOf=rec?.updated_at?(rec.updated_at.split(' ')[1]||''):'';
       const buyHtml=`<div style="${cardStyle}">
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px">${escHtml(buyTitle)}</div>
         <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:4px">${escHtml(buy?.symbol||'—')}</div>
         <div style="font-size:12px;color:var(--green);margin-bottom:4px">${buy?.recommendation||'Buy'} · ${buy?.reason||''}</div>
         <div style="font-size:12px;color:var(--muted2)">Price: ₹${fmtNum(buy?.price||0)} · Change: ${fmtNum(buy?.percentage_change||0)}%${buy?.confidence!==undefined&&buy?.confidence!==null?` · Confidence: ${fmtNum(buy.confidence)}%`:''}</div>
         ${buy?.previous_rank!==null&&buy?.previous_rank!==undefined&&buy?.current_rank!==null&&buy?.current_rank!==undefined?`<div style="font-size:11px;color:var(--muted);margin-top:4px">Rank ${buy.previous_rank} → ${buy.current_rank}</div>`:''}
+        ${asOf?`<div style="font-size:10px;color:var(--muted);margin-top:4px">as of ${escHtml(asOf)}</div>`:''}
       </div>`;
 
       const sellHtml=`<div style="${cardStyle}">
@@ -879,6 +926,7 @@ function renderEngineRecommendations(engine, rec){
         <div style="font-size:12px;color:var(--red);margin-bottom:4px">${sell?.recommendation||'Sell'} · ${sell?.reason||''}</div>
         <div style="font-size:12px;color:var(--muted2)">Price: ₹${fmtNum(sell?.price||0)} · Change: ${fmtNum(sell?.percentage_change||0)}%${sell?.confidence!==undefined&&sell?.confidence!==null?` · Confidence: ${fmtNum(sell.confidence)}%`:''}</div>
         ${sell?.previous_rank!==null&&sell?.previous_rank!==undefined&&sell?.current_rank!==null&&sell?.current_rank!==undefined?`<div style="font-size:11px;color:var(--muted);margin-top:4px">Rank ${sell.previous_rank} → ${sell.current_rank}</div>`:''}
+        ${asOf?`<div style="font-size:10px;color:var(--muted);margin-top:4px">as of ${escHtml(asOf)}</div>`:''}
       </div>`;
 
       el.innerHTML=`<div>${buy?buyHtml:'<div style="'+cardStyle+'">No buy recommendation yet</div>'}</div><div>${sell?sellHtml:'<div style="'+cardStyle+'">No sell recommendation yet</div>'}</div>`;
@@ -980,9 +1028,11 @@ function renderEngineTopPicks(engine, rec){
       <span style="color:${sideColor};font-weight:600;text-align:right">${'⭐'.repeat(p.stars)||'—'} ${escHtml(p.tier)} · ${fmtNum(p.score)} pts</span>
     </div>`;
   }
-  const buyCol=`<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🏆 Top ${top5Buy.length} Buy</div>` +
+  const asOf = rec?.updated_at ? (rec.updated_at.split(' ')[1]||'') : '';
+  const asOfHtml = asOf ? ` <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">· as of ${escHtml(asOf)}</span>` : '';
+  const buyCol=`<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🏆 Top ${top5Buy.length} Buy${asOfHtml}</div>` +
     (top5Buy.length?top5Buy.map(p=>pickRow(p,'Buy')).join(''):'<div style="font-size:11px;color:var(--muted)">No candidates yet</div>');
-  const sellCol=`<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🏆 Top ${top5Sell.length} Sell</div>` +
+  const sellCol=`<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🏆 Top ${top5Sell.length} Sell${asOfHtml}</div>` +
     (top5Sell.length?top5Sell.map(p=>pickRow(p,'Sell')).join(''):'<div style="font-size:11px;color:var(--muted)">No candidates yet</div>');
   el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:12px">
     <div style="display:flex;flex-direction:column;gap:5px">${buyCol}</div>
@@ -2260,6 +2310,127 @@ async function saveSignalManual(sym,name,signal,entry,target1,sl,target2){
 // target price, and achieved/failed status. Backs both the on-page table
 // and the CSV download.
 let _lastCombinedEod=null;
+// ── Combined Momentum+AI report: state + rendering ──────────────────────
+// Filters are applied client-side against the last-fetched rows (no refetch
+// needed), so switching "Open / Achieved / Not Achieved" or "Momentum / AI"
+// is instant.
+let _eodFilters = { status: 'all', engine: 'all' };
+
+function setEodFilter(kind, value){
+  _eodFilters[kind] = value;
+  const groupId = kind==='status' ? 'ceodStatusFilter' : 'ceodEngineFilter';
+  document.querySelectorAll('#'+groupId+' .eod-chip').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.filter===value);
+  });
+  renderCombinedEodCards(_lastCombinedEod);
+}
+
+// A trader opening this report wants to know, in order: what's still live
+// and how close it is (Open, closest-to-target first), then what won most
+// recently, then what missed. This ordering — not a flat chronological
+// list — is what actually makes a multi-pick day (Titan bought twice, sold
+// once) readable at a glance.
+function eodRowStatusKey(r){
+  const label = r.status_label || (r.achieved?'ACHIEVED':(r.final_status==='Not Achieved'?'NOT ACHIEVED':'OPEN'));
+  if (label==='ACHIEVED') return 'achieved';
+  if (label==='NOT ACHIEVED') return 'not_achieved';
+  return 'open';
+}
+function eodRowProgressPct(r){
+  const isBuy = r.side==='Buy';
+  const entry = r.entry_price||0, target = r.target_price||0;
+  const cur = (r.current_price ?? r.last_checked_price ?? entry);
+  const span = isBuy ? (target-entry) : (entry-target);
+  if(!span) return 0;
+  const moved = isBuy ? (cur-entry) : (entry-cur);
+  return (moved/span)*100;
+}
+function sortEodRows(rows){
+  const rank = {open:0, achieved:1, not_achieved:2};
+  return [...rows].sort((a,b)=>{
+    const ka=eodRowStatusKey(a), kb=eodRowStatusKey(b);
+    if(rank[ka]!==rank[kb]) return rank[ka]-rank[kb];
+    if(ka==='open') return eodRowProgressPct(b)-eodRowProgressPct(a); // closest to target first
+    if(ka==='achieved') return (b.achieved_at||'').localeCompare(a.achieved_at||''); // most recent win first
+    return (b.entry_time||'').localeCompare(a.entry_time||'');
+  });
+}
+
+// Visual entry→target bar with a marker for where the current price actually
+// sits. The track represents entry(0%) to target(100%), but with 20%
+// breathing room on each side so a price that hasn't moved yet, or one that
+// already overshot the target, still has somewhere sane to sit rather than
+// clipping off the edge.
+function eodProgressBarHtml(r){
+  const isBuy = r.side==='Buy';
+  const entry = r.entry_price||0, target = r.target_price||0, cur=(r.current_price ?? r.last_checked_price ?? entry);
+  const pct = eodRowProgressPct(r);
+  const scale = p => Math.max(0, Math.min(100, (p+20)/140*100));
+  const entryPos = scale(0), targetPos = scale(100), curPos = scale(pct);
+  const favorable = pct>=0;
+  const fillColor = favorable ? 'linear-gradient(90deg,#059669,var(--green))' : 'linear-gradient(90deg,#dc2626,var(--red))';
+  const fillLeft = Math.min(entryPos, curPos), fillWidth = Math.abs(curPos-entryPos);
+  const markerColor = favorable ? 'var(--green2)' : 'var(--red2)';
+  return `<div class="eod-progress-track">
+    <div class="eod-progress-fill" style="left:${fillLeft}%;width:${fillWidth}%;background:${fillColor}"></div>
+    <div class="eod-progress-tick" style="left:${entryPos}%"></div>
+    <div class="eod-progress-tick" style="left:${targetPos}%"></div>
+    <div class="eod-progress-marker" style="left:${curPos}%;background:${markerColor}" title="Current ₹${fmtNum(cur)}"></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-top:2px">
+    <span>Entry ₹${fmtNum(entry)}</span><span>Target ₹${fmtNum(target)}</span>
+  </div>`;
+}
+
+function eodCardHtml(r){
+  const isBuy = r.side==='Buy';
+  const statusKey = eodRowStatusKey(r);
+  const statusColor = statusKey==='achieved'?'var(--green)':(statusKey==='not_achieved'?'var(--red)':'var(--orange)');
+  const statusText = statusKey==='achieved'
+    ? `✅ Achieved${r.achieved_at?' · '+escHtml(r.achieved_at.split(' ')[1]||''):''}`
+    : (statusKey==='not_achieved' ? '❌ Not achieved' : '⏳ Open');
+  const cur=(r.current_price ?? r.last_checked_price ?? r.entry_price ?? 0);
+  const gap=(typeof r.gap_pct==='number')?r.gap_pct:null;
+  const favorable = gap===null?true:(isBuy?gap>=0:gap<=0);
+  const gapColor = favorable?'var(--green)':'var(--red)';
+  const gapStr = gap===null?'':`${gap>=0?'+':''}${fmtNum(gap)}%`;
+  const stale = r.price_live===false?' <span title="Price not refreshed live this check — showing last known price" style="color:var(--orange);font-size:9px">· stale</span>':'';
+  const occ=r.occurrence||1;
+  const occBadge=occ>1?` <span style="color:var(--accent2);font-weight:700;font-size:10px">· ${occ===2?'2nd':occ===3?'3rd':occ+'th'} pick</span>`:'';
+  const engineLabel = r.engine==='Prakash' ? '📊 Momentum' : '🤖 AI';
+  return `<div class="eod-card is-${statusKey}" data-status="${statusKey}" data-engine="${escHtml(r.engine)}">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+      <div>
+        <span style="color:#fff;font-weight:700;font-size:13px">${escHtml(r.symbol)}</span>${occBadge}
+        <span class="eod-side-pill ${isBuy?'buy':'sell'}" style="margin-left:6px">${escHtml(r.side)}</span>
+      </div>
+      <span class="eod-engine-pill" title="${escHtml(r.reason||'')}">${engineLabel}</span>
+    </div>
+    ${eodProgressBarHtml(r)}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+      <span style="color:${gapColor};font-weight:700;font-size:12px">Now ₹${fmtNum(cur)} <span style="font-weight:400;font-size:11px">(${gapStr})</span>${stale}</span>
+      <span style="color:${statusColor};font-weight:700;font-size:11px">${statusText}</span>
+    </div>
+  </div>`;
+}
+
+function renderCombinedEodCards(d){
+  const tableEl=document.getElementById('combinedEodTable');
+  if(!tableEl || !d) return;
+  const rows=d.rows||[];
+  let filtered = rows.filter(r=>{
+    if(_eodFilters.engine!=='all' && r.engine!==_eodFilters.engine) return false;
+    if(_eodFilters.status!=='all' && eodRowStatusKey(r)!==_eodFilters.status) return false;
+    return true;
+  });
+  if(filtered.length===0){
+    tableEl.innerHTML='<div style="color:var(--muted);padding:20px;text-align:center">No picks match this filter.</div>';
+    return;
+  }
+  filtered = sortEodRows(filtered);
+  tableEl.innerHTML = filtered.map(eodCardHtml).join('');
+}
+
 async function loadCombinedEodReport(date){
   const tableEl=document.getElementById('combinedEodTable');
   const summaryEl=document.getElementById('combinedEodSummary');
@@ -2272,6 +2443,7 @@ async function loadCombinedEodReport(date){
     _lastCombinedEod=d;
     if(d.error){ tableEl.innerHTML=`<div class="err-box">${escHtml(d.error)}</div>`; return; }
     const rows=d.rows||[];
+    const kpiEl=document.getElementById('combinedEodKpis');
     if(summaryEl){
       const s=d.summary||{};
       const rate=s.success_rate!==null&&s.success_rate!==undefined?s.success_rate+'%':'—';
@@ -2279,53 +2451,27 @@ async function loadCombinedEodReport(date){
       summaryEl.innerHTML=rows.length?`<strong style="color:#fff">${s.achieved}/${s.total}</strong> hit · <strong style="color:${rc}">${rate}</strong> · Momentum: ${s.prakash_total} · AI: ${s.ai_total}`:'';
     }
     if(rows.length===0){
-      tableEl.innerHTML='<div style="color:var(--muted)">No Momentum/AI recommendations logged for this date yet.</div>';
+      if(kpiEl) kpiEl.style.display='none';
+      tableEl.innerHTML='<div style="color:var(--muted);padding:20px;text-align:center">No Momentum/AI recommendations logged for this date yet.</div>';
       return;
     }
-    // Explicit column table so a stock recommended more than once today
-    // (e.g. Titan: Buy → hit, Buy again → hit, now Sell) reads as a clear,
-    // ordered sequence of rows instead of ambiguous free-floating text.
-    // status_label (OPEN / ACHIEVED / NOT ACHIEVED) comes straight from the
-    // server, computed against a live-refreshed price — never re-derived
-    // client-side — so what's shown here can't drift out of sync with it.
-    let html=`<table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead><tr style="text-align:left;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.08)">
-        <th style="padding:6px 8px">Stock</th>
-        <th style="padding:6px 8px">Signal</th>
-        <th style="padding:6px 8px">Given By</th>
-        <th style="padding:6px 8px">Recommended</th>
-        <th style="padding:6px 8px">Current</th>
-        <th style="padding:6px 8px">Target</th>
-        <th style="padding:6px 8px">Status</th>
-      </tr></thead><tbody>`;
-    rows.forEach(r=>{
-      const achieved=!!r.achieved;
-      const label=r.status_label || (achieved?'ACHIEVED':(r.final_status==='Not Achieved'?'NOT ACHIEVED':'OPEN'));
-      const statusColor=label==='ACHIEVED'?'var(--green)':(label==='NOT ACHIEVED'?'var(--red)':'var(--muted)');
-      const statusText=label==='ACHIEVED'?`✅ Achieved${r.achieved_at?' · '+escHtml(r.achieved_at.split(' ')[1]||''):''}`
-        :(label==='NOT ACHIEVED'?'❌ Not achieved':'⏳ Open');
-      const sideColor=r.side==='Buy'?'var(--green)':'var(--red)';
-      const cur=(r.current_price ?? r.last_checked_price ?? r.entry_price ?? 0);
-      const gap=(typeof r.gap_pct==='number')?r.gap_pct:null;
-      const isBuy=r.side==='Buy';
-      const favorable=gap===null?true:(isBuy?gap>=0:gap<=0);
-      const gapColor=favorable?'var(--green)':'var(--red)';
-      const gapStr=gap===null?'':` <span style="color:${gapColor};font-size:10px">(${gap>=0?'+':''}${fmtNum(gap)}%)</span>`;
-      const stale=r.price_live===false?' <span title="Price not refreshed live this check — showing last known price" style="color:var(--orange);font-size:10px">stale</span>':'';
-      const occ=r.occurrence||1;
-      const occBadge=occ>1?` <span style="color:var(--accent2);font-weight:700;font-size:10px">· ${occ===2?'2nd':occ===3?'3rd':occ+'th'} pick</span>`:'';
-      html+=`<tr style="border-bottom:1px solid rgba(255,255,255,.04)">
-        <td style="padding:6px 8px;color:#fff;font-weight:700;white-space:nowrap">${escHtml(r.symbol)}${occBadge}</td>
-        <td style="padding:6px 8px;color:${sideColor};font-weight:700;text-transform:uppercase">${escHtml(r.side)}</td>
-        <td style="padding:6px 8px;color:var(--accent2)">${escHtml(r.engine)}${r.reason?' · '+escHtml(r.reason):''}</td>
-        <td style="padding:6px 8px;color:var(--muted2)">₹${fmtNum(r.entry_price)}</td>
-        <td style="padding:6px 8px;color:var(--muted2);white-space:nowrap">₹${fmtNum(cur)}${gapStr}${stale}</td>
-        <td style="padding:6px 8px;color:var(--muted2)">₹${fmtNum(r.target_price)}</td>
-        <td style="padding:6px 8px;color:${statusColor};font-weight:600;white-space:nowrap">${statusText}</td>
-      </tr>`;
-    });
-    html+='</tbody></table>';
-    tableEl.innerHTML=html;
+    // Feed the at-a-glance KPI cards straight from status_label so a trader
+    // sees "how many are still live / won / missed" before reading a single row.
+    const openCount = rows.filter(r=>eodRowStatusKey(r)==='open').length;
+    const achievedCount = rows.filter(r=>eodRowStatusKey(r)==='achieved').length;
+    const notAchievedCount = rows.filter(r=>eodRowStatusKey(r)==='not_achieved').length;
+    const resolved = achievedCount+notAchievedCount;
+    const rate = resolved>0 ? Math.round(achievedCount/resolved*100) : null;
+    if(kpiEl){
+      kpiEl.style.display='';
+      document.getElementById('ceodOpen').textContent=openCount;
+      document.getElementById('ceodAchieved').textContent=achievedCount;
+      document.getElementById('ceodNotAchieved').textContent=notAchievedCount;
+      const rateEl=document.getElementById('ceodRate');
+      rateEl.textContent = rate!==null ? rate+'%' : '—';
+      rateEl.style.color = rate===null?'#fff':(rate>=50?'var(--green)':'var(--red)');
+    }
+    renderCombinedEodCards(d);
   }catch(e){
     tableEl.innerHTML=`<div class="err-box">Error: ${escHtml(e.message)}</div>`;
   }

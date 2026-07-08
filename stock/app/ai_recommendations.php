@@ -336,6 +336,7 @@ function buildAiRecommendations(array $stocks, ?string $statePath = null, ?strin
     $topSell = $sellCandidates[0] ?? null;
 
     return [
+        'updated_at' => $timestamp,
         'buy_recommendation' => $topBuy ? array_merge($topBuy, ['recommendation' => 'Buy']) : null,
         'sell_recommendation' => $topSell ? array_merge($topSell, ['recommendation' => 'Sell']) : null,
         'buy_box' => $buyCandidates,

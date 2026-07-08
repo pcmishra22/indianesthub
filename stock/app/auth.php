@@ -102,6 +102,7 @@ if ($uri === '/register' || $uri === '/register/') {
             registerPage($APP_NAME, 'Username and password are required.'); exit;
         }
         if (createUser($username, $password)) {
+            session_regenerate_id(true);
             $_SESSION['auth'] = true;
             $_SESSION['user'] = $username;
             redirect('/');
@@ -117,6 +118,7 @@ if ($uri === '/login' || $uri === '/login/') {
         $password = trim((string)($_POST['p'] ?? ''));
         $user = authenticateUser($username, $password);
         if ($user) {
+            session_regenerate_id(true);
             $_SESSION['auth'] = true;
             $_SESSION['user'] = $user['username'];
             redirect('/');

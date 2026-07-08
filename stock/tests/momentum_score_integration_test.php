@@ -37,7 +37,10 @@ $stocks = [
 $out = msiRun($stocks, $statePath, $historyPath, $rankHistoryPath, $topSeenPath);
 msiTestAssert(array_key_exists('top5_buy', $out), 'top5_buy key present in output');
 msiTestAssert(array_key_exists('top5_sell', $out), 'top5_sell key present in output');
-msiTestAssert(count($out['top5_buy']) === 3, 'top5_buy contains every tracked stock when fewer than 5 are tracked');
+$buySymsInit = array_column($out['top5_buy'], 'symbol');
+$sellSymsInit = array_column($out['top5_sell'], 'symbol');
+msiTestAssert(count($buySymsInit) + count($sellSymsInit) === 3, 'every tracked stock is placed on exactly one side (Buy+Sell totals 3 when only 3 are tracked)');
+msiTestAssert(count(array_intersect($buySymsInit, $sellSymsInit)) === 0, 'no stock appears in both top5_buy and top5_sell at once');
 msiTestAssert(isset($out['top5_buy'][0]['score']), 'top5_buy entries carry a point score');
 msiTestAssert(isset($out['top5_buy'][0]['stars']), 'top5_buy entries carry a star rating');
 msiTestAssert(isset($out['top5_buy'][0]['tier']), 'top5_buy entries carry a tier label');
@@ -71,3 +74,30 @@ msiTestAssert(($out['top5_buy'][0]['tier'] ?? '') === 'Strong Buy', 'STAR is tie
 msiTestAssert(($out['top5_buy'][0]['stars'] ?? 0) === 5, 'STAR gets 5 stars');
 
 echo "\nAll momentum-score integration tests passed ✓\n";
+
+echo "── A choppy stock scoring on BOTH sides is only shown on its stronger side ──\n";
+@unlink($statePath); @unlink($historyPath); @unlink($rankHistoryPath); @unlink($topSeenPath);
+// TITAN-style stock: bounces around mid-table (rank series not cleanly
+// monotonic either way) so it can pick up some Buy-side points (e.g. volume,
+// partial rank recovery) and some Sell-side points (e.g. partial rank
+// slippage) in the same refresh — exactly the scenario that used to let it
+// surface in both the Top 5 Buy and Top 5 Sell leaderboards at once.
+$symbols2 = ['TITAN', 'UP1', 'UP2', 'DOWN1', 'DOWN2'];
+$rankFor2 = ['TITAN' => [3, 2, 3, 2, 3], 'UP1' => [5, 5, 4, 3, 1], 'UP2' => [4, 4, 4, 4, 2], 'DOWN1' => [1, 1, 2, 4, 4], 'DOWN2' => [2, 3, 1, 5, 5]];
+$changeFor2 = ['TITAN' => [0.5, 1.0, -0.3, 0.8, 0.1], 'UP1' => [-1, -0.5, 0.5, 1.5, 3.0], 'UP2' => [-0.5, -0.2, 0.1, 0.4, 1.0], 'DOWN1' => [3.0, 2.0, 1.0, -1.0, -2.0], 'DOWN2' => [1.5, 0.5, 2.0, -2.0, -3.0]];
+for ($iter = 0; $iter < 5; $iter++) {
+    $batch = [];
+    foreach ($symbols2 as $sym) {
+        $batch[] = ['symbol' => $sym, 'price' => 100.0 + $rankFor2[$sym][$iter], 'change_pct' => $changeFor2[$sym][$iter], 'vol_ratio' => $sym === 'TITAN' ? 2.0 : 1.0];
+    }
+    usort($batch, function ($a, $b) use ($rankFor2, $iter) {
+        return $rankFor2[$a['symbol']][$iter] <=> $rankFor2[$b['symbol']][$iter];
+    });
+    $out2 = msiRun($batch, $statePath, $historyPath, $rankHistoryPath, $topSeenPath);
+}
+$buySyms2 = array_column($out2['top5_buy'], 'symbol');
+$sellSyms2 = array_column($out2['top5_sell'], 'symbol');
+msiTestAssert(count(array_intersect($buySyms2, $sellSyms2)) === 0, 'TITAN-style choppy stock never appears in both leaderboards simultaneously');
+$inBuy = in_array('TITAN.NS', $buySyms2, true);
+$inSell = in_array('TITAN.NS', $sellSyms2, true);
+msiTestAssert($inBuy xor $inSell, 'TITAN.NS lands on exactly one side, whichever it scores higher on, when it appears at all');
