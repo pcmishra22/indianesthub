@@ -38,6 +38,11 @@ function lastNonNull(array $arr, mixed $default = null): mixed
  *   Bollinger Reversal      1     1    Confirmation
  *   Volume Spike            2     2    Confirmation
  *   HH-HL / LH-LL           2     2    Confirmation
+ *   SMA50 vs SMA200         2     2    Trend        (Golden/Death Cross, needs ~200d history)
+ *   RSI Oversold/Overbought 2     2    Momentum     (cross back over 30/70)
+ *   RSI Divergence          3     3    Momentum
+ *   Support Bounce/Reject   2     2    Confirmation (reversal candle at 20-day low/high)
+ *   Volume Expansion Breakout 3   3    Confirmation (breakout + 2x+ volume together)
  *   Resistance Breakout     2     0    Confirmation
  *   Support Breakdown       0     2    Confirmation
  *   52-week Breakout        3     0    Confirmation
@@ -100,12 +105,51 @@ function generateSignal(array $quote, array $history, array $indicators): array
         else { $bearFactors[] = "ADX {$adxData['adx']} > 25 — strong trend, but bearish side scores 0 by design"; }
     }
 
-    // ── MOMENTUM ───────────────────────────────────────────────
-    if ($rsiVal > 55) { $momB += 2; $bullFactors[] = "RSI at {$rsiVal} — bullish momentum"; }
-    elseif ($rsiVal < 45) { $momR += 2; $bearFactors[] = "RSI at {$rsiVal} — bearish momentum"; }
+    // ── TREND: SMA50 vs SMA200 Golden/Death Cross ───────────────
+    // Distinct from the EMA20/EMA50 check above (that one's a faster,
+    // short-term trend read already labeled "Golden/Death Cross" in this
+    // codebase) — this is the classic long-horizon version. Needs ~200
+    // trading days of history to ever fire; on a shorter history window
+    // sma200 is null and this simply contributes nothing rather than a
+    // false signal.
+    $closesArr = closes($history);
+    $sma50Arr  = sma($closesArr, 50);
+    $sma200Arr = sma($closesArr, 200);
+    $sma50Last  = lastNonNull($sma50Arr);
+    $sma200Last = lastNonNull($sma200Arr);
+    if ($sma50Last !== null && $sma200Last !== null) {
+        if ($sma50Last > $sma200Last) { $trendB += 2; $bullFactors[] = 'SMA50 above SMA200 — Golden Cross, long-term uptrend'; }
+        elseif ($sma50Last < $sma200Last) { $trendR += 2; $bearFactors[] = 'SMA50 below SMA200 — Death Cross, long-term downtrend'; }
+    }
 
-    if ($macdHPrev <= 0 && $macdH > 0) { $momB += 2; $bullFactors[] = 'MACD crossed above Signal line — bullish crossover'; }
-    elseif ($macdHPrev >= 0 && $macdH < 0) { $momR += 2; $bearFactors[] = 'MACD crossed below Signal line — bearish crossover'; }
+    // ── MOMENTUM: RSI Oversold/Overbought Bounce + Divergence ───
+    $swing = swingStructure($history);
+    $rsiArr = $indicators['rsi'] ?? [];
+    $rsiVals = array_values(array_filter($rsiArr, fn($v) => $v !== null));
+    $rc = count($rsiVals);
+    if ($rc >= 2) {
+        $rPrev = $rsiVals[$rc - 2]; $rCurr = $rsiVals[$rc - 1];
+        if ($rPrev < 30 && $rCurr >= 30) { $momB += 2; $bullFactors[] = "RSI crossed back above 30 (from {$rPrev} to {$rCurr}) — oversold bounce"; }
+        elseif ($rPrev > 70 && $rCurr <= 70) { $momR += 2; $bearFactors[] = "RSI crossed back below 70 (from {$rPrev} to {$rCurr}) — overbought reversal"; }
+    }
+
+    // Divergence compares price's swing highs/lows against RSI's value at
+    // those exact same bars (using the indices swingStructure() exposes).
+    if ($swing['low1_idx'] !== null && $swing['low2_idx'] !== null) {
+        $rsiAtLow1 = $rsiArr[$swing['low1_idx']] ?? null;
+        $rsiAtLow2 = $rsiArr[$swing['low2_idx']] ?? null;
+        if ($rsiAtLow1 !== null && $rsiAtLow2 !== null && $swing['low2'] < $swing['low1'] && $rsiAtLow2 > $rsiAtLow1) {
+            $momB += 3; $bullFactors[] = 'Bullish RSI Divergence — price made a lower low but RSI made a higher low, downtrend losing steam';
+        }
+    }
+    if ($swing['high1_idx'] !== null && $swing['high2_idx'] !== null) {
+        $rsiAtHigh1 = $rsiArr[$swing['high1_idx']] ?? null;
+        $rsiAtHigh2 = $rsiArr[$swing['high2_idx']] ?? null;
+        if ($rsiAtHigh1 !== null && $rsiAtHigh2 !== null && $swing['high2'] > $swing['high1'] && $rsiAtHigh2 < $rsiAtHigh1) {
+            $momR += 3; $bearFactors[] = 'Bearish RSI Divergence — price made a higher high but RSI made a lower high, uptrend losing steam';
+        }
+    }
+
 
     // ── CONFIRMATION ───────────────────────────────────────────
     if ($price > $ema20) { $confB++; $bullFactors[] = 'Price above EMA20'; }
@@ -124,7 +168,6 @@ function generateSignal(array $quote, array $history, array $indicators): array
         elseif ($chgPct < 0) { $confR += 2; $bearFactors[] = "Volume {$volInfo['ratio']}x the 20-day average on a down day — real selling participation"; }
     }
 
-    $swing = swingStructure($history);
     if ($swing['structure'] === 'HH-HL') { $confB += 2; $bullFactors[] = 'Higher-High / Higher-Low structure — uptrend confirmed by price action'; }
     elseif ($swing['structure'] === 'LH-LL') { $confR += 2; $bearFactors[] = 'Lower-High / Lower-Low structure — downtrend confirmed by price action'; }
 
@@ -140,6 +183,34 @@ function generateSignal(array $quote, array $history, array $indicators): array
     }
     if ($priorLow20 !== null && $price < $priorLow20) {
         $confR += 2; $bearFactors[] = "Price broke below the prior 20-day low of {$priorLow20} — support breakdown";
+    }
+
+    // Volume Expansion Breakout — the resistance-breakout and volume-spike
+    // checks above fire independently; this is the stronger, specifically
+    // "confirmed" version the spec calls out: a breakout AND 2x+ average
+    // volume on the same bar, which is a much higher-conviction signal
+    // than either alone (a breakout on thin volume is often a false one).
+    if ($priorHigh20 !== null && $price > $priorHigh20 && $volInfo['ratio'] !== null && $volInfo['ratio'] >= 2) {
+        $confB += 3; $bullFactors[] = "Volume Expansion Breakout — broke above the 20-day high on {$volInfo['ratio']}x average volume, institutional-grade confirmation";
+    }
+    if ($priorLow20 !== null && $price < $priorLow20 && $volInfo['ratio'] !== null && $volInfo['ratio'] >= 2) {
+        $confR += 3; $bearFactors[] = "Volume Expansion Breakdown — broke below the 20-day low on {$volInfo['ratio']}x average volume, heavy distribution";
+    }
+
+    // Support Bounce / Resistance Rejection — price sitting near (within
+    // 1.5%) a recent support/resistance level, confirmed by a reversal
+    // candle right there. This is the "buy near support with a small,
+    // well-defined stop-loss" setup, distinct from just being inside the
+    // 20-day range.
+    $candlePats = detectPatterns($history);
+    $patternNames = array_column($candlePats, 'name');
+    if ($priorLow20 !== null && $priorLow20 > 0 && $price <= $priorLow20 * 1.015
+        && (in_array('Hammer', $patternNames, true) || in_array('Bullish Engulfing', $patternNames, true))) {
+        $confB += 2; $bullFactors[] = "Support Bounce — price near the 20-day low of {$priorLow20} with a bullish reversal candle";
+    }
+    if ($priorHigh20 !== null && $priorHigh20 > 0 && $price >= $priorHigh20 * 0.985
+        && (in_array('Shooting Star', $patternNames, true) || in_array('Bearish Engulfing', $patternNames, true))) {
+        $confR += 2; $bearFactors[] = "Resistance Rejection — price near the 20-day high of {$priorHigh20} with a bearish reversal candle";
     }
 
     // Delivery % — activates automatically once a data source populates it

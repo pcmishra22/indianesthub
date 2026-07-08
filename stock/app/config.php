@@ -83,6 +83,7 @@ define('MS_POINTS_ACCELERATION',          (float)(getenv('MS_POINTS_ACCELERATION
 define('MS_ACCELERATION_SCALE',           (float)(getenv('MS_ACCELERATION_SCALE') ?: 10));  // Signal 8: points per (%-change unit of 2nd derivative)
 define('MS_VOLATILITY_FLIP_THRESHOLD',    (int)(getenv('MS_VOLATILITY_FLIP_THRESHOLD') ?: 2)); // Signal 9: sign flips within the window to count as "unstable"
 define('MS_POINTS_VOLATILITY_PENALTY',    (float)(getenv('MS_POINTS_VOLATILITY_PENALTY') ?: 15)); // Signal 9: penalty subtracted when unstable
+define('MS_POINTS_SWING',                 (float)(getenv('MS_POINTS_SWING') ?: 15));  // Signal 10: Higher-High/Higher-Low (or reverse) price structure
 define('MS_TIER_STRONG',                  (float)(getenv('MS_TIER_STRONG') ?: 100)); // score > this -> 5 stars "Strong Buy/Sell"
 define('MS_TIER_ACTIONABLE',              (float)(getenv('MS_TIER_ACTIONABLE') ?: 80)); // score >= this -> 4 stars "Buy/Sell"
 define('MS_TIER_WATCH',                   (float)(getenv('MS_TIER_WATCH') ?: 60)); // score >= this -> 3 stars "Watch"; below -> "Ignore"

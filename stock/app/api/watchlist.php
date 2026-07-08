@@ -40,7 +40,7 @@ function apiWatchlist(): array
         $quote = yahooQuote($sym);
         if (!$quote) continue;
 
-        $history = yahooHistory($sym, 60);
+        $history = yahooHistory($sym, 300); // widened from 60 -> needed for SMA200 Golden/Death Cross
         if (count($history) < 20) continue;
 
         $closePrices = closes($history);
@@ -201,7 +201,7 @@ function apiAnalyze(string $symbol): array
         $yahooSym = $symbol;
     }
 
-    $history = yahooHistory($yahooSym, 90);
+    $history = yahooHistory($yahooSym, 300); // widened from 90 -> needed for SMA200 Golden/Death Cross
     if (count($history) < 26) return ['error' => "Not enough history for {$symbol}. Need at least 26 trading days."];
 
     $closePrices = closes($history);
@@ -865,7 +865,7 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
         $quote = $allQuotes[$sym] ?? null;
         if (!$quote) { $skippedNoQuote++; continue; }
         try {
-            $history = yahooHistory($sym, 90);
+            $history = yahooHistory($sym, 300); // widened from 90 -> needed for SMA200 Golden/Death Cross
             // Use whatever history we have; skip only if truly empty
             if (count($history) < 5) {
                 // Still show the stock with price data, minimal indicators

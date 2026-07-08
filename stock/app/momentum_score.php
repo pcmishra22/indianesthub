@@ -25,6 +25,10 @@ declare(strict_types=1);
  * is the only caller and supplies the per-symbol context.
  */
 
+if (!function_exists('swingStructure')) {
+    require_once __DIR__ . '/indicators.php';
+}
+
 // ── Signal 1: Rank Score ───────────────────────────────────────
 // +MS_POINTS_RANK if this stock currently holds the #1 spot (Buy) or the
 // very last spot (Sell) on the %-change leaderboard.
@@ -166,6 +170,30 @@ function msVolatilityPenalty(array $changeSeries): float
     return $flips >= (int)MS_VOLATILITY_FLIP_THRESHOLD ? (float)MS_POINTS_VOLATILITY_PENALTY : 0.0;
 }
 
+// ── Signal 10: Swing Structure (Higher-High/Higher-Low) ─────────
+// "Stock making a Higher High and a Higher Low is a Buy signal — the
+// reverse (Lower High, Lower Low) is a Sell signal." Reuses the exact
+// same swingStructure() detector app/indicators.php already runs for
+// the AI engine, just fed the Momentum engine's own tick-price series
+// (one price per refresh) as degenerate high==low bars, since Momentum
+// doesn't have full OHLC candles — only a live price per iteration.
+// $priceSeries is oldest -> newest, e.g. the last PRAKASH_MOMENTUM_LOOKBACK
+// refreshes' prices for this symbol.
+function msSwingScore(array $priceSeries, string $side): float
+{
+    if (count($priceSeries) < 5) return 0.0; // need enough points for 2 highs + 2 lows
+    $bars = array_map(fn($p) => ['high' => (float)$p, 'low' => (float)$p], $priceSeries);
+    // look=1 (immediate-neighbor swing points) instead of indicators.php's
+    // default look=2 — the Momentum window is only a handful of 60s ticks,
+    // not a full session of daily candles, so a tighter neighborhood is
+    // needed for a swing point to be detectable at all.
+    $swing = swingStructure($bars, 1);
+    if ($side === 'Buy') {
+        return $swing['structure'] === 'HH-HL' ? (float)MS_POINTS_SWING : 0.0;
+    }
+    return $swing['structure'] === 'LH-LL' ? (float)MS_POINTS_SWING : 0.0;
+}
+
 // ── Combine + Tier ───────────────────────────────────────────────
 // Sums all 9 signals (already side-normalized so "good for this side"
 // is always positive) into one score, clamped at a floor of 0 for
@@ -181,6 +209,7 @@ function msCombineSignals(array $signals): array
         + ($signals['volume_score'] ?? 0.0)
         + ($signals['price_confirm_score'] ?? 0.0)
         + ($signals['acceleration_score'] ?? 0.0)
+        + ($signals['swing_score'] ?? 0.0)
         - ($signals['volatility_penalty'] ?? 0.0);
 
     $score = max(0.0, $raw);
@@ -220,6 +249,7 @@ function msScoreStock(array $ctx, string $side): array
         'volume_score' => msVolumeScore(isset($ctx['volRatio']) ? (float)$ctx['volRatio'] : null),
         'price_confirm_score' => msPriceConfirmationScore($ctx['priceSeries'] ?? [], $ctx['changeSeries'] ?? [], $side),
         'acceleration_score' => msAccelerationScore($ctx['changeSeries'] ?? [], $side),
+        'swing_score' => msSwingScore($ctx['priceSeries'] ?? [], $side),
         'volatility_penalty' => msVolatilityPenalty($ctx['changeSeries'] ?? []),
     ];
 

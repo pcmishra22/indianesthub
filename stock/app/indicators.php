@@ -478,13 +478,20 @@ function swingStructure(array $history, int $look = 2): array
     $lastLows  = array_slice($lowsIdx, -2);
     $structure = 'Mixed';
     $h1 = $h2 = $l1 = $l2 = null;
+    $h1Idx = $h2Idx = $l1Idx = $l2Idx = null;
     if (count($lastHighs) === 2 && count($lastLows) === 2) {
-        $h1 = $history[$lastHighs[0]]['high']; $h2 = $history[$lastHighs[1]]['high'];
-        $l1 = $history[$lastLows[0]]['low'];   $l2 = $history[$lastLows[1]]['low'];
+        $h1Idx = $lastHighs[0]; $h2Idx = $lastHighs[1];
+        $l1Idx = $lastLows[0];  $l2Idx = $lastLows[1];
+        $h1 = $history[$h1Idx]['high']; $h2 = $history[$h2Idx]['high'];
+        $l1 = $history[$l1Idx]['low'];  $l2 = $history[$l2Idx]['low'];
         if ($h2 > $h1 && $l2 > $l1) $structure = 'HH-HL';
         elseif ($h2 < $h1 && $l2 < $l1) $structure = 'LH-LL';
     }
-    return ['structure' => $structure, 'high1' => $h1, 'high2' => $h2, 'low1' => $l1, 'low2' => $l2];
+    return [
+        'structure' => $structure,
+        'high1' => $h1, 'high2' => $h2, 'low1' => $l1, 'low2' => $l2,
+        'high1_idx' => $h1Idx, 'high2_idx' => $h2Idx, 'low1_idx' => $l1Idx, 'low2_idx' => $l2Idx,
+    ];
 }
 
 

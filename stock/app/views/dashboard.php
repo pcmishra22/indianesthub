@@ -426,6 +426,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0">🎯 Momentum Intraday Recommendations</h3>
       <div id="prakashDailySummary" style="font-size:12px;color:var(--muted)"></div>
     </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Signals that fired on the most recent refresh — the "Today" total above includes every pick made across earlier refreshes too, not just what's shown here</div>
     <div id="prakashBoxes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
     <div id="prakashTopPicks"></div>
   </div>
@@ -450,6 +451,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0">🤖 AI Intraday Recommendations</h3>
       <div id="aiDailySummary" style="font-size:12px;color:var(--muted)"></div>
     </div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Signals that fired on the most recent refresh — the "Today" total above includes every pick made across earlier refreshes too, not just what's shown here</div>
     <div id="aiBoxes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
   </div>
 
@@ -1005,8 +1007,15 @@ function renderEngineBoxes(engine, rec){
   }
 
   const daily=rec.daily_summary||null;
+  // Box entries (buy_box/sell_box) carry the full "SYMBOL.NS" form, while
+  // the server's daily-tracking file stores the bare "SYMBOL" form (see
+  // prakashDisplaySymbol() in prakash_recommendations.php). Without
+  // stripping ".NS" here, this lookup always missed, so every card silently
+  // fell back to entry.price for BOTH entry and current price — which is
+  // why Entry/Current always looked identical with 0.00% change.
+  const stripNs=s=>(s||'').toUpperCase().replace(/\.NS$/,'');
   const dailyBySymbol={};
-  (daily?.recommendations||[]).forEach(r=>{dailyBySymbol[r.symbol]=r;});
+  (daily?.recommendations||[]).forEach(r=>{dailyBySymbol[stripNs(r.symbol)]=r;});
 
   if(summaryEl){
     if(daily && daily.total>0){
@@ -1020,7 +1029,7 @@ function renderEngineBoxes(engine, rec){
   function boxCard(entry,side){
     const isBuy=side==='Buy';
     const symbol=escHtml(entry.symbol||'—');
-    const trackedDaily=dailyBySymbol[entry.symbol]||null;
+    const trackedDaily=dailyBySymbol[stripNs(entry.symbol)]||null;
     const entryPrice=trackedDaily?.entry_price ?? entry.price ?? 0;
     const targetPrice=trackedDaily?.target_price ?? null;
     const achieved=trackedDaily?.achieved || false;
@@ -1046,9 +1055,9 @@ function renderEngineBoxes(engine, rec){
         <span style="font-size:14px;font-weight:700;color:#fff">${symbol}</span>
         <span style="font-size:10px;font-weight:700;color:${sideColor};text-transform:uppercase">${side}</span>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:3px">${escHtml(entry.reason||'')}</div>
+      <div style="font-size:11px;color:var(--muted)">${escHtml(entry.reason||'')}${typeof entry.percentage_change==='number'?` · <span style="color:${entry.percentage_change>=0?'var(--green)':'var(--red)'};font-weight:700">${entry.percentage_change>=0?'+':''}${fmtNum(entry.percentage_change)}% today</span>`:''}</div>
       <div style="font-size:12px;color:var(--muted2)">Entry: ₹${fmtNum(entryPrice)}${entryTime?` <span style="color:var(--muted)">@ ${escHtml(entryTime)}</span>`:''}</div>
-      <div style="font-size:12px;color:${gapColor};font-weight:700;margin-top:2px">Current: ₹${fmtNum(currentPrice)} <span style="font-weight:400">(${gapPct>=0?'+':''}${fmtNum(gapPct)}%)</span></div>
+      <div style="font-size:12px;color:${gapColor};font-weight:700;margin-top:2px">Current: ₹${fmtNum(currentPrice)} <span style="font-weight:400">(${gapPct>=0?'+':''}${fmtNum(gapPct)}% since entry)</span></div>
       ${targetPrice?`<div style="font-size:12px;color:var(--muted2);margin-top:2px">Target: ₹${fmtNum(targetPrice)}</div>`:''}
       <div style="font-size:11px;color:${statusColor};margin-top:4px;font-weight:600">${statusText}</div>
       ${starsHtml}
@@ -1087,19 +1096,22 @@ function renderEngineTopPicks(engine, rec){
 
   function pickRow(p,side){
     const sideColor=side==='Buy'?'var(--green)':'var(--red)';
+    const hasSwing=(p.signals?.swing_score||0)>0;
+    const swingBadge=hasSwing?` <span style="color:${sideColor}" title="${side==='Buy'?'Higher-High / Higher-Low':'Lower-High / Lower-Low'} price structure">${side==='Buy'?'📈HH-HL':'📉LH-LL'}</span>`:'';
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:rgba(255,255,255,.03);border-radius:6px;font-size:11px;gap:8px">
-      <span style="color:#fff;font-weight:700;min-width:70px">${escHtml(p.symbol)}</span>
+      <span style="color:#fff;font-weight:700;min-width:70px">${escHtml(p.symbol)}${swingBadge}</span>
       <span style="color:var(--muted2)">₹${fmtNum(p.price)} · ${fmtNum(p.percentage_change)}%</span>
       <span style="color:${sideColor};font-weight:600;text-align:right">${'⭐'.repeat(p.stars)||'—'} ${escHtml(p.tier)} · ${fmtNum(p.score)} pts</span>
     </div>`;
   }
   const asOf = rec?.updated_at ? (rec.updated_at.split(' ')[1]||'') : '';
   const asOfHtml = asOf ? ` <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">· as of ${escHtml(asOf)}</span>` : '';
-  const buyCol=`<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🏆 Top ${top5Buy.length} Buy${asOfHtml}</div>` +
+  const buyCol=`<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🏆 Leaderboard — Top ${top5Buy.length} Buy${asOfHtml}</div>` +
     (top5Buy.length?top5Buy.map(p=>pickRow(p,'Buy')).join(''):'<div style="font-size:11px;color:var(--muted)">No candidates yet</div>');
-  const sellCol=`<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🏆 Top ${top5Sell.length} Sell${asOfHtml}</div>` +
+  const sellCol=`<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🏆 Leaderboard — Top ${top5Sell.length} Sell${asOfHtml}</div>` +
     (top5Sell.length?top5Sell.map(p=>pickRow(p,'Sell')).join(''):'<div style="font-size:11px;color:var(--muted)">No candidates yet</div>');
   el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:12px">
+    <div style="font-size:10px;color:var(--muted);grid-column:1/-1;margin-bottom:-6px">Ranked by point-score across the whole tracked list — not the same as, and not limited to, today's locked-in picks above</div>
     <div style="display:flex;flex-direction:column;gap:5px">${buyCol}</div>
     <div style="display:flex;flex-direction:column;gap:5px">${sellCol}</div>
   </div>`;
