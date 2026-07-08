@@ -371,6 +371,10 @@ function apiAnalyze(string $symbol): array
 
 function apiTick(): array
 {
+    if (!prakashIsMarketHours()) {
+        return ['tick' => date('H:i'), 'ts' => time(), 'data' => [], 'market_open' => false];
+    }
+
     $logFile  = STORAGE . '/signals_' . date('Y-m-d') . '.json';
     $indFile  = STORAGE . '/indicators_cache.json';
 
@@ -604,6 +608,7 @@ function apiLeaders(): array
         'total_ticks' => $totalTicks,
         'date'        => date('Y-m-d'),
         'generated'   => date('H:i:s'),
+        'market_open' => prakashIsMarketHours(),
     ];
 }
 

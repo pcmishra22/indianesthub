@@ -11,7 +11,10 @@ declare(strict_types=1);
  * for the server-side counterparts) since this is where live quotes are
  * actually retrieved from — see datasources.php header comment for why.
  */
-function dashboardPage(string $appName, string $username): void { ?>
+function dashboardPage(string $appName, string $username): void {
+  header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+  header('Pragma: no-cache');
+  ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -667,6 +670,17 @@ function apiUrl(path){ return BASE_PATH + '/' + path.replace(/^\//,''); }
 function tick(){document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata'});}
 setInterval(tick,1000);tick();
 
+// yyyy-mm-dd HH:MM style check matching the server's 9:10-3:30 IST window,
+// so the client doesn't keep polling for ticks that the server will just
+// ignore once the market's shut.
+function isMarketHoursIST(){
+  const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
+  const h=parseInt(parts.find(p=>p.type==='hour').value,10);
+  const m=parseInt(parts.find(p=>p.type==='minute').value,10);
+  const mins=h*60+m;
+  return mins>=(9*60+10) && mins<=(15*60+30);
+}
+
 // ── Tab switching ─────────────────────────────────────────────
 function showTab(name,btn){
   document.querySelectorAll('.tab-pane').forEach(e=>e.classList.remove('active'));
@@ -677,9 +691,9 @@ function showTab(name,btn){
   if(name==='leaders'){
     if(!leaderLoaded) loadLeaders();
     if(!prakashRollupLoaded) loadPrakashRollup();
-    if(!tickTimer){
+    if(!tickTimer && isMarketHoursIST()){
       forceTick();
-      tickTimer=setInterval(forceTick, TICK_INTERVAL);
+      tickTimer=setInterval(()=>{ if(isMarketHoursIST()) forceTick(); }, TICK_INTERVAL);
     }
   }
 }
@@ -1100,6 +1114,13 @@ function renderEngineTodayLists(engine, rec){
   const buyEl=document.getElementById(engine+'TodayBuy');
   const sellEl=document.getElementById(engine+'TodaySell');
   if(!buyEl || !sellEl) return;
+  if(rec && rec.market_open===false){
+    // Same rule as the boxes above: outside 9:10 AM - 3:30 PM IST, don't
+    // keep showing today's accumulated picks as if they were still live.
+    buyEl.innerHTML='<div style="font-size:11px;color:var(--muted)">🌙 Market closed</div>';
+    sellEl.innerHTML='<div style="font-size:11px;color:var(--muted)">🌙 Market closed</div>';
+    return;
+  }
   const recs=(rec?.daily_summary?.recommendations)||[];
   if(recs.length===0){
     buyEl.innerHTML='<div style="font-size:11px;color:var(--muted)">None yet today</div>';
@@ -2014,6 +2035,11 @@ async function forceTick(){
   try{
     const r=await fetch(apiUrl('api/tick'));
     const d=await r.json();
+    if(d.market_open===false){
+      document.getElementById('tickStatus').innerHTML='🌙 Market closed';
+      loadLeaders();
+      return;
+    }
     if(d.data){
       tickCount++;
       const t=d.tick||'--:--';
@@ -2140,7 +2166,17 @@ function renderLeaders(d){
       <div style="font-size:12px;color:var(--muted)">📊 <strong style="color:#fff">${totalTicks}</strong> total signals tracked today · ${d.date||''} · Updated: ${d.generated||''}</div>
       <div style="font-size:11px;color:var(--green);background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);padding:3px 10px;border-radius:10px">Auto-ticks every 60s</div>
     </div>
+  `;
 
+  if(d.market_open===false){
+    html+=`<div style="text-align:center;padding:28px;color:var(--muted);font-size:12px;border:1px dashed var(--border2);border-radius:12px">
+      🌙 Market is closed — Signal Leaders resume during trading hours (9:10 AM – 3:30 PM IST)
+    </div>`;
+    el.innerHTML=html;
+    return;
+  }
+
+  html+=`
     <div style="margin-bottom:20px">
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)">
         ⏰ THIS HOUR — Last 60 Minutes
