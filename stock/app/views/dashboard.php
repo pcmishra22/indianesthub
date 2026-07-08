@@ -23,7 +23,7 @@ function dashboardPage(string $appName, string $username): void {
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0b0e1a;--panel:#131728;--panel2:#1a1f35;
+  --bg:#062330;--panel:#0d3247;--panel2:#134259;
   --border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);
   --accent:#0072ff;--accent2:#00c6ff;
   --green:#10b981;--green2:#34d399;
@@ -45,7 +45,7 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .btn-sm{font-size:12px;padding:5px 12px;border-radius:8px;border:1px solid var(--border2);background:none;color:var(--muted);cursor:pointer;transition:all .15s}
 .btn-sm:hover{color:var(--red);border-color:var(--red)}
 .free-tag{font-size:10px;color:var(--green);background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);padding:3px 8px;border-radius:10px}
-.ticker-bar{background:rgba(0,0,0,.4);border-bottom:1px solid var(--border);padding:6px 20px;font-size:11px;color:var(--muted);display:flex;gap:4px;align-items:center;overflow:hidden}
+.ticker-bar{background:rgba(2,14,20,.45);border-bottom:1px solid var(--border);padding:6px 20px;font-size:11px;color:var(--muted);display:flex;gap:4px;align-items:center;overflow:hidden}
 .ticker-item{white-space:nowrap;padding:0 12px;border-right:1px solid var(--border)}
 .up{color:var(--green)}.dn{color:var(--red)}
 .wrap{padding:18px 20px;max-width:1600px;margin:0 auto}
