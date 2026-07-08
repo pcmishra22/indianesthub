@@ -23,12 +23,12 @@ function dashboardPage(string $appName, string $username): void {
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#062330;--panel:#0d3247;--panel2:#134259;
+  --bg:#0d2b4e;--panel:#123a63;--panel2:#1a4a7d;
   --border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);
-  --accent:#0072ff;--accent2:#00c6ff;
+  --accent:#22d3ee;--accent2:#38bdf8;
   --green:#10b981;--green2:#34d399;
   --red:#ef4444;--red2:#f87171;
-  --orange:#f59e0b;--yellow:#fbbf24;
+  --orange:#fbbf24;--yellow:#fbbf24;
   --text:#e2e8f0;--muted:#6b7280;--muted2:#9ca3af;
   --r:12px;
 }
@@ -40,12 +40,12 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .nb{padding:6px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;border:none;background:transparent;color:var(--muted);transition:all .15s}
 .nb:hover,.nb.active{background:rgba(255,255,255,.08);color:#fff}
 .topbar-r{display:flex;align-items:center;gap:12px}
-.clock{font-size:12px;color:var(--accent2);background:rgba(0,198,255,.1);padding:4px 10px;border-radius:20px;font-weight:600}
+.clock{font-size:12px;color:var(--accent2);background:rgba(56,189,248,.1);padding:4px 10px;border-radius:20px;font-weight:600}
 .user-tag{font-size:12px;color:var(--muted)}
 .btn-sm{font-size:12px;padding:5px 12px;border-radius:8px;border:1px solid var(--border2);background:none;color:var(--muted);cursor:pointer;transition:all .15s}
 .btn-sm:hover{color:var(--red);border-color:var(--red)}
 .free-tag{font-size:10px;color:var(--green);background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);padding:3px 8px;border-radius:10px}
-.ticker-bar{background:rgba(2,14,20,.45);border-bottom:1px solid var(--border);padding:6px 20px;font-size:11px;color:var(--muted);display:flex;gap:4px;align-items:center;overflow:hidden}
+.ticker-bar{background:rgba(6,20,38,.45);border-bottom:1px solid var(--border);padding:6px 20px;font-size:11px;color:var(--muted);display:flex;gap:4px;align-items:center;overflow:hidden}
 .ticker-item{white-space:nowrap;padding:0 12px;border-right:1px solid var(--border)}
 .up{color:var(--green)}.dn{color:var(--red)}
 .wrap{padding:18px 20px;max-width:1600px;margin:0 auto}
@@ -67,8 +67,8 @@ body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,san
 .btn{padding:9px 18px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:all .15s}
 .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
 .btn-primary:hover{opacity:.9}
-.btn-outline{background:rgba(0,114,255,.1);border:1px solid rgba(0,114,255,.3);color:var(--accent2)}
-.btn-outline:hover{background:rgba(0,114,255,.2)}
+.btn-outline{background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.3);color:var(--accent2)}
+.btn-outline:hover{background:rgba(34,211,238,.2)}
 .watch-grid{overflow-x:auto}
 table{width:100%;border-collapse:collapse}
 th{padding:10px 14px;text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);white-space:nowrap;cursor:pointer}
@@ -86,8 +86,8 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .conf-wrap{display:flex;align-items:center;gap:8px}
 .conf-bar-bg{flex:1;height:4px;background:rgba(255,255,255,.07);border-radius:4px;min-width:50px}
 .conf-bar-fill{height:100%;border-radius:4px}
-.action-btn{font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid rgba(0,114,255,.3);background:rgba(0,114,255,.08);color:var(--accent2);cursor:pointer;transition:all .15s;white-space:nowrap}
-.action-btn:hover{background:rgba(0,114,255,.2)}
+.action-btn{font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid rgba(34,211,238,.3);background:rgba(34,211,238,.08);color:var(--accent2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.action-btn:hover{background:rgba(34,211,238,.2)}
 .analyze-box{display:grid;grid-template-columns:1fr 2fr;gap:16px;margin-bottom:16px}
 @media(max-width:900px){.analyze-box{grid-template-columns:1fr}}
 .search-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:20px}
@@ -124,7 +124,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .factor-list li{padding:5px 0;font-size:12px;color:var(--text);display:flex;align-items:flex-start;gap:8px;border-bottom:1px solid rgba(255,255,255,.04)}
 .factor-list li:last-child{border-bottom:none}
 .factor-list .ico{flex-shrink:0;margin-top:1px}
-.verdict-box{background:rgba(0,114,255,.06);border:1px solid rgba(0,114,255,.2);border-radius:10px;padding:14px;font-size:13px;line-height:1.7;color:var(--text);margin-bottom:14px}
+.verdict-box{background:rgba(34,211,238,.06);border:1px solid rgba(34,211,238,.2);border-radius:10px;padding:14px;font-size:13px;line-height:1.7;color:var(--text);margin-bottom:14px}
 .trade-setup{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 @media(max-width:700px){.trade-setup{grid-template-columns:repeat(2,1fr)}}
 .ts-box{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:12px;text-align:center}
@@ -139,13 +139,13 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .risk-box{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:12px;font-size:12px;color:var(--orange);line-height:1.6}
 .news-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
 .news-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:16px;cursor:pointer;transition:border-color .2s}
-.news-card:hover{border-color:rgba(0,114,255,.4)}
+.news-card:hover{border-color:rgba(34,211,238,.4)}
 .news-impact{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
 .imp-bull{color:var(--green)}.imp-bear{color:var(--red)}.imp-neu{color:var(--orange)}
 .news-head{font-size:13px;font-weight:600;color:#fff;line-height:1.5;margin-bottom:8px}
 .news-sum{font-size:12px;color:var(--muted);line-height:1.6}
 .news-stocks{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
-.ns-tag{font-size:10px;background:rgba(0,114,255,.1);border:1px solid rgba(0,114,255,.2);color:var(--accent2);padding:2px 7px;border-radius:4px}
+.ns-tag{font-size:10px;background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.2);color:var(--accent2);padding:2px 7px;border-radius:4px}
 .leader-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
 @media(max-width:800px){.leader-grid{grid-template-columns:1fr}}
 .leader-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
@@ -194,7 +194,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .eod-side-pill{font-size:10px;font-weight:800;letter-spacing:.4px;padding:2px 8px;border-radius:6px;text-transform:uppercase}
 .eod-side-pill.buy{background:rgba(16,185,129,.12);color:var(--green2)}
 .eod-side-pill.sell{background:rgba(239,68,68,.12);color:var(--red2)}
-.eod-engine-pill{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(0,198,255,.1);color:var(--accent2)}
+.eod-engine-pill{font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;background:rgba(56,189,248,.1);color:var(--accent2)}
 .eod-progress-track{position:relative;height:6px;background:rgba(255,255,255,.07);border-radius:4px;margin:8px 0 4px}
 .eod-progress-fill{position:absolute;top:0;height:100%;border-radius:4px}
 .eod-progress-tick{position:absolute;top:-3px;width:2px;height:12px;background:var(--muted2);border-radius:1px}
@@ -295,7 +295,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="rbar-bg"><div class="rbar-fill" id="rbar" style="width:100%"></div></div>
     <button class="btn btn-outline" onclick="wlPage=1;loadWatchlist()" style="padding:5px 12px;font-size:12px" id="refreshBtn">🔄 Refresh</button>
     <button class="btn btn-outline" onclick="clearYahooCache()" style="padding:5px 12px;font-size:12px;color:var(--orange);border-color:var(--orange)" id="clearCacheBtn" title="Clear data cache and reload">🗑️ Clear Cache</button>
-    <span id="watchlistSourceBadge" style="font-size:11px;padding:4px 8px;border-radius:999px;background:rgba(0,114,255,.12);border:1px solid rgba(0,114,255,.25);color:var(--a2)">Loading…</span>
+    <span id="watchlistSourceBadge" style="font-size:11px;padding:4px 8px;border-radius:999px;background:rgba(34,211,238,.12);border:1px solid rgba(34,211,238,.25);color:var(--a2)">Loading…</span>
     <div id="cacheNote" style="font-size:11px;color:var(--muted)"></div>
   </div>
 
@@ -323,7 +323,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
           <?=htmlspecialchars($s)?>
         </button>
         <?php endforeach; ?>
-        <button onclick="setSector('')" style="font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid var(--accent);background:rgba(0,114,255,.1);color:var(--a2);cursor:pointer">All</button>
+        <button onclick="setSector('')" style="font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid var(--accent);background:rgba(34,211,238,.1);color:var(--a2);cursor:pointer">All</button>
       </div>
 
       <!-- Spacer -->
@@ -892,7 +892,7 @@ function renderPagination(d){
   el.innerHTML=html;
 }
 function pgBtn(active=false){
-  return `font-size:11px;padding:3px 9px;border-radius:5px;cursor:pointer;border:1px solid ${active?'var(--accent)':'var(--border)'};background:${active?'rgba(0,114,255,.2)':'transparent'};color:${active?'var(--accent2)':'var(--muted)'}`;
+  return `font-size:11px;padding:3px 9px;border-radius:5px;cursor:pointer;border:1px solid ${active?'var(--accent)':'var(--border)'};background:${active?'rgba(34,211,238,.2)':'transparent'};color:${active?'var(--accent2)':'var(--muted)'}`;
 }
 
 async function loadSectors(){
@@ -1442,7 +1442,7 @@ function renderWatchlistManager(wl){
   const el=document.getElementById('wlItems');
   if(!el)return;
   if(!wl||!wl.length){el.innerHTML='<span style="color:var(--muted);font-size:11px">Using default 5 stocks</span>';return;}
-  el.innerHTML=wl.map(s=>`<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(0,114,255,.1);border:1px solid rgba(0,114,255,.25);border-radius:5px;padding:2px 7px;font-size:11px;margin:2px">${escHtml(s.replace('.NS',''))}<button onclick="removeFromWatchlist('${escHtml(s)}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;padding:0 2px">×</button></span>`).join('');
+  el.innerHTML=wl.map(s=>`<span style="display:inline-flex;align-items:center;gap:3px;background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.25);border-radius:5px;padding:2px 7px;font-size:11px;margin:2px">${escHtml(s.replace('.NS',''))}<button onclick="removeFromWatchlist('${escHtml(s)}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px;padding:0 2px">×</button></span>`).join('');
 }
 
 // Alerts
@@ -1720,7 +1720,7 @@ function renderAnalysis(el,d){
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:8px">🌀 Fibonacci Retracement (${fibs.high?'Swing High ₹'+fmtNum(fibs.high):''}${fibs.low?' → Low ₹'+fmtNum(fibs.low):''})</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px">
         ${['0','23.6','38.2','50','61.8','78.6','100'].map(k=>fibs[k]!=null?`
-          <div style="background:${k==='0'?'rgba(16,185,129,.08)':k==='100'?'rgba(239,68,68,.08)':'rgba(0,114,255,.08)'};border:1px solid rgba(255,255,255,.08);border-radius:7px;padding:7px;text-align:center">
+          <div style="background:${k==='0'?'rgba(16,185,129,.08)':k==='100'?'rgba(239,68,68,.08)':'rgba(34,211,238,.08)'};border:1px solid rgba(255,255,255,.08);border-radius:7px;padding:7px;text-align:center">
             <div style="font-size:10px;color:var(--muted);margin-bottom:2px">${k}%</div>
             <div style="font-size:12px;font-weight:700;color:${k==='0'?'var(--green)':k==='100'?'var(--red)':'var(--accent2)'}">₹${fmtNum(fibs[k])}</div>
           </div>`:'').join('')}
@@ -1732,7 +1732,7 @@ function renderAnalysis(el,d){
       <div style="font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:8px">📐 Pivot Points + CPR</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:5px">
         ${['R3','R2','R1','TC','PP','BC','S1','S2','S3'].map(k=>pivots[k]!=null?`
-          <div style="background:${k.startsWith('R')?'rgba(16,185,129,.08)':k.startsWith('S')?'rgba(239,68,68,.08)':'rgba(0,114,255,.08)'};border:1px solid ${k.startsWith('R')?'rgba(16,185,129,.25)':k.startsWith('S')?'rgba(239,68,68,.25)':'rgba(0,114,255,.25)'};border-radius:7px;padding:7px;text-align:center">
+          <div style="background:${k.startsWith('R')?'rgba(16,185,129,.08)':k.startsWith('S')?'rgba(239,68,68,.08)':'rgba(34,211,238,.08)'};border:1px solid ${k.startsWith('R')?'rgba(16,185,129,.25)':k.startsWith('S')?'rgba(239,68,68,.25)':'rgba(34,211,238,.25)'};border-radius:7px;padding:7px;text-align:center">
             <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:2px">${k}</div>
             <div style="font-size:11px;font-weight:700;color:${k.startsWith('R')?'var(--green)':k.startsWith('S')?'var(--red)':'var(--accent2)'}">₹${fmtNum(pivots[k])}</div>
           </div>`:'').join('')}
@@ -1744,7 +1744,7 @@ function renderAnalysis(el,d){
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px">
         <div style="font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted)">📈 Intraday Charts</div>
         <div style="display:flex;gap:5px">
-          <button onclick="switchChartInterval('5m',this)" style="font-size:11px;padding:3px 10px;border-radius:5px;border:1px solid var(--accent);background:rgba(0,114,255,.15);color:var(--accent2);cursor:pointer" class="int-btn">5M</button>
+          <button onclick="switchChartInterval('5m',this)" style="font-size:11px;padding:3px 10px;border-radius:5px;border:1px solid var(--accent);background:rgba(34,211,238,.15);color:var(--accent2);cursor:pointer" class="int-btn">5M</button>
           <button onclick="switchChartInterval('15m',this)" style="font-size:11px;padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer" class="int-btn">15M</button>
           <button onclick="switchChartInterval('1h',this)"  style="font-size:11px;padding:3px 10px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer" class="int-btn">1H</button>
         </div>
@@ -1791,7 +1791,7 @@ function switchChartInterval(iv,btn){
   document.querySelectorAll('.int-btn').forEach(b=>{
     b.style.borderColor='var(--border)';b.style.background='transparent';b.style.color='var(--muted)';
   });
-  btn.style.borderColor='var(--accent)';btn.style.background='rgba(0,114,255,.15)';btn.style.color='var(--accent2)';
+  btn.style.borderColor='var(--accent)';btn.style.background='rgba(34,211,238,.15)';btn.style.color='var(--accent2)';
   loadAnalyzeCharts(aCurrentSym,iv);
 }
 
@@ -1905,7 +1905,7 @@ async function loadChart(sym, interval='5m'){
   ['5m','15m','1h'].forEach(i=>{
     const b=document.getElementById('btn'+i);
     if(b){ b.style.borderColor=i===interval?'var(--accent)':'var(--border)';
-           b.style.background=i===interval?'rgba(0,114,255,.15)':'transparent';
+           b.style.background=i===interval?'rgba(34,211,238,.15)':'transparent';
            b.style.color=i===interval?'var(--accent2)':'var(--muted)'; }
   });
   const cl=document.getElementById('chartLoading');
@@ -1982,8 +1982,8 @@ async function loadChart(sym, interval='5m'){
         datasets:[{
           label:`${sym} (${interval})`,
           data:closes,
-          borderColor:'rgba(0,198,255,0.9)',
-          backgroundColor:'rgba(0,198,255,0.05)',
+          borderColor:'rgba(56,189,248,0.9)',
+          backgroundColor:'rgba(56,189,248,0.05)',
           borderWidth:1.5,
           pointRadius:0,
           fill:true,
