@@ -2545,8 +2545,21 @@ async function loadCombinedEodReport(date){
     const d=await r.json();
     _lastCombinedEod=d;
     if(d.error){ tableEl.innerHTML=`<div class="err-box">${escHtml(d.error)}</div>`; return; }
-    const rows=d.rows||[];
     const kpiEl=document.getElementById('combinedEodKpis');
+    if(d.is_today && d.market_open===false){
+      // Same rule as the Leaders tab: outside 9:10 AM - 3:30 PM IST, today's
+      // log is either not started yet or frozen from earlier in the
+      // session — don't show it as if it were current. Picking a past date
+      // from the dropdown still works normally for reviewing prior days.
+      if(kpiEl) kpiEl.style.display='none';
+      if(summaryEl) summaryEl.textContent='';
+      tableEl.innerHTML=`<div style="text-align:center;padding:24px;color:var(--muted);font-size:12px;border:1px dashed var(--border2);border-radius:12px">
+        🌙 Market is closed — today's log resumes during trading hours (9:10 AM – 3:30 PM IST)<br>
+        <span style="font-size:11px">Pick a previous date above to review past days.</span>
+      </div>`;
+      return;
+    }
+    const rows=d.rows||[];
     if(summaryEl){
       const s=d.summary||{};
       const rate=s.success_rate!==null&&s.success_rate!==undefined?s.success_rate+'%':'—';

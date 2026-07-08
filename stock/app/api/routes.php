@@ -332,6 +332,8 @@ if ($uri === '/api/eod/combined') {
         $total = count($rows);
         echo json_encode([
             'date' => $date,
+            'is_today' => $isToday,
+            'market_open' => prakashIsMarketHours(),
             'rows' => $rows,
             'summary' => [
                 'total' => $total,
