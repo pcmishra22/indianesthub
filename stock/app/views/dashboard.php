@@ -968,6 +968,28 @@ function renderEngineBoxes(engine, rec){
   if(!el) return;
   if(!rec){el.innerHTML='';if(summaryEl)summaryEl.textContent='';return;}
 
+  if(rec.market_open===false){
+    // Outside 9:10 AM - 3:30 PM IST there are no live picks to show — the
+    // buy/sell boxes would otherwise keep displaying whatever was last
+    // computed during the session, which reads as a live recommendation
+    // even though nothing is happening. Blank them; today's list/report
+    // (daily summary, rollup, Top Recommendation for Today) still show.
+    el.innerHTML=`<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--muted);font-size:12px;border:1px dashed var(--border2);border-radius:12px">
+      🌙 Market is closed — recommendations resume during trading hours (9:10 AM – 3:30 PM IST)
+    </div>`;
+    renderEngineTopPicks(engine, rec);
+    const daily=rec.daily_summary||null;
+    if(summaryEl){
+      if(daily && daily.total>0){
+        const rate=daily.success_rate!==null?daily.success_rate+'%':'—';
+        summaryEl.innerHTML=`Today: <strong style="color:#fff">${daily.achieved}/${daily.total}</strong> targets hit · <strong style="color:${daily.success_rate>=50?'var(--green)':'var(--red)'}">${rate}</strong> · <span style="color:var(--muted)">Market closed</span>`;
+      } else {
+        summaryEl.textContent='No recommendations today';
+      }
+    }
+    return;
+  }
+
   const daily=rec.daily_summary||null;
   const dailyBySymbol={};
   (daily?.recommendations||[]).forEach(r=>{dailyBySymbol[r.symbol]=r;});
