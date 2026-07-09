@@ -762,55 +762,17 @@ function apiMomentumPicks(): array
     ];
 }
 
-function apiWatchlistPage(int $page = 1, string $sector = '', string $search = ''): array
+/**
+ * Fetch (with 6h cache) daily history for every symbol in $syms that doesn't
+ * already have a fresh cache file, in parallel. This is the same pipeline
+ * apiWatchlistPage always used for its page — extracted so it can be pointed
+ * at either a single page (20 symbols) or the entire watchlist (200+ symbols).
+ */
+function ensureHistoryCached(array $syms): void
 {
-    $perPage  = 20;
-    $username = getCurrentUser();
-    $allSyms  = $username ? getUserWatchlist($username) : getActiveWatchlist();
-
-    // ── Step 1: check if browser already pushed quotes via /api/proxy/quotes ──
-    // This is the primary path when server-side sources (Stooq/Yahoo/NSE) are IP-blocked.
-    $bulkCache = STORAGE . '/bulk_quotes.json';
-    $browserQuotes = [];
-    if (file_exists($bulkCache) && (time() - filemtime($bulkCache)) < 300) {
-        $cached = json_decode(file_get_contents($bulkCache), true) ?? [];
-        if (count($cached) >= 3) {
-            $browserQuotes = $cached;
-        }
-    }
-
-    // ── Step 2: if no valid browser cache, try server-side fetch ──
-    $allQuotes = !empty($browserQuotes) ? $browserQuotes : yahooQuoteBulk($allSyms);
-
-    // ── Step 2: filter by sector ────────────────────────────────
-    if ($sector && isset(SECTOR_MAP[$sector])) {
-        $sectorSyms = array_map(fn($s) => $s . '.NS', SECTOR_MAP[$sector]);
-        $allSyms    = array_values(array_filter($allSyms, fn($s) => in_array($s, $sectorSyms)));
-    }
-
-    // ── Step 3: filter by search ────────────────────────────────
-    if ($search) {
-        $allSyms = array_values(array_filter($allSyms, function($s) use ($search, $allQuotes) {
-            if (str_contains(strtoupper($s), $search)) return true;
-            $name = strtoupper($allQuotes[$s]['shortName'] ?? '');
-            return str_contains($name, $search);
-        }));
-    }
-
-    $totalSyms  = count($allSyms);
-    $totalPages = (int)ceil($totalSyms / $perPage);
-    $page       = min($page, max(1, $totalPages));
-    $pageSyms   = array_slice($allSyms, ($page - 1) * $perPage, $perPage);
-
-    if (empty($pageSyms)) {
-        return ['stocks'=>[], 'page'=>$page, 'total_pages'=>0, 'total_stocks'=>0,
-                'per_page'=>$perPage, 'sector'=>$sector, 'search'=>$search, 'error'=>'No stocks found'];
-    }
-
-    // ── Step 4: parallel history fetch for page stocks only ─────
     $mh = curl_multi_init();
     $hHandles = [];
-    foreach ($pageSyms as $sym) {
+    foreach ($syms as $sym) {
         $cacheFile = STORAGE . '/hist_' . preg_replace('/[^A-Z0-9]/', '_', strtoupper($sym)) . '.json';
         if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < 21600) continue; // already cached
         $period2 = time();
@@ -857,11 +819,20 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
         }
     }
     curl_multi_close($mh);
+}
 
-    // ── Step 5: analyse page stocks ─────────────────────────────
+/**
+ * Run full indicator/signal analysis over an arbitrary list of symbols.
+ * Extracted so the momentum box / leaderboard / daily tally can be driven
+ * from the ENTIRE watchlist instead of whichever 20-symbol page happens to
+ * be open in the Watchlist tab (that was the pagination bug reported).
+ * Returns ['stocks' => [...], 'skipped_no_quote' => int].
+ */
+function analyzeSymbolsBatch(array $syms, array $allQuotes): array
+{
     $stocks = [];
     $skippedNoQuote = 0;
-    foreach ($pageSyms as $sym) {
+    foreach ($syms as $sym) {
         $quote = $allQuotes[$sym] ?? null;
         if (!$quote) { $skippedNoQuote++; continue; }
         try {
@@ -987,13 +958,69 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
     // Sort: Buy first by momentum, then Sells
     usort($stocks, fn($a,$b) => ($b['signal']==='Buy'?1:0) - ($a['signal']==='Buy'?1:0) ?: $b['momentum_score'] <=> $a['momentum_score']);
 
+    return ['stocks' => $stocks, 'skipped_no_quote' => $skippedNoQuote];
+}
+
+function apiWatchlistPage(int $page = 1, string $sector = '', string $search = ''): array
+{
+    $username = getCurrentUser();
+    $fullSyms = $username ? getUserWatchlist($username) : getActiveWatchlist();
+
+    // ── Step 1: check if browser already pushed quotes via /api/proxy/quotes ──
+    // This is the primary path when server-side sources (Stooq/Yahoo/NSE) are IP-blocked.
+    $bulkCache = STORAGE . '/bulk_quotes.json';
+    $browserQuotes = [];
+    if (file_exists($bulkCache) && (time() - filemtime($bulkCache)) < 300) {
+        $cached = json_decode(file_get_contents($bulkCache), true) ?? [];
+        if (count($cached) >= 3) {
+            $browserQuotes = $cached;
+        }
+    }
+
+    // ── Step 2: if no valid browser cache, try server-side fetch ──
+    // Always covers the FULL watchlist.
+    $allQuotes = !empty($browserQuotes) ? $browserQuotes : yahooQuoteBulk($fullSyms);
+
+    // ── Step 3: make sure history is cached, then analyse the ENTIRE
+    // watchlist. There is no pagination any more — every symbol in the
+    // watchlist (all ~214 for admin) is analysed and returned in one
+    // response, so the Watchlist tab, the Momentum box, the Leaderboard,
+    // and the daily tally all draw from exactly the same, complete set.
+    ensureHistoryCached($fullSyms);
+    $fullAnalysis   = analyzeSymbolsBatch($fullSyms, $allQuotes);
+    $allStocks      = $fullAnalysis['stocks'];
+    $skippedNoQuote = $fullAnalysis['skipped_no_quote'];
+
+    // ── Step 4: apply sector/search filters ──────────────────────────
+    $displayStocks = $allStocks;
+    if ($sector && isset(SECTOR_MAP[$sector])) {
+        $sectorSyms     = array_map(fn($s) => $s . '.NS', SECTOR_MAP[$sector]);
+        $displayStocks  = array_values(array_filter($displayStocks, fn($s) => in_array($s['symbol'], $sectorSyms)));
+    }
+    if ($search) {
+        $displayStocks = array_values(array_filter($displayStocks, function($s) use ($search) {
+            return str_contains(strtoupper($s['symbol']), $search) || str_contains(strtoupper($s['name'] ?? ''), $search);
+        }));
+    }
+
+    $totalSyms = count($displayStocks);
+    $stocks    = $displayStocks; // no slicing — return everything
+
+    if (empty($stocks)) {
+        return ['stocks'=>[], 'page'=>1, 'total_pages'=>1, 'total_stocks'=>0,
+                'per_page'=>0, 'sector'=>$sector, 'search'=>$search, 'error'=>'No stocks found'];
+    }
+
     $buys  = array_values(array_filter($stocks, fn($s) => in_array($s['signal'], ['Buy', 'Strong Buy'], true)));
     $sells = array_values(array_filter($stocks, fn($s) => in_array($s['signal'], ['Sell', 'Strong Sell'], true)));
     $mood  = count($buys) / max(1, count($stocks)) >= 0.6 ? 'Bullish'
            : (count($buys) / max(1, count($stocks)) <= 0.4 ? 'Bearish' : 'Mixed');
 
-    $prakash = buildPrakashRecommendations($stocks, null, null, getCurrentUser());
-    $ai = buildAiRecommendations($stocks, null, null, getCurrentUser());
+    // Recommendations (Momentum box + Leaderboard + daily tally) are built
+    // from $allStocks — the full watchlist analysis — so they stay identical
+    // regardless of any sector/search filter applied to the display table.
+    $prakash = buildPrakashRecommendations($allStocks, null, null, getCurrentUser());
+    $ai = buildAiRecommendations($allStocks, null, null, getCurrentUser());
     // Freeze today's file as Not Achieved for any open target once market
     // close has passed. Cheap no-op check on every request; only actually
     // rewrites the daily file the first time it runs after close each day.
@@ -1005,10 +1032,12 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
         'buy_list'        => $buys,
         'sell_list'       => $sells,
         'market_mood'     => $mood,
-        'page'            => $page,
-        'total_pages'     => $totalPages,
+        // Pagination fields kept (value 1) only for backward compatibility
+        // with any old cached frontend — the API no longer paginates.
+        'page'            => 1,
+        'total_pages'     => 1,
         'total_stocks'    => $totalSyms,
-        'per_page'        => $perPage,
+        'per_page'        => $totalSyms,
         'sector'          => $sector,
         'search'          => $search,
         'ts'              => time(),

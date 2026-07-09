@@ -168,7 +168,8 @@ if ($uri === '/api/cron') {
     exit;
 }
 
-// Paginated watchlist — 20 stocks per page, filterable by sector/search
+// Full watchlist — every symbol analysed in one response, filterable by sector/search.
+// ($page kept as a harmless no-op param for backward compatibility with old cached JS.)
 if ($uri === '/api/watchlist/page') {
     header('Content-Type: application/json');
     $page   = max(1, (int)($_GET['page']   ?? 1));

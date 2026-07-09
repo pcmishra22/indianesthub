@@ -1137,6 +1137,62 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
     }
     // (No global state to clean up — confidence helper captures by value.)
 
+    // ── Rank-based Top Gainer / Top Loser signal ──────────────────────
+    // Runs on EVERY iteration (including the initial one), independent
+    // of the 5-iteration momentum system above. Whichever stock is
+    // currently in position #1 (top gainer) or the last position (top
+    // loser) after sorting by change_pct fires as an immediate Buy/Sell.
+    // Unlike momentum, this has no lookback requirement and no "once
+    // per day" dedup on the signal itself — if the *same* stock keeps
+    // holding #1 across many refreshes in a row it keeps firing every
+    // time. (The underlying daily entry-price/target tracking still
+    // only locks in once per symbol via registerRecommendation's
+    // existing dedup — this only affects the box/history feed.)
+    //
+    // IMPORTANT: this must run BEFORE the point-score attach + leaderboard
+    // slice below. It used to run after, which meant a rank-based pick
+    // added here would show up in the box but never on the leaderboard
+    // (and would be missing its point-score/stars/tier) — the box and
+    // leaderboard could disagree in count exactly the way it was reported.
+    $rankBuyCandidate = null;
+    $rankSellCandidate = null;
+    if ($topGainer) {
+        $sym = prakashNormalizeSymbol((string)($topGainer['symbol'] ?? ''));
+        if ($sym !== '') {
+            $rankBuyCandidate = [
+                'symbol' => $sym,
+                'price' => (float)($topGainer['price'] ?? 0),
+                'percentage_change' => (float)($topGainer['change_pct'] ?? 0),
+                'reason' => $isInitial ? 'Initial Top Gainer' : 'Current Top Gainer (Rank #1)',
+                'strength' => 0,
+                'confidence' => $isInitial ? 0.0 : $computeConfidence($sym, 'Buy', empty($buyCandidateSources[$sym])),
+            ];
+            // Surface it in the display box too if it isn't already there
+            // (from momentum or new-entry) and there's room under the cap.
+            if (!isset($buyCandidateSources[$sym]) && count($buyCandidates) < $boxCap) {
+                $buyCandidates[] = $rankBuyCandidate;
+                $buyCandidateSources[$sym] = 'rank';
+            }
+        }
+    }
+    if ($topLoser) {
+        $sym = prakashNormalizeSymbol((string)($topLoser['symbol'] ?? ''));
+        if ($sym !== '') {
+            $rankSellCandidate = [
+                'symbol' => $sym,
+                'price' => (float)($topLoser['price'] ?? 0),
+                'percentage_change' => (float)($topLoser['change_pct'] ?? 0),
+                'reason' => $isInitial ? 'Initial Top Loser' : 'Current Top Loser (Rank Last)',
+                'strength' => 0,
+                'confidence' => $isInitial ? 0.0 : $computeConfidence($sym, 'Sell', empty($sellCandidateSources[$sym])),
+            ];
+            if (!isset($sellCandidateSources[$sym]) && count($sellCandidates) < $boxCap) {
+                $sellCandidates[] = $rankSellCandidate;
+                $sellCandidateSources[$sym] = 'rank';
+            }
+        }
+    }
+
     // Attach the point-score engine's output to every box entry, so the
     // dashboard can show both Prakash's existing 0..100 confidence AND
     // the spec's star-tier point score side by side.
@@ -1191,56 +1247,6 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
         $p['signals'] = $pointScores[$p['symbol']]['Sell']['signals'] ?? [];
     }
     unset($p);
-
-    // ── Rank-based Top Gainer / Top Loser signal ──────────────────────
-    // Runs on EVERY iteration (including the initial one), independent
-    // of the 5-iteration momentum system above. Whichever stock is
-    // currently in position #1 (top gainer) or the last position (top
-    // loser) after sorting by change_pct fires as an immediate Buy/Sell.
-    // Unlike momentum, this has no lookback requirement and no "once
-    // per day" dedup on the signal itself — if the *same* stock keeps
-    // holding #1 across many refreshes in a row it keeps firing every
-    // time. (The underlying daily entry-price/target tracking still
-    // only locks in once per symbol via registerRecommendation's
-    // existing dedup — this only affects the box/history feed.)
-    $rankBuyCandidate = null;
-    $rankSellCandidate = null;
-    if ($topGainer) {
-        $sym = prakashNormalizeSymbol((string)($topGainer['symbol'] ?? ''));
-        if ($sym !== '') {
-            $rankBuyCandidate = [
-                'symbol' => $sym,
-                'price' => (float)($topGainer['price'] ?? 0),
-                'percentage_change' => (float)($topGainer['change_pct'] ?? 0),
-                'reason' => $isInitial ? 'Initial Top Gainer' : 'Current Top Gainer (Rank #1)',
-                'strength' => 0,
-                'confidence' => $isInitial ? 0.0 : $computeConfidence($sym, 'Buy', empty($buyCandidateSources[$sym])),
-            ];
-            // Surface it in the display box too if it isn't already there
-            // (from momentum or new-entry) and there's room under the cap.
-            if (!isset($buyCandidateSources[$sym]) && count($buyCandidates) < $boxCap) {
-                $buyCandidates[] = $rankBuyCandidate;
-                $buyCandidateSources[$sym] = 'rank';
-            }
-        }
-    }
-    if ($topLoser) {
-        $sym = prakashNormalizeSymbol((string)($topLoser['symbol'] ?? ''));
-        if ($sym !== '') {
-            $rankSellCandidate = [
-                'symbol' => $sym,
-                'price' => (float)($topLoser['price'] ?? 0),
-                'percentage_change' => (float)($topLoser['change_pct'] ?? 0),
-                'reason' => $isInitial ? 'Initial Top Loser' : 'Current Top Loser (Rank Last)',
-                'strength' => 0,
-                'confidence' => $isInitial ? 0.0 : $computeConfidence($sym, 'Sell', empty($sellCandidateSources[$sym])),
-            ];
-            if (!isset($sellCandidateSources[$sym]) && count($sellCandidates) < $boxCap) {
-                $sellCandidates[] = $rankSellCandidate;
-                $sellCandidateSources[$sym] = 'rank';
-            }
-        }
-    }
 
     // ── Intraday target + status tracking ────────────────────────────
     // Only the actual headline Buy/Sell recommendation gets logged for the

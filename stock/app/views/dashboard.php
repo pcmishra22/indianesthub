@@ -293,7 +293,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
   <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px">
     <span class="label">Auto-refresh in <strong id="cdSec">300</strong>s</span>
     <div class="rbar-bg"><div class="rbar-fill" id="rbar" style="width:100%"></div></div>
-    <button class="btn btn-outline" onclick="wlPage=1;loadWatchlist()" style="padding:5px 12px;font-size:12px" id="refreshBtn">🔄 Refresh</button>
+    <button class="btn btn-outline" onclick="loadWatchlist()" style="padding:5px 12px;font-size:12px" id="refreshBtn">🔄 Refresh</button>
     <button class="btn btn-outline" onclick="clearYahooCache()" style="padding:5px 12px;font-size:12px;color:var(--orange);border-color:var(--orange)" id="clearCacheBtn" title="Clear data cache and reload">🗑️ Clear Cache</button>
     <span id="watchlistSourceBadge" style="font-size:11px;padding:4px 8px;border-radius:999px;background:rgba(34,211,238,.12);border:1px solid rgba(34,211,238,.25);color:var(--a2)">Loading…</span>
     <div id="cacheNote" style="font-size:11px;color:var(--muted)"></div>
@@ -348,7 +348,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="loading-card" id="watchLoading">
       <div class="spin"></div>
       <div>Fetching 200+ NSE stocks…</div>
-      <div style="font-size:11px;color:var(--muted)">Bulk parallel fetch → page analysis (~10s, then cached)</div>
+      <div style="font-size:11px;color:var(--muted)">Bulk parallel fetch → full-list analysis (~15-30s, then cached)</div>
     </div>
     <div id="watchTable" style="display:none"></div>
     <!-- Pagination -->
@@ -715,7 +715,7 @@ function startCountdown(){
 }
 
 // ── State ─────────────────────────────────────────────────────
-let wlPage=1, wlSector='', wlSearch='', wlTotalPages=1, wlLoading=false;
+let wlSector='', wlSearch='', wlLoading=false;
 
 async function loadWatchlist(force=false){
   if(wlLoading) return;
@@ -736,32 +736,22 @@ async function loadWatchlist(force=false){
     const sourceBadge = document.getElementById('watchlistSourceBadge');
     if(sourceBadge){ sourceBadge.textContent = sourceLabel; }
 
-    // Step 2: identify current-page symbols for priority fetch
-    const PAGE=20;
-    const pageStart=(wlPage-1)*PAGE;
-    const pageSyms=symbols.slice(pageStart,pageStart+PAGE);
-    const restSyms=symbols.filter(s=>!pageSyms.includes(s));
+    // Step 2: fetch quotes for the ENTIRE watchlist — no more pagination,
+    // every stock is fetched and analysed together.
+    document.getElementById('watchLoading').innerHTML=`<div class="spin"></div><div>Fetching quotes for all ${symbols.length} stocks…</div><div style="font-size:11px;color:var(--muted)">Fetching directly from browser (bypasses server IP restrictions)</div>`;
 
-    document.getElementById('watchLoading').innerHTML=`<div class="spin"></div><div>Fetching quotes for ${pageSyms.length} stocks on this page…</div><div style="font-size:11px;color:var(--muted)">Fetching directly from browser (bypasses server IP restrictions)</div>`;
-
-    // Step 3: fetch page quotes first (priority), then rest in background
-    const pageQuotes=await fetchQuotesDirect(pageSyms);
+    // Step 3: fetch all quotes
+    const pageQuotes=await fetchQuotesDirect(symbols);
 
     if(pageQuotes.length>0){
       document.getElementById('watchLoading').innerHTML=`<div class="spin"></div><div>Got ${pageQuotes.length} quotes — pushing to server for analysis…</div>`;
       // MUST await this — PHP reads bulk_quotes.json immediately after
       await fetch(apiUrl('api/proxy/quotes'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pageQuotes)});
-      // Background fetch for remaining symbols (fire-and-forget, no await)
-      if(restSyms.length>0){
-        fetchQuotesDirect(restSyms).then(rest=>{
-          if(rest.length>0) fetch(apiUrl('api/proxy/quotes'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(rest)});
-        });
-      }
     } else {
       // All browser sources failed too — try server-side as last resort
       document.getElementById('watchLoading').innerHTML=`<div class="spin"></div><div>Browser fetch failed — trying server-side sources…</div>`;
       try{
-        const r=await fetch(apiUrl('api/quotes/bulk'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbols:pageSyms})});
+        const r=await fetch(apiUrl('api/quotes/bulk'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbols})});
         if(r.ok){const d=await r.json();if(d.count>0) console.log('Server fallback succeeded:',d.count,'quotes');}
       }catch(e){console.warn('Server fallback also failed:',e);}
     }
@@ -770,9 +760,8 @@ async function loadWatchlist(force=false){
     document.getElementById('watchLoading').innerHTML=`<div class="spin"></div><div>Running technical analysis (RSI, MACD, EMA, Supertrend…)</div>`;
 
     const url=apiUrl('api/watchlist/page')
-      +'?page='+wlPage
-      +(wlSector?'&sector='+encodeURIComponent(wlSector):'')
-      +(wlSearch?'&search='+encodeURIComponent(wlSearch):'');
+      +(wlSector?'?sector='+encodeURIComponent(wlSector):'')
+      +(wlSearch?(wlSector?'&':'?')+'search='+encodeURIComponent(wlSearch):'');
     const r=await fetch(url);
     const text=await r.text();
     let d;
@@ -790,7 +779,6 @@ async function loadWatchlist(force=false){
       document.getElementById('watchLoading').innerHTML=`<div class="err-box" style="width:100%">⚠️ ${escHtml(d.warning)}<br><small>Quotes fetched: ${d.quotes_fetched||0} · Skipped (no quote): ${d.skipped_no_quote||0}</small></div>`;
       if(!d.stocks?.length) return;
     }
-    wlTotalPages=d.total_pages||1;
     renderWatchlist(d);
     renderPagination(d);
     renderPrakashRecommendations(d.prakash_recommendations);
@@ -858,8 +846,7 @@ function parseYahooChart(j){
   })).filter(r=>r.close>0);
 }
 
-function goPage(p){wlPage=p;loadWatchlist();}
-function setSector(s){wlSector=s;wlPage=1;loadWatchlist();}
+function setSector(s){wlSector=s;loadWatchlist();}
 async function clearYahooCache(){
   const btn=document.getElementById('clearCacheBtn');
   if(btn){btn.disabled=true;btn.textContent='⏳ Clearing…';}
@@ -867,34 +854,21 @@ async function clearYahooCache(){
     const r=await fetch(apiUrl('api/cache/clear'));
     const d=await r.json();
     if(btn){btn.disabled=false;btn.textContent='🗑️ Clear Cache';}
-    wlPage=1;
     loadWatchlist(true);
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent='🗑️ Clear Cache';}
     alert('Cache clear failed: '+e.message);
   }
 }
-function setSearch(q){wlSearch=q;wlPage=1;loadWatchlist();}
+function setSearch(q){wlSearch=q;loadWatchlist();}
 
 function renderPagination(d){
   const el=document.getElementById('wlPagination');
   if(!el) return;
-  const tp=d.total_pages||1, cp=d.page||1, ts=d.total_stocks||0;
-  let html=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 0">
-    <span style="font-size:11px;color:var(--muted)">${ts} stocks · Page ${cp} of ${tp} · 20 per page</span>
-    <div style="display:flex;gap:4px;flex-wrap:wrap">`;
-  if(cp>1) html+=`<button onclick="goPage(1)" style="${pgBtn()}">«</button><button onclick="goPage(${cp-1})" style="${pgBtn()}">‹</button>`;
-  // Show window of pages
-  const start=Math.max(1,cp-2), end=Math.min(tp,cp+2);
-  for(let i=start;i<=end;i++){
-    html+=`<button onclick="goPage(${i})" style="${pgBtn(i===cp)}">${i}</button>`;
-  }
-  if(cp<tp) html+=`<button onclick="goPage(${cp+1})" style="${pgBtn()}">›</button><button onclick="goPage(${tp})" style="${pgBtn()}">»</button>`;
-  html+='</div></div>';
-  el.innerHTML=html;
-}
-function pgBtn(active=false){
-  return `font-size:11px;padding:3px 9px;border-radius:5px;cursor:pointer;border:1px solid ${active?'var(--accent)':'var(--border)'};background:${active?'rgba(34,211,238,.2)':'transparent'};color:${active?'var(--accent2)':'var(--muted)'}`;
+  const ts=d.total_stocks||0;
+  el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 0">
+    <span style="font-size:11px;color:var(--muted)">Showing all ${ts} stocks — no pagination</span>
+  </div>`;
 }
 
 async function loadSectors(){
