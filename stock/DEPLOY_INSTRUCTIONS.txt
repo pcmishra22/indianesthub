@@ -1,83 +1,125 @@
-WHAT'S IN THIS PATCH
-=====================
-Two rounds of fixes, all tested (151 backend checks + 14 frontend logic
-checks, all passing):
+WHAT WAS WRONG
+==============
+/api/watchlist/page analyses all 249 watchlist stocks on every request.
+For each stock it needs price history, which is supposed to come from a
+local cache file (hist_SYMBOL.json) that a separate step (ensureHistoryCached)
+refreshes concurrently before the analysis loop runs.
 
-ROUND 1 — EOD Report clarity (Titan bought twice, then sold)
---------------------------------------------------------------
-Your multi-occurrence tracking (a stock getting a fresh Buy/Sell row each
-time a new signal fires after the last one closed) was already correct —
-verified with a standalone script simulating exactly your scenario. The
-report SCREEN was the gap: no current-price column, current price only as
-fresh as the last Watchlist tick, and repeat rows for one stock could
-appear scattered instead of grouped. Rebuilt the "Momentum+AI Report" (EOD
-tab) as a trader-focused view:
-  - KPI cards up top: Open / Achieved / Not Achieved / Success Rate
-  - Filter chips: All/Open/Achieved/Not Achieved, and Both Engines/Momentum/AI
-  - Each pick is now a card with a visual progress bar from entry → target
-    with a marker for the live current price, colored green/red by whether
-    it's moving favorably
-  - Repeat picks for one stock show an occurrence badge ("2nd pick", "3rd
-    pick") and are sorted together — open positions first (closest to
-    target first), then most-recently-achieved, then not-achieved
-  - Current price is now always live-refreshed against the actual quote
-    when the report loads, not just whatever the last Watchlist tick saw
+The bug: the analysis loop itself called yahooHistory() instead of reading
+the cache directly. yahooHistory() has a built-in fallback -- if the cache
+is missing/stale, it makes its OWN live network call, sequentially, one
+host after another (up to 30s per stock).
 
-ROUND 2 — the screenshot you sent (Titan in BOTH Top 5 Buy and Top 5 Sell)
-----------------------------------------------------------------------------
-Real bug, now fixed. Every tracked stock was being scored twice —
-independently as a hypothetical Buy candidate and as a hypothetical Sell
-candidate — and the Top 5 Buy / Top 5 Sell leaderboards were each just
-"top 5 by that side's score," with nothing stopping the same stock (like
-Titan) from scoring decently on both sides and landing in both lists at
-once. That's not an actionable signal — you can't buy and sell the same
-stock on the same tick. Fixed so each stock is placed on whichever side it
-scores strictly higher on; ties break toward whichever extreme rank it
-currently holds (top gainer → Buy, top loser → Sell). Added a dedicated
-regression test simulating a choppy "Titan-style" stock that scores on
-both sides, confirming it now only ever appears on one list.
+In your uploaded storage, only 114 of 249 symbols had a cached history
+file. That's ~135 stocks each potentially blocking for up to 30s, one
+after another, inside a single request. Since your server's IP is already
+blocked by Yahoo/NSE (confirmed in earlier debugging), those calls don't
+fail fast -- they hang toward the timeout. Worst case: tens of minutes in
+one HTTP request. Guaranteed 504 Gateway Timeout.
 
-Also added: a live "as of HH:MM:SS" timestamp on the Top 5 Buy/Sell
-leaderboard headers and on the big Buy/Sell headline cards, so you can see
-how fresh a given ranking actually is.
+There was also a compounding issue: because the blocked-IP fetches always
+fail, the cache for those ~135 stocks never gets created, so the same
+~20s of wasted concurrent networking (from ensureHistoryCached itself)
+was repeating on EVERY page load forever, even after fixing the main bug.
 
-Login/session: reviewed users.php + auth.php end to end. Didn't find a
-functional bug in sign-in/sign-up — passwords are properly hashed with
-password_hash()/password_verify(). Did find one thing worth hardening:
-the session ID wasn't being regenerated after a successful login/signup,
-which is a mild session-fixation risk (an attacker who got a victim to use
-a known session ID before login could inherit their post-login session).
-Fixed — session_regenerate_id() now runs right after auth succeeds. If you
-were seeing a different, specific login problem (e.g. getting logged out
-unexpectedly, or a particular error), tell me what you're actually seeing
-and I'll dig into that specifically.
+THE FIX (2 files)
+==================
+app/datasources.php
+  - Added readHistoryCacheOnly($symbol, $days): reads only the local
+    hist_*.json cache file. Never makes a network call. Returns []
+    instantly if the cache is missing or stale.
 
-FILES CHANGED (6 total)
-=========================
-app/prakash_recommendations.php   — live price refresh helpers + Top5 Buy/Sell mutual exclusivity + updated_at timestamp
-app/ai_recommendations.php        — updated_at timestamp
-app/api/routes.php                — /api/eod/combined: live price refresh, day finalization, chronological grouping
-app/views/dashboard.php           — new trader-focused report UI, Top5 timestamp, headline card timestamp
-app/auth.php                      — session_regenerate_id() after login/register
-tests/prakash_recommendations_test.php        — fixed 2 pre-existing test-harness bugs (array_column silently dropping repeat-occurrence rows)
-tests/momentum_score_integration_test.php     — updated for the new Buy/Sell mutual-exclusivity behavior + added a Titan-style regression test
+app/api/watchlist.php
+  - analyzeSymbolsBatch() now calls readHistoryCacheOnly() instead of
+    yahooHistory(). Stocks with no usable cache fall through to the
+    existing "minimal stock entry" branch (price only, neutral
+    indicators) instead of triggering a live fetch.
+  - ensureHistoryCached() now writes a short-lived "fail marker" file
+    (hist_fail_SYMBOL.marker) when a fetch fails, and skips retrying
+    that symbol for 30 minutes instead of retrying on every single
+    request. The marker is cleared automatically the moment a fetch
+    succeeds again (e.g. once your IP gets unblocked/whitelisted).
+
+WHAT DIDN'T CHANGE
+===================
+- yahooHistory() itself is untouched -- still used by the other endpoints
+  (single-stock detail, intraday, cron tick) where an occasional live
+  fetch for ONE symbol is fine and not the bottleneck.
+- No pagination, filtering, sorting, or recommendation-engine logic
+  changed. Same response shape as before.
 
 HOW TO DEPLOY
 ==============
-Upload these 6 files to the same paths on your server (tests/ files are
-optional — only needed if you run the test suite yourself via `php
-tests/whatever_test.php`). No artisan/migration/composer step needed.
+Upload these 2 files to the same paths on your server:
+  app/datasources.php
+  app/api/watchlist.php
+
+No artisan/migration/composer step needed. No .env changes.
+
+First request after deploying may still take a few extra seconds while
+ensureHistoryCached tries the ~135 uncached symbols once and writes fail
+markers for the blocked ones -- after that, every request for the next
+30 min skips those symbols instantly, and the page should load fast and
+reliably.
 
 TESTING DONE
 ============
-- Full backend suite: 151 checks across all 4 test files, all passing
-  (php tests/prakash_recommendations_test.php, momentum_score_test.php,
-  momentum_score_integration_test.php, multiuser_watchlist_recommendations_test.php)
-- New regression test added specifically for the "one stock scores on both
-  Buy and Sell sides" scenario from your screenshot
-- Standalone script confirming the Titan buy-buy-sell EOD tracking scenario
-  resolves all 3 rows correctly and independently
-- Extracted and syntax-checked the dashboard's JS with Node
-- Wrote 14 isolated unit tests for the new report's filtering/sorting/
-  progress-bar math (all passing) since that logic can't run through PHP's
-  test runner
+- php -l on both changed files: no syntax errors
+- Confirmed readHistoryCacheOnly() returns cached rows for a symbol with
+  a fresh cache file, and returns instantly (no delay) for a symbol with
+  no cache file at all -- the exact scenario that was causing the timeout
+
+ONE THING WORTH KNOWING
+=========================
+This fix stops the 504, but it doesn't un-block your server's IP with
+Yahoo/NSE. Those ~135 symbols will keep showing with price-only /
+neutral-indicator data (no RSI, MACD, momentum score, etc.) until either
+the IP gets unblocked or you rely on the browser-side quote push
+(/api/proxy/quotes) you already have, which is IP-independent since it
+runs from the visitor's browser, not your server.
+
+ROUND 2 -- ACTUALLY GETTING HISTORY DATA FOR ALL 249 STOCKS
+==============================================================
+Your .env already has a real Twelve Data API key (DATA_API_KEY) -- a paid-
+style API, not scraping, so it isn't subject to the same IP block. The
+code to use it (twelveDataHistory()) already existed but was never wired
+into the bulk/cron path, so it was doing nothing.
+
+Twelve Data's free plan is capped at 8 credits/minute, 800/day, and each
+symbol costs 1 credit no matter how many symbols you pack into one call --
+batching into fewer HTTP requests does not get around the per-minute cap.
+So this can't be "fetch all 249 in a few big calls." It has to be paced.
+
+New function: backfillHistoryViaTwelveData() in app/datasources.php
+  - Each call fetches up to 6 stale/missing symbols (leaving headroom
+    under the 8/min cap for anything else hitting Twelve Data that
+    minute) and writes straight into hist_SYMBOL.json -- same cache file
+    everything else already reads.
+  - Symbols with a cache file <6h old are skipped automatically, so once
+    the watchlist is fully backfilled, each call only tops up whatever
+    has actually gone stale. Stays far under the 800/day cap long-term.
+
+Wired into apiTick() (your existing /api/cron endpoint, called every
+minute) in app/api/watchlist.php, running BEFORE the market-hours check
+so backfill keeps progressing pre-market too, not just 9:10-3:30.
+
+TIMELINE
+  - Cold start: 249 symbols / 6 per minute = ~40 minutes to backfill the
+    whole watchlist once your cron job is running every minute.
+  - After that: only the handful going stale each cycle need refetching --
+    cheap and sustainable indefinitely on the free plan.
+  - No extra "wait N minutes then compute" step needed on your end --
+    apiWatchlistPage() already reads whatever's in the cache on every
+    request, so momentum/AI signals for each stock just start appearing
+    automatically as the cron backfill fills its cache file in.
+
+IF YOU WANT IT FASTER: Twelve Data's Grow plan ($29/mo) raises the cap to
+~55 credits/min -- at that rate the full watchlist backfills in about
+5-10 minutes instead of 40. Only worth it if you need that speed; the
+free-tier pacing above works fine for a daily-refresh use case.
+
+FILES CHANGED (2 total, same as Round 1 -- both updated in this package)
+==========================================================================
+app/datasources.php   -- + backfillHistoryViaTwelveData()
+app/api/watchlist.php -- apiTick() now calls the backfill every cron tick
+

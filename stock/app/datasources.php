@@ -468,6 +468,43 @@ function eodhdHistory(string $symbol, int $days = 90): array
  * Get a single quote, trying the real API first, then legacy scrapers
  * as a safety net (in priority order: NSE, Stooq, Yahoo-dead-path-last).
  */
+/**
+ * Rate-limited history backfill via Twelve Data — free plan is capped at
+ * 8 credits/minute, 800/day, and each symbol costs 1 credit no matter how
+ * many symbols are packed into one HTTP call (batching calls does NOT get
+ * around the per-minute cap). So instead of one huge request, this fetches
+ * a small slice of symbols (whichever are missing/stale) each time it's
+ * called and relies on being called repeatedly (once per cron minute) to
+ * work through the whole watchlist over time.
+ *
+ * $limit=6 leaves headroom under the 8/min cap for any other Twelve Data
+ * call (e.g. a manual single-quote lookup) happening in the same minute.
+ * Already-fresh symbols (cache <6h old) are skipped, so once the full
+ * watchlist has been backfilled, each call only tops up the handful that
+ * have actually gone stale -- daily credit usage stays far under 800.
+ */
+function backfillHistoryViaTwelveData(array $syms, int $limit = 6): array
+{
+    if (!DATA_API_KEY) return ['attempted' => [], 'fetched' => 0, 'reason' => 'DATA_API_KEY not set'];
+
+    $stale = [];
+    foreach ($syms as $sym) {
+        $cacheFile = STORAGE . '/hist_' . preg_replace('/[^A-Z0-9]/', '_', strtoupper($sym)) . '.json';
+        if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < 21600) continue; // fresh
+        $stale[] = $sym;
+        if (count($stale) >= $limit) break;
+    }
+
+    $fetched = 0;
+    foreach ($stale as $sym) {
+        $rows = twelveDataHistory($sym, 300); // caches internally on success
+        if (!empty($rows)) $fetched++;
+    }
+
+    return ['attempted' => $stale, 'fetched' => $fetched];
+}
+
+
 function yahooQuote(string $symbol): ?array
 {
     // Check bulk cache first (populated by yahooQuoteBulk)
@@ -554,6 +591,26 @@ function yahooQuoteBulk(array $symbols, bool $forceRefresh = false): array
  * Historical OHLCV — real API first, Stooq/Yahoo as fallback.
  * Cached per-symbol for 6 hours (daily data is stable intraday).
  */
+/**
+ * Cache-only counterpart to yahooHistory(): reads the local hist_*.json cache
+ * file if present and fresh, otherwise returns [] immediately. NEVER makes a
+ * network call. Intended for hot paths (e.g. analyzeSymbolsBatch) that loop
+ * over the full watchlist and must not risk a slow/blocked live fetch per
+ * symbol -- that fetching responsibility belongs to ensureHistoryCached(),
+ * which runs once, concurrently, with bounded timeouts, before such loops.
+ */
+function readHistoryCacheOnly(string $symbol, int $days = 90): array
+{
+    $cacheFile = STORAGE . '/hist_' . preg_replace('/[^A-Z0-9]/', '_', strtoupper($symbol)) . '.json';
+    if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < 21600) {
+        $cached = json_decode(file_get_contents($cacheFile), true);
+        if (!empty($cached)) {
+            return $days > 0 ? array_slice($cached, -$days) : $cached;
+        }
+    }
+    return [];
+}
+
 function yahooHistory(string $symbol, int $days = 90): array
 {
     $cacheFile = STORAGE . '/hist_' . preg_replace('/[^A-Z0-9]/', '_', strtoupper($symbol)) . '.json';

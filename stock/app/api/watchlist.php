@@ -371,8 +371,14 @@ function apiAnalyze(string $symbol): array
 
 function apiTick(): array
 {
+    // Rate-limited history backfill (Twelve Data, ~6 symbols/min on the free
+    // plan). Runs on every cron tick regardless of market hours, so cache
+    // coverage keeps improving pre-market too and is ready when trading
+    // opens. Cheap no-op once a symbol's cache is fresh (<6h old).
+    $backfill = backfillHistoryViaTwelveData(getActiveWatchlist());
+
     if (!prakashIsMarketHours()) {
-        return ['tick' => date('H:i'), 'ts' => time(), 'data' => [], 'market_open' => false];
+        return ['tick' => date('H:i'), 'ts' => time(), 'data' => [], 'market_open' => false, 'history_backfill' => $backfill];
     }
 
     $logFile  = STORAGE . '/signals_' . date('Y-m-d') . '.json';
@@ -496,7 +502,7 @@ function apiTick(): array
     if (!is_dir(STORAGE)) mkdir(STORAGE, 0755, true);
     file_put_contents($logFile, json_encode($log));
 
-    return ['tick' => $minute, 'ts' => $now, 'data' => $results];
+    return ['tick' => $minute, 'ts' => $now, 'data' => $results, 'history_backfill' => $backfill];
 }
 
 function apiLeaders(): array
@@ -775,6 +781,12 @@ function ensureHistoryCached(array $syms): void
     foreach ($syms as $sym) {
         $cacheFile = STORAGE . '/hist_' . preg_replace('/[^A-Z0-9]/', '_', strtoupper($sym)) . '.json';
         if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < 21600) continue; // already cached
+        // Negative-cache marker: if the last attempt for this symbol failed (e.g. the
+        // hosting IP is blocked by Yahoo), don't retry it on every single page load --
+        // that turns into ~20s of wasted concurrent networking per request, forever.
+        // Back off for 30 min instead of retrying immediately every request.
+        $failMarker = STORAGE . '/hist_fail_' . preg_replace('/[^A-Z0-9]/', '_', strtoupper($sym)) . '.marker';
+        if (file_exists($failMarker) && (time() - filemtime($failMarker)) < 1800) continue;
         $period2 = time();
         $period1 = $period2 - (90 * 86400);
         $url = 'https://query2.finance.yahoo.com/v8/finance/chart/' . urlencode($sym)
@@ -798,10 +810,11 @@ function ensureHistoryCached(array $syms): void
         foreach ($hHandles as $sym => $ch) {
             $raw = curl_multi_getcontent($ch);
             curl_multi_remove_handle($mh, $ch); curl_close($ch);
-            if (!$raw) continue;
+            $failMarker = STORAGE . '/hist_fail_' . preg_replace('/[^A-Z0-9]/','_',strtoupper($sym)) . '.marker';
+            if (!$raw) { touch($failMarker); continue; }
             $data  = json_decode($raw, true);
             $chart = $data['chart']['result'][0] ?? null;
-            if (!$chart) continue;
+            if (!$chart) { touch($failMarker); continue; }
             $ts   = $chart['timestamp'] ?? [];
             $ohlcv= $chart['indicators']['quote'][0] ?? [];
             $rows = [];
@@ -815,6 +828,9 @@ function ensureHistoryCached(array $syms): void
             if (!empty($rows)) {
                 $cf = STORAGE . '/hist_' . preg_replace('/[^A-Z0-9]/','_',strtoupper($sym)) . '.json';
                 file_put_contents($cf, json_encode($rows));
+                if (file_exists($failMarker)) @unlink($failMarker); // recovered - clear backoff
+            } else {
+                touch($failMarker);
             }
         }
     }
@@ -836,7 +852,16 @@ function analyzeSymbolsBatch(array $syms, array $allQuotes): array
         $quote = $allQuotes[$sym] ?? null;
         if (!$quote) { $skippedNoQuote++; continue; }
         try {
-            $history = yahooHistory($sym, 300); // widened from 90 -> needed for SMA200 Golden/Death Cross
+            // Cache-only read: ensureHistoryCached() already ran (concurrently, with
+            // bounded timeouts) just before this loop for every symbol that needed
+            // refreshing. Calling yahooHistory() here would let it fall back to a
+            // SEQUENTIAL live network fetch (2 hosts x 15s timeout each) for every
+            // symbol whose cache is still missing/stale -- with ~249 symbols and a
+            // blocked server IP, that serialised fallback was the actual cause of
+            // the /api/watchlist/page 504 Gateway Timeout (worst case: tens of
+            // minutes in one request). Symbols with no usable cache simply fall
+            // through to the "minimal stock entry" branch below instead.
+            $history = readHistoryCacheOnly($sym, 300);
             // Use whatever history we have; skip only if truly empty
             if (count($history) < 5) {
                 // Still show the stock with price data, minimal indicators
