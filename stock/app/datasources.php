@@ -513,17 +513,23 @@ function yahooQuoteBulk(array $symbols, bool $forceRefresh = false): array
         if (!empty($cached)) return $cached;
     }
 
-    // Priority 1: BSE bulk (confirmed working API)
+    // NOTE: these sources are merged, not tried-in-order-and-stop. bseQuoteBulk
+    // in particular only ever covers the ~111 symbols in its hardcoded scrip-code
+    // map — treating that as "success" used to make the function return early
+    // and silently drop every other symbol in a 200+ stock watchlist (e.g. only
+    // ~102 of 214 stocks would ever get a quote). Now each source only fills in
+    // symbols still missing after the previous ones, so coverage adds up across
+    // all four sources instead of stopping at whichever one answers first.
     $all = bseQuoteBulk($symbols);
 
-    // Priority 2: Stooq bulk parallel
-    if (empty($all)) {
-        $all = stooqBulkFetch($symbols);
+    $missing = array_values(array_diff($symbols, array_keys($all)));
+    if (!empty($missing)) {
+        $all += stooqBulkFetch($missing);
     }
 
-    // Priority 3: NSE per-symbol
-    if (empty($all)) {
-        foreach (array_slice($symbols, 0, 20) as $sym) {
+    $missing = array_values(array_diff($symbols, array_keys($all)));
+    if (!empty($missing)) {
+        foreach ($missing as $sym) {
             $q = nseMarketFetch($sym);
             if (!$q) $q = nseQuoteFallback($sym);
             if ($q && ($q['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $q;
@@ -531,9 +537,9 @@ function yahooQuoteBulk(array $symbols, bool $forceRefresh = false): array
         }
     }
 
-    // Priority 4: Groww
-    if (empty($all)) {
-        foreach (array_slice($symbols, 0, 20) as $sym) {
+    $missing = array_values(array_diff($symbols, array_keys($all)));
+    if (!empty($missing)) {
+        foreach ($missing as $sym) {
             $q = growwQuoteFetch($sym);
             if ($q && ($q['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $q;
             usleep(150000);
