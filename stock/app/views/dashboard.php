@@ -716,6 +716,14 @@ function startCountdown(){
 
 // ── State ─────────────────────────────────────────────────────
 let wlSector='', wlSearch='', wlLoading=false;
+// Pagination is purely a DISPLAY concern: the full stocks/buy_list/sell_list
+// arrays for ALL 214+ watchlist stocks are already in memory from a single
+// /api/watchlist/page response (recommendations are always built server-side
+// from the complete watchlist regardless of this). We just slice them for
+// rendering so the DOM isn't painting 200+ rows at once, and re-slice on
+// page-change without any network round-trip.
+const WL_PAGE_SIZE=50;
+let wlBuyPage=1, wlSellPage=1, wlLastData=null;
 
 async function loadWatchlist(force=false){
   if(wlLoading) return;
@@ -867,7 +875,7 @@ function renderPagination(d){
   if(!el) return;
   const ts=d.total_stocks||0;
   el.innerHTML=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 0">
-    <span style="font-size:11px;color:var(--muted)">Showing all ${ts} stocks — no pagination</span>
+    <span style="font-size:11px;color:var(--muted)">Analysing all ${ts} watchlist stocks · Buy/Sell recommendations always use the full set · table below is paginated ${WL_PAGE_SIZE}/page</span>
   </div>`;
 }
 
@@ -1290,7 +1298,9 @@ function closeTrackRecordDetails(){
   if(modal) modal.style.display='none';
 }
 
-function renderWatchlist(d){
+function renderWatchlist(d, preserveWlPage){
+  wlLastData=d;
+  if(!preserveWlPage){ wlBuyPage=1; wlSellPage=1; }
   const all=d.stocks||[];
   const buys=d.buy_list||[];
   const sells=d.sell_list||[];
@@ -1385,8 +1395,32 @@ function renderWatchlist(d){
     </tr>`;
   }
 
-  function stockTable(list,title,color,icon){
+  function paginationBar(section, totalCount, page, totalPages){
+    if(totalPages<=1) return '';
+    const goto=p=>`setWlPage('${section}',${p})`;
+    let nums='';
+    const start=Math.max(1,page-2), end=Math.min(totalPages,page+2);
+    if(start>1) nums+=`<button class="action-btn" onclick="${goto(1)}">1</button>${start>2?'<span style="color:var(--muted)">…</span>':''}`;
+    for(let p=start;p<=end;p++){
+      nums+=`<button class="action-btn" ${p===page?'style="font-weight:700;color:var(--accent2)"':''} onclick="${goto(p)}">${p}</button>`;
+    }
+    if(end<totalPages) nums+=`${end<totalPages-1?'<span style="color:var(--muted)">…</span>':''}<button class="action-btn" onclick="${goto(totalPages)}">${totalPages}</button>`;
+    return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px 18px;border-top:1px solid var(--border)">
+      <span style="font-size:11px;color:var(--muted)">${totalCount} stocks · page ${page} of ${totalPages}</span>
+      <div style="display:flex;gap:4px;margin-left:auto;flex-wrap:wrap">
+        <button class="action-btn" ${page<=1?'disabled':''} onclick="${goto(page-1)}">‹ Prev</button>
+        ${nums}
+        <button class="action-btn" ${page>=totalPages?'disabled':''} onclick="${goto(page+1)}">Next ›</button>
+      </div>
+    </div>`;
+  }
+
+  function stockTable(list,title,color,icon,section,page){
     if(!list.length) return `<div style="padding:20px;color:var(--muted);font-size:13px">No ${title.includes('BUY')?'buy':'sell'} signals right now — stocks may be in a neutral/hold zone, Try refreshing or wait a moment for data to load.</div>`;
+    const totalPages=Math.max(1,Math.ceil(list.length/WL_PAGE_SIZE));
+    const curPage=Math.min(Math.max(1,page),totalPages);
+    const startIdx=(curPage-1)*WL_PAGE_SIZE;
+    const pageList=list.slice(startIdx,startIdx+WL_PAGE_SIZE);
     return `<div style="padding:12px 18px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:16px">${icon}</span>
       <span style="font-weight:700;color:${color};font-size:14px">${title}</span>
@@ -1397,17 +1431,27 @@ function renderWatchlist(d){
       <th>Momentum</th><th>Direction</th><th>Volume</th><th>RSI</th>
       <th>Supertrend</th><th>ADX/DMI</th><th>Stoch</th><th>OBV</th>
       <th>Signal</th><th>Pattern</th><th>Target/SL+Pivots</th><th>Action</th>
-    </tr></thead><tbody>${list.map((s,i)=>stockRow(s,i+1)).join('')}</tbody></table></div>`;
+    </tr></thead><tbody>${pageList.map((s,i)=>stockRow(s,startIdx+i+1)).join('')}</tbody></table></div>
+    ${paginationBar(section,list.length,curPage,totalPages)}`;
   }
 
   document.getElementById('watchLoading').style.display='none';
   document.getElementById('watchTable').innerHTML=`
     <div style="margin-bottom:16px">
-      <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:var(--r);margin-bottom:12px">${stockTable(buys,'📈 BUY Candidates','var(--green)','🟢')}</div>
-      <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:var(--r)">${stockTable(sells,'📉 SELL / Avoid','var(--red)','🔴')}</div>
+      <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:var(--r);margin-bottom:12px">${stockTable(buys,'📈 BUY Candidates','var(--green)','🟢','buy',wlBuyPage)}</div>
+      <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:var(--r)">${stockTable(sells,'📉 SELL / Avoid','var(--red)','🔴','sell',wlSellPage)}</div>
     </div>
-    <div style="padding:8px;font-size:10px;color:var(--muted)">Score = Price×Volume + RSI + MACD + EMA + ADX + Supertrend · Live NSE Data · Educational only</div>`;
+    <div style="padding:8px;font-size:10px;color:var(--muted)">Score = Price×Volume + RSI + MACD + EMA + ADX + Supertrend · Live NSE Data · Educational only · Buy/Sell recommendations always use the full ${total}-stock watchlist regardless of the page shown here</div>`;
   document.getElementById('watchTable').style.display='block';
+}
+
+// Change which page of the Buy or Sell table is shown. Purely local —
+// re-slices the already-fetched full dataset, no network call, and never
+// touches the Prakash/AI recommendation panels (those are independent of
+// table pagination and always reflect the complete watchlist).
+function setWlPage(section, page){
+  if(section==='buy') wlBuyPage=page; else wlSellPage=page;
+  if(wlLastData) renderWatchlist(wlLastData, true);
 }
 
 // Custom watchlist manager

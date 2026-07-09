@@ -123,3 +123,33 @@ FILES CHANGED (2 total, same as Round 1 -- both updated in this package)
 app/datasources.php   -- + backfillHistoryViaTwelveData()
 app/api/watchlist.php -- apiTick() now calls the backfill every cron tick
 
+ROUND 3 -- TABLE PAGINATION (DISPLAY ONLY, RECOMMENDATIONS UNCHANGED)
+========================================================================
+Confirmed first: apiWatchlistPage() already builds Prakash/AI Buy-Sell
+recommendations from the FULL watchlist ($allStocks, all 214+ stocks)
+regardless of any sector/search filter -- that part was already correct
+and needed no backend change.
+
+What was missing: the Watchlist tab was rendering every matching stock
+into the DOM in one shot (all Buy-signal stocks in one table, all Sell-
+signal stocks in another) -- for a 214-stock watchlist that's 100+ rows
+of a fairly heavy table (progress bars, badges, etc.) painted at once.
+
+Added client-side pagination (app/views/dashboard.php only):
+  - 50 stocks/page (WL_PAGE_SIZE), separately for the Buy table and the
+    Sell table, each with Prev/Next + page-number controls.
+  - Purely local: the full stocks/buy_list/sell_list arrays are already
+    in memory from the one /api/watchlist/page response. Changing pages
+    just re-slices that array and re-renders -- no network call, so it's
+    instant and doesn't touch or re-trigger the quote-fetch step.
+  - Recommendation panels (Prakash/AI boxes, EOD tracker) are completely
+    separate from this and were not touched -- they already only ever
+    read d.prakash_recommendations / d.ai_recommendations, which the
+    server always builds from the complete watchlist.
+
+FILES CHANGED (3 total now)
+=============================
+app/datasources.php   -- + backfillHistoryViaTwelveData()
+app/api/watchlist.php -- apiTick() now calls the backfill every cron tick
+app/views/dashboard.php -- Buy/Sell tables paginated client-side (50/page)
+
