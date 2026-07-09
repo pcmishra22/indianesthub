@@ -956,61 +956,15 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
         ];
     }
 
-    // "Pick of the Day": Top 5 Buy + Top 5 Sell across the *whole* tracked
-    // universe, ranked by point score — not just the momentum/new-entry
-    // box below, so a stock with a strong point score but no fresh
-    // momentum trigger this exact refresh still surfaces here.
-    //
-    // A stock is scored independently for both sides (its Buy-side score
-    // and Sell-side score use different signal formulas, so both can come
-    // out non-trivial for a choppy/volatile stock), but showing the SAME
-    // stock in both the Buy leaderboard and the Sell leaderboard at once
-    // is not an actionable signal for a trader — you can't act on "buy
-    // this AND sell this right now" for one stock. So each stock is only
-    // ever placed on the side it scores strictly higher on; a tie falls
-    // back to whichever side currently holds the leaderboard-extreme rank
-    // (top gainer -> Buy, top loser -> Sell) to break it deterministically.
+    // NOTE: top5_buy / top5_sell ("Leaderboard") are no longer computed
+    // independently here. They are now derived directly from $buyCandidates /
+    // $sellCandidates (the same momentum box shown as "Momentum Intraday
+    // Recommendations") further below, once those candidates have their
+    // point-score attached — see "Leaderboard = box, ranked by point score"
+    // below. This guarantees the box, the leaderboard, and the daily tally
+    // always agree on which stocks are today's picks, instead of three
+    // separately-computed lists that could disagree in count and membership.
     $topPicksCount = (int)(defined('MS_TOP_PICKS_COUNT') ? MS_TOP_PICKS_COUNT : 5);
-    $buyPicks = [];
-    $sellPicks = [];
-    foreach ($pointScores as $symbol => $sides) {
-        $stock = $stocksBySymbol[$symbol] ?? null;
-        if (!$stock) continue;
-        $buyScore = $sides['Buy']['score'];
-        $sellScore = $sides['Sell']['score'];
-        if ($buyScore === $sellScore) {
-            $dominant = isset($topGainersSet[$symbol]) ? 'Buy' : (isset($topLosersSet[$symbol]) ? 'Sell' : 'Buy');
-        } else {
-            $dominant = $buyScore > $sellScore ? 'Buy' : 'Sell';
-        }
-        if ($dominant === 'Buy') {
-            $buyPicks[] = [
-                'symbol' => $symbol,
-                'price' => (float)($stock['price'] ?? 0),
-                'percentage_change' => (float)($stock['change_pct'] ?? 0),
-                'rank' => $currentRanks[$symbol] ?? null,
-                'score' => $sides['Buy']['score'],
-                'stars' => $sides['Buy']['stars'],
-                'tier' => $sides['Buy']['tier'],
-                'signals' => $sides['Buy']['signals'],
-            ];
-        } else {
-            $sellPicks[] = [
-                'symbol' => $symbol,
-                'price' => (float)($stock['price'] ?? 0),
-                'percentage_change' => (float)($stock['change_pct'] ?? 0),
-                'rank' => $currentRanks[$symbol] ?? null,
-                'score' => $sides['Sell']['score'],
-                'stars' => $sides['Sell']['stars'],
-                'tier' => $sides['Sell']['tier'],
-                'signals' => $sides['Sell']['signals'],
-            ];
-        }
-    }
-    usort($buyPicks, fn($a, $b) => $b['score'] <=> $a['score']);
-    usort($sellPicks, fn($a, $b) => $b['score'] <=> $a['score']);
-    $top5Buy  = array_slice($buyPicks, 0, $topPicksCount);
-    $top5Sell = array_slice($sellPicks, 0, $topPicksCount);
 
     // ── Build the Buy/Sell candidate sets for this refresh. ──
     //
@@ -1207,6 +1161,37 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
     }
     unset($c);
 
+    // ── Leaderboard = box, ranked by point score ───────────────────────
+    // Previously this leaderboard was computed independently across the
+    // whole tracked universe, which meant it could show a completely
+    // different stock count/membership than the box above (e.g. 5 Buy /
+    // 1 Sell on the leaderboard vs. 5 Buy / 5 Sell in the box) — confusing
+    // since both claim to be "today's picks". Now it's simply the box
+    // candidates themselves, sorted by point score, so the leaderboard is
+    // guaranteed to show the same stocks (and the same count, up to
+    // $topPicksCount) as the box directly above it.
+    $top5Buy = $buyCandidates;
+    usort($top5Buy, fn($a, $b) => ($b['point_score'] ?? 0) <=> ($a['point_score'] ?? 0));
+    $top5Buy = array_slice($top5Buy, 0, $topPicksCount);
+    foreach ($top5Buy as &$p) {
+        $p['score'] = $p['point_score'] ?? 0;
+        $p['stars'] = $p['stars'] ?? 0;
+        $p['tier'] = $p['tier'] ?? '';
+        $p['signals'] = $pointScores[$p['symbol']]['Buy']['signals'] ?? [];
+    }
+    unset($p);
+
+    $top5Sell = $sellCandidates;
+    usort($top5Sell, fn($a, $b) => ($b['point_score'] ?? 0) <=> ($a['point_score'] ?? 0));
+    $top5Sell = array_slice($top5Sell, 0, $topPicksCount);
+    foreach ($top5Sell as &$p) {
+        $p['score'] = $p['point_score'] ?? 0;
+        $p['stars'] = $p['stars'] ?? 0;
+        $p['tier'] = $p['tier'] ?? '';
+        $p['signals'] = $pointScores[$p['symbol']]['Sell']['signals'] ?? [];
+    }
+    unset($p);
+
     // ── Rank-based Top Gainer / Top Loser signal ──────────────────────
     // Runs on EVERY iteration (including the initial one), independent
     // of the 5-iteration momentum system above. Whichever stock is
@@ -1397,31 +1382,40 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
     // close quotes) or after close would silently write fresh "recommendations"
     // into today's log using data that was never really a live intraday move.
     if ($marketHoursNow) {
-    if ($isInitial) {
-        $registerRecommendation($headlineBuyCandidate, 'Buy', $buyHeadlineReason, 0.0);
-        $registerRecommendation($headlineSellCandidate, 'Sell', $sellHeadlineReason, 0.0);
-    } else {
-        foreach ($buyCandidates as $c) {
-            $registerRecommendation(
-                ['symbol' => $c['symbol'], 'price' => $c['price'], 'change_pct' => $c['percentage_change'] ?? null],
-                'Buy',
-                $c['reason'] ?? 'Momentum Buy',
-                isset($c['confidence']) ? (float)$c['confidence'] : null
-            );
-        }
-        foreach ($sellCandidates as $c) {
-            $registerRecommendation(
-                ['symbol' => $c['symbol'], 'price' => $c['price'], 'change_pct' => $c['percentage_change'] ?? null],
-                'Sell',
-                $c['reason'] ?? 'Momentum Sell',
-                isset($c['confidence']) ? (float)$c['confidence'] : null
-            );
-        }
+    // Register EVERY candidate currently in the Buy/Sell box — on every
+    // iteration, including the very first one. Previously the initial
+    // iteration only locked in a single headline Buy + Sell (per the
+    // original "day's opening picks" spec), while the box itself displayed
+    // up to 5+5 candidates — so "Today X/Y targets hit" could read e.g.
+    // "0/2" on the same refresh where the box showed 10 stocks. Registering
+    // the whole box every time (registerRecommendation already dedupes by
+    // symbol/open-position) keeps the daily tally in lockstep with what's
+    // actually shown in the box and on the leaderboard above.
+    foreach ($buyCandidates as $c) {
+        $registerRecommendation(
+            ['symbol' => $c['symbol'], 'price' => $c['price'], 'change_pct' => $c['percentage_change'] ?? null],
+            'Buy',
+            $c['reason'] ?? 'Momentum Buy',
+            isset($c['confidence']) ? (float)$c['confidence'] : 0.0
+        );
+    }
+    foreach ($sellCandidates as $c) {
+        $registerRecommendation(
+            ['symbol' => $c['symbol'], 'price' => $c['price'], 'change_pct' => $c['percentage_change'] ?? null],
+            'Sell',
+            $c['reason'] ?? 'Momentum Sell',
+            isset($c['confidence']) ? (float)$c['confidence'] : 0.0
+        );
+    }
+    if (!$isInitial) {
         // The rank-based signal (current #1 / current last position) is
         // registered unconditionally here too, even if the display box
         // was already full and it didn't get a slot above — dedup inside
         // registerRecommendation makes this a no-op price refresh if it
-        // was already tracked from the box loop just above.
+        // was already tracked from the box loop just above. (On the
+        // initial iteration the top gainer/loser are already the first
+        // entries in $buyCandidates/$sellCandidates, so this would just
+        // be a redundant no-op there.)
         if ($rankBuyCandidate) {
             $registerRecommendation(
                 ['symbol' => $rankBuyCandidate['symbol'], 'price' => $rankBuyCandidate['price'], 'change_pct' => $rankBuyCandidate['percentage_change'] ?? null],

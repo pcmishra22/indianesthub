@@ -1111,7 +1111,7 @@ function renderEngineTopPicks(engine, rec){
   const sellCol=`<div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">🏆 Leaderboard — Top ${top5Sell.length} Sell${asOfHtml}</div>` +
     (top5Sell.length?top5Sell.map(p=>pickRow(p,'Sell')).join(''):'<div style="font-size:11px;color:var(--muted)">No candidates yet</div>');
   el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:12px">
-    <div style="font-size:10px;color:var(--muted);grid-column:1/-1;margin-bottom:-6px">Ranked by point-score across the whole tracked list — not the same as, and not limited to, today's locked-in picks above</div>
+    <div style="font-size:10px;color:var(--muted);grid-column:1/-1;margin-bottom:-6px">Same picks as the boxes above, re-ranked by point score — every stock shown here is also locked into today's tally</div>
     <div style="display:flex;flex-direction:column;gap:5px">${buyCol}</div>
     <div style="display:flex;flex-direction:column;gap:5px">${sellCol}</div>
   </div>`;
