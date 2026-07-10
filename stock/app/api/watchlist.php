@@ -33,7 +33,10 @@ function apiWatchlist(): array
     }
 
     $username = getCurrentUser();
-    $symbols = $username ? getUserWatchlist($username) : getActiveWatchlist();
+    $rawSyms  = $username ? getUserWatchlist($username) : getActiveWatchlist();
+    // Same large-watchlist fallback as apiWatchlistPage() — see config.php
+    // RELIABLE_FALLBACK_SYMBOLS for why.
+    $symbols = count($rawSyms) > WATCHLIST_LARGE_THRESHOLD ? RELIABLE_FALLBACK_SYMBOLS : $rawSyms;
     $stocks  = [];
 
     foreach ($symbols as $sym) {
@@ -989,7 +992,16 @@ function analyzeSymbolsBatch(array $syms, array $allQuotes): array
 function apiWatchlistPage(int $page = 1, string $sector = '', string $search = ''): array
 {
     $username = getCurrentUser();
-    $fullSyms = $username ? getUserWatchlist($username) : getActiveWatchlist();
+    $rawSyms  = $username ? getUserWatchlist($username) : getActiveWatchlist();
+
+    // ── Step 0: large watchlists (> WATCHLIST_LARGE_THRESHOLD, default 50)
+    // don't fetch reliably from the free scrape sources (BSE scrip map,
+    // Stooq, NSE, Groww each only cover a subset) — the result used to
+    // vary run to run with most symbols silently dropped. Instead, fall
+    // back deterministically to a fixed set of 24 large-cap symbols that
+    // are guaranteed coverage (see RELIABLE_FALLBACK_SYMBOLS in config.php).
+    $fallbackApplied = count($rawSyms) > WATCHLIST_LARGE_THRESHOLD;
+    $fullSyms = $fallbackApplied ? RELIABLE_FALLBACK_SYMBOLS : $rawSyms;
 
     // ── Step 1: check if browser already pushed quotes via /api/proxy/quotes ──
     // This is the primary path when server-side sources (Stooq/Yahoo/NSE) are IP-blocked.
@@ -1072,6 +1084,11 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
         'custom_watchlist' => $username ? getUserWatchlist($username) : [],
         'prakash_recommendations' => $prakash,
         'ai_recommendations' => $ai,
+        'fallback_applied'      => $fallbackApplied,
+        'fallback_watchlist_size' => count($rawSyms),
+        'fallback_reason'       => $fallbackApplied
+            ? ('Watchlist has ' . count($rawSyms) . ' symbols — showing the ' . count(RELIABLE_FALLBACK_SYMBOLS) . ' most reliably-covered large-caps instead of an inconsistent partial scrape.')
+            : null,
     ];
 }
 

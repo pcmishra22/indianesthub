@@ -1319,7 +1319,9 @@ function renderWatchlist(d, preserveWlPage){
   document.getElementById('kpiNifty').textContent=d.nifty_view||'';
   document.getElementById('kpiTime').textContent=new Date().toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata'});
   document.getElementById('kpiCached').textContent=d.cached?'cached (< 5 min)':'fresh data';
-  document.getElementById('cacheNote').textContent=d.cached?'⚡ Cached':'🔴 Live';
+  document.getElementById('cacheNote').textContent=d.fallback_applied
+    ? `⚠️ ${d.fallback_reason||('Showing top '+total+' reliable stocks instead of '+(d.fallback_watchlist_size||'')+' — see notes')}`
+    : (d.cached?'⚡ Cached':'🔴 Live');
   renderWatchlistManager(d.custom_watchlist||[]);
 
   function momBar(score){

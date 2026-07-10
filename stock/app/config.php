@@ -179,6 +179,24 @@ define('WATCHLIST_SYMBOLS', [
     'AIAENG.NS','ELGIEQUIP.NS','ESCORTS.NS','KIRLOSENG.NS','TDPOWERSYS.NS',
 ]);
 
+// ─── Reliable fallback symbols ────────────────────────────────
+// WATCHLIST_SYMBOLS (~214 stocks) is too large to fetch reliably from the
+// free scrape sources (BSE scrip map, Stooq, NSE, Groww) — most requests
+// only get partial coverage and the result set varies from run to run.
+// When the active watchlist is large (see WATCHLIST_LARGE_THRESHOLD below),
+// we fall back to this fixed set of 24 large-cap, high-liquidity NSE names.
+// These are exactly the symbols covered by bseScripCode() in datasources.php,
+// so they reliably resolve a live quote every time regardless of which
+// upstream source answers first.
+define('WATCHLIST_LARGE_THRESHOLD', (int)(getenv('WATCHLIST_LARGE_THRESHOLD') ?: 50));
+define('RELIABLE_FALLBACK_SYMBOLS', [
+    'RELIANCE.NS','TCS.NS','HDFCBANK.NS','BHARTIARTL.NS','ICICIBANK.NS',
+    'INFY.NS','SBIN.NS','HINDUNILVR.NS','ITC.NS','LT.NS',
+    'KOTAKBANK.NS','AXISBANK.NS','BAJFINANCE.NS','MARUTI.NS','TITAN.NS',
+    'SUNPHARMA.NS','NTPC.NS','POWERGRID.NS','ONGC.NS','HCLTECH.NS',
+    'ADANIENT.NS','ADANIPORTS.NS','COALINDIA.NS','JSWSTEEL.NS',
+]);
+
 define('SECTOR_MAP', [
     'Banking'    => ['HDFCBANK','ICICIBANK','SBIN','KOTAKBANK','AXISBANK','INDUSINDBK','BANKBARODA','CANBK','PNB','UNIONBANK','IDFCFIRSTB','FEDERALBNK','BANDHANBNK','RBLBANK','AUBANK','CUB'],
     'Finance'    => ['BAJFINANCE','BAJAJFINSV','SHRIRAMFIN','HDFCLIFE','SBILIFE','CHOLAFIN','MUTHOOTFIN','MANAPPURAM','LICHSGFIN','ANGELONE','MOTILALOFS','ABCAPITAL'],

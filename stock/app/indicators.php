@@ -124,28 +124,73 @@ function bollingerBands(array $prices, int $period = 20, float $stdDev = 2.0): a
     return ['upper' => $upper, 'middle' => $middle, 'lower' => $lower];
 }
 
-/** Supertrend (10, 3) — simplified using ATR */
+/**
+ * Supertrend (10, 3).
+ *
+ * Previously this only checked "is today's close above a band 3xATR below
+ * itself" on a single bar — that band is so wide (3x ATR) that close is
+ * almost always above it, so it returned 'Bullish' for nearly every stock,
+ * nearly every day. Downstream (signals.php) uses a Bullish Supertrend to
+ * override a computed Sell/Strong Sell signal back to Buy — so that bug
+ * was silently erasing almost all Sell signals app-wide.
+ *
+ * Fixed to the real Supertrend algorithm: basic bands are computed per bar
+ * from a rolling ATR, then "final" bands and trend direction carry forward
+ * bar-to-bar with proper flip logic (only flips Bearish->Bullish when price
+ * closes above the final upper band, and Bullish->Bearish when price closes
+ * below the final lower band). Returns the trend as of the most recent bar.
+ */
 function supertrend(array $history, int $period = 10, float $mult = 3.0): string
 {
     $n = count($history);
     if ($n < $period + 1) return 'Bullish';
 
-    $trs = [];
+    // True Range for every bar (index 0 has no previous close, skip it).
+    $trs = [null];
     for ($i = 1; $i < $n; $i++) {
-        $h = $history[$i]['high'];
-        $l = $history[$i]['low'];
+        $h  = $history[$i]['high'];
+        $l  = $history[$i]['low'];
         $pc = $history[$i - 1]['close'];
         $trs[] = max($h - $l, abs($h - $pc), abs($l - $pc));
     }
-    // ATR = SMA of TRs
-    $atr = array_sum(array_slice($trs, -$period)) / $period;
 
-    $last = $history[$n - 1];
-    $hl2 = ($last['high'] + $last['low']) / 2;
-    $upperBand = $hl2 + $mult * $atr;
-    $lowerBand = $hl2 - $mult * $atr;
+    // Rolling ATR (simple moving average of TR over $period), per bar.
+    $atrs = array_fill(0, $n, null);
+    for ($i = $period; $i < $n; $i++) {
+        $atrs[$i] = array_sum(array_slice($trs, $i - $period + 1, $period)) / $period;
+    }
 
-    return $last['close'] > $lowerBand ? 'Bullish' : 'Bearish';
+    $finalUpper = null;
+    $finalLower = null;
+    $trend = 'Bullish'; // seed; first few bars with no ATR yet default bullish
+
+    for ($i = $period; $i < $n; $i++) {
+        $bar  = $history[$i];
+        $hl2  = ($bar['high'] + $bar['low']) / 2;
+        $atr  = $atrs[$i];
+        $basicUpper = $hl2 + $mult * $atr;
+        $basicLower = $hl2 - $mult * $atr;
+        $prevClose  = $history[$i - 1]['close'];
+
+        if ($finalUpper === null) {
+            $finalUpper = $basicUpper;
+            $finalLower = $basicLower;
+        } else {
+            $finalUpper = ($basicUpper < $finalUpper || $prevClose > $finalUpper) ? $basicUpper : $finalUpper;
+            $finalLower = ($basicLower > $finalLower || $prevClose < $finalLower) ? $basicLower : $finalLower;
+        }
+
+        $close = $bar['close'];
+        if ($trend === 'Bullish' && $close < $finalLower) {
+            $trend = 'Bearish';
+        } elseif ($trend === 'Bearish' && $close > $finalUpper) {
+            $trend = 'Bullish';
+        }
+        // else: trend unchanged (this is the flip-state carry-forward the
+        // old single-bar version was missing entirely).
+    }
+
+    return $trend;
 }
 
 /** VWAP — intraday approximation using daily data */
