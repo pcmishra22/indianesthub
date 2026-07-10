@@ -11,7 +11,7 @@
 <div class="card border-0 shadow-sm mb-3">
     <div class="card-body py-3">
         <form method="GET" class="row g-2 align-items-end">
-            <div class="col-md-8">
+            <div class="col-md-6">
                 <label class="form-label small mb-1">Search</label>
                 <div class="input-group input-group-sm">
                     <input type="text" name="search" class="form-control"
@@ -20,7 +20,17 @@
                     <button class="btn btn-primary" type="submit"><i data-feather="search" style="width:14px;height:14px;"></i></button>
                 </div>
             </div>
-            @if(request()->filled('search'))
+            <div class="col-md-3">
+                <label class="form-label small mb-1">Purpose</label>
+                <select name="looking_for" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">All</option>
+                    <option value="Sale" {{ request('looking_for') == 'Sale' ? 'selected' : '' }}>Sale</option>
+                    <option value="Rent" {{ request('looking_for') == 'Rent' ? 'selected' : '' }}>Rent</option>
+                    <option value="PG" {{ request('looking_for') == 'PG' ? 'selected' : '' }}>PG</option>
+                    <option value="Renovate" {{ request('looking_for') == 'Renovate' ? 'selected' : '' }}>Renovate</option>
+                </select>
+            </div>
+            @if(request()->filled('search') || request()->filled('looking_for'))
             <div class="col-md-2">
                 <a href="{{ route('admin.properties.index') }}" class="btn btn-sm btn-outline-secondary w-100">
                     <i data-feather="x" style="width:14px;height:14px;" class="me-1"></i>Clear
@@ -47,6 +57,7 @@
 						<th>ID</th>
 						<th>Title</th>
 						<th>Type</th>
+						<th>Purpose</th>
 						<th>City</th>
 						<th>Price</th>
 						<th>Status</th>
@@ -60,6 +71,18 @@
 						<td>{{ $property->id }}</td>
 						<td>{{ $property->title }}</td>
 						<td>{{ $property->property_type }}</td>
+						<td>
+							@php
+								$lf = $property->looking_for ?? '';
+								$lfBadge = match($lf) {
+									'Rent' => 'bg-info',
+									'PG' => 'bg-warning text-dark',
+									'Renovate' => 'bg-danger',
+									default => 'bg-success',
+								};
+							@endphp
+							<span class="badge {{ $lfBadge }}">{{ $lf ?: '—' }}</span>
+						</td>
 						<td>{{ $property->city }}</td>
 						<td>{{ $property->price }}</td>
 						<td>
@@ -98,7 +121,7 @@
 
 				@empty
 					<tr>
-						<td colspan="7" class="text-center">No properties found.</td>
+						<td colspan="8" class="text-center">No properties found.</td>
 					</tr>
 				@endforelse
 				</tbody>

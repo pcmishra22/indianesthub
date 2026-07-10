@@ -381,6 +381,7 @@
           <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties', ['looking_for' => 'Sale']) }}">Buy Property</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties', ['looking_for' => 'Rent']) }}">Rent Property</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties', ['looking_for' => 'PG']) }}">PG / Co-living</a></li>
+          <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties', ['looking_for' => 'Renovate']) }}">Renovate</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties', ['property_type' => 'Apartment']) }}">Flats</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties', ['property_type' => 'Villa']) }}">Villas</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties', ['property_type' => 'Plot']) }}">Plots</a></li>

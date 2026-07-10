@@ -48,6 +48,7 @@
                 <option value="">Select Option</option>
                 <option value="Rent" {{ old('looking_for', $property->looking_for ?? '') == 'Rent' ? 'selected' : '' }}>Rent</option>
                 <option value="Sale" {{ old('looking_for', $property->looking_for ?? '') == 'Sale' ? 'selected' : '' }}>Sale</option>
+                <option value="Renovate" {{ old('looking_for', $property->looking_for ?? '') == 'Renovate' ? 'selected' : '' }}>Renovate</option>
             </select>
         </div>
         <div class="row">

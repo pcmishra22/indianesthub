@@ -17,6 +17,7 @@
             <button class="hero-tab active" onclick="switchHeroTab('buy',this)"><i class="bi bi-house-check"></i> Buy</button>
             <button class="hero-tab" onclick="switchHeroTab('rent',this)"><i class="bi bi-key"></i> Rent</button>
             <button class="hero-tab" onclick="switchHeroTab('pg',this)"><i class="bi bi-people"></i> PG</button>
+            <button class="hero-tab" onclick="switchHeroTab('renovate',this)"><i class="bi bi-tools"></i> Renovate</button>
             <button class="hero-tab" onclick="switchHeroTab('new',this)"><i class="bi bi-building-add"></i> New Projects</button>
           </div>
 
@@ -131,6 +132,46 @@
               <span>Popular:</span>
               <a href="{{ route('properties', ['looking_for'=>'PG','city'=>'Zirakpur']) }}" class="popular-tag">PG in Zirakpur</a>
               <a href="{{ route('properties', ['looking_for'=>'PG','city'=>'Chandigarh']) }}" class="popular-tag">PG in Chandigarh</a>
+            </div>
+          </div>
+
+          {{-- Renovate --}}
+          <div class="hero-tab-panel" id="htab-renovate">
+            <form action="{{ route('properties') }}" method="GET">
+              <input type="hidden" name="looking_for" value="Renovate">
+              <div class="hero-search-row">
+                <div class="hero-field" style="flex:2;min-width:180px;">
+                  <label><i class="bi bi-geo-alt me-1"></i>Location</label>
+                  <input type="text" name="keyword" placeholder="City, locality, project…">
+                </div>
+                <div class="hero-field">
+                  <label><i class="bi bi-building me-1"></i>Type</label>
+                  <select name="property_type">
+                    <option value="">All Types</option>
+                    <option value="Apartment">Apartment / Flat</option>
+                    <option value="Villa">Villa / House</option>
+                    <option value="Independent House">Independent House</option>
+                    <option value="Commercial">Commercial</option>
+                  </select>
+                </div>
+                <div class="hero-field">
+                  <label><i class="bi bi-currency-rupee me-1"></i>Budget</label>
+                  <select name="max_price">
+                    <option value="">Any Budget</option>
+                    <option value="2500000">Under ₹25 L</option>
+                    <option value="5000000">Under ₹50 L</option>
+                    <option value="10000000">Under ₹1 Cr</option>
+                    <option value="20000000">Under ₹2 Cr</option>
+                  </select>
+                </div>
+                <button type="submit" class="btn-hero-search"><i class="bi bi-search"></i> Search</button>
+              </div>
+            </form>
+            <div class="popular-tags">
+              <span>Popular:</span>
+              <a href="{{ route('properties', ['looking_for'=>'Renovate','city'=>'Zirakpur']) }}" class="popular-tag">Zirakpur</a>
+              <a href="{{ route('properties', ['looking_for'=>'Renovate','city'=>'Mohali']) }}" class="popular-tag">Mohali</a>
+              <a href="{{ route('properties', ['looking_for'=>'Renovate','property_type'=>'Villa']) }}" class="popular-tag">Villas</a>
             </div>
           </div>
 

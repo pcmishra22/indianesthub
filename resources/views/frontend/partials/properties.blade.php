@@ -101,6 +101,12 @@
             <i class="bi bi-people me-1"></i> PG
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link {{ request('looking_for') == 'Renovate' ? 'active' : '' }}"
+             href="{{ url('/properties') . '?' . http_build_query(array_merge(request()->except(['looking_for','page']), ['looking_for'=>'Renovate'])) }}">
+            <i class="bi bi-tools me-1"></i> Renovate
+          </a>
+        </li>
       </ul>
 
       <form method="GET" action="{{ url('/properties') }}" id="propSearchForm">
@@ -279,7 +285,7 @@
         @php $displayCity = request('city'); @endphp
         @if(!$displayCity && request()->route('city')) $displayCity = request()->route('city'); @endif
         @if($displayCity) in {{ $displayCity }} @endif
-        @if(request('looking_for') == 'Sale') &nbsp;· For Sale @elseif(request('looking_for') == 'Rent') &nbsp;· For Rent @elseif(request('looking_for') == 'PG') &nbsp;· PG @endif
+        @if(request('looking_for') == 'Sale') &nbsp;· For Sale @elseif(request('looking_for') == 'Rent') &nbsp;· For Rent @elseif(request('looking_for') == 'PG') &nbsp;· PG @elseif(request('looking_for') == 'Renovate') &nbsp;· For Renovation @endif
         @if($properties->total() > 0)
           <small class="text-muted ms-2">({{ $properties->firstItem() }}–{{ $properties->lastItem() }} shown)</small>
         @endif

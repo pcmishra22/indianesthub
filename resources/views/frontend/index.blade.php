@@ -124,6 +124,11 @@
         <div class="label">PG / Co-living</div>
         <div class="cnt">Available</div>
       </a>
+      <a href="{{ route('properties', ['looking_for' => 'Renovate']) }}" class="prop-type-chip">
+        <div class="icon" style="background:#fef2f2;color:#dc2626;"><i class="bi bi-tools"></i></div>
+        <div class="label">Renovate</div>
+        <div class="cnt">Available</div>
+      </a>
       <a href="{{ route('builders.index') }}" class="prop-type-chip">
         <div class="icon" style="background:#f0fdf4;color:#16a34a;"><i class="bi bi-building-add"></i></div>
         <div class="label">New Projects</div>

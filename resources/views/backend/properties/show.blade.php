@@ -97,6 +97,10 @@
 				<td>{{ $property->property_type }}</td>
 			</tr>
 			<tr>
+				<th>Purpose</th>
+				<td>{{ $property->looking_for ?: '—' }}</td>
+			</tr>
+			<tr>
 				<th>City</th>
 				<td>{{ $property->city }}</td>
 			</tr>

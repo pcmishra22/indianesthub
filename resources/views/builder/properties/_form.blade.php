@@ -46,6 +46,7 @@
                         <select name="looking_for" class="form-select">
                             <option value="Sale"  {{ old('looking_for', $property->looking_for ?? 'Sale') === 'Sale'  ? 'selected' : '' }}>For Sale</option>
                             <option value="Rent"  {{ old('looking_for', $property->looking_for ?? 'Sale') === 'Rent'  ? 'selected' : '' }}>For Rent</option>
+                            <option value="Renovate"  {{ old('looking_for', $property->looking_for ?? 'Sale') === 'Renovate'  ? 'selected' : '' }}>For Renovation</option>
                         </select>
                     </div>
                     <div class="col-md-4">

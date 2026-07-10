@@ -63,6 +63,7 @@
           <li><a href="{{ url('/properties') }}" class="{{ request()->is('properties') ? 'active' : '' }}">Properties</a></li>
           <li><a href="{{ url('/properties?looking_for=Sale') }}" class="{{ request()->is('properties') && request('looking_for') == 'Sale' ? 'active' : '' }}">Buy</a></li>
           <li><a href="{{ url('/properties?looking_for=Rent') }}" class="{{ request()->is('properties') && request('looking_for') == 'Rent' ? 'active' : '' }}">Rent</a></li>
+          <li><a href="{{ url('/properties?looking_for=Renovate') }}" class="{{ request()->is('properties') && request('looking_for') == 'Renovate' ? 'active' : '' }}">Renovate</a></li>
           <li><a href="{{ url('/services') }}" class="{{ request()->is('services') ? 'active' : '' }}">Services</a></li>
           <li><a href="{{ url('/agents') }}" class="{{ request()->is('agents') ? 'active' : '' }}">Agents</a></li>
           <li><a href="{{ route('builders.index') }}" class="{{ request()->is('builders*') ? 'active' : '' }}">Builders</a></li>

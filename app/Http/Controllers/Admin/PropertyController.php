@@ -18,8 +18,13 @@ class PropertyController extends Controller
                 $q->where('title', 'like', "%{$search}%")
                   ->orWhere('city', 'like', "%{$search}%")
                   ->orWhere('property_type', 'like', "%{$search}%")
-                  ->orWhere('address', 'like', "%{$search}%");
+                  ->orWhere('address', 'like', "%{$search}%")
+                  ->orWhere('looking_for', 'like', "%{$search}%");
             });
+        }
+
+        if ($lookingFor = $request->input('looking_for')) {
+            $query->where('looking_for', $lookingFor);
         }
 
         $properties = $query->latest()->paginate(20)->withQueryString();
