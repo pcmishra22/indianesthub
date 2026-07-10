@@ -550,6 +550,17 @@ function yahooQuoteBulk(array $symbols, bool $forceRefresh = false): array
         if (!empty($cached)) return $cached;
     }
 
+    // Hard wall-clock ceiling for this whole function. The two sequential
+    // per-symbol loops below (NSE, Groww) used to have no time budget at
+    // all — if those sources were slow or silently hanging for even a
+    // handful of missing symbols, the combined wait could run to several
+    // minutes, which is what was causing the reverse-proxy/gateway to give
+    // up and return 504 before PHP ever got a chance to respond. Every
+    // per-symbol loop below now checks elapsed time and bails out early,
+    // returning whatever was fetched so far, well before that happens.
+    $fnStart = microtime(true);
+    $hardDeadline = 20.0; // seconds, measured from the start of this call
+
     // NOTE: these sources are merged, not tried-in-order-and-stop. bseQuoteBulk
     // in particular only ever covers the ~111 symbols in its hardcoded scrip-code
     // map — treating that as "success" used to make the function return early
@@ -560,13 +571,14 @@ function yahooQuoteBulk(array $symbols, bool $forceRefresh = false): array
     $all = bseQuoteBulk($symbols);
 
     $missing = array_values(array_diff($symbols, array_keys($all)));
-    if (!empty($missing)) {
+    if (!empty($missing) && (microtime(true) - $fnStart) < $hardDeadline) {
         $all += stooqBulkFetch($missing);
     }
 
     $missing = array_values(array_diff($symbols, array_keys($all)));
     if (!empty($missing)) {
         foreach ($missing as $sym) {
+            if ((microtime(true) - $fnStart) > $hardDeadline) break;
             $q = nseMarketFetch($sym);
             if (!$q) $q = nseQuoteFallback($sym);
             if ($q && ($q['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $q;
@@ -577,6 +589,7 @@ function yahooQuoteBulk(array $symbols, bool $forceRefresh = false): array
     $missing = array_values(array_diff($symbols, array_keys($all)));
     if (!empty($missing)) {
         foreach ($missing as $sym) {
+            if ((microtime(true) - $fnStart) > $hardDeadline) break;
             $q = growwQuoteFetch($sym);
             if ($q && ($q['regularMarketPrice'] ?? 0) > 0) $all[$sym] = $q;
             usleep(150000);
@@ -693,7 +706,7 @@ function nseQuoteFallback(string $symbol): ?array
         $ch = curl_init('https://www.nseindia.com/');
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_TIMEOUT => 5, CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_HEADERFUNCTION => function ($c, $h) use (&$rawHeaders) { $rawHeaders .= $h; return strlen($h); },
             CURLOPT_HTTPHEADER => [
                 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -720,7 +733,7 @@ function nseQuoteFallback(string $symbol): ?array
     $ch = curl_init('https://www.nseindia.com/api/quote-equity?symbol=' . urlencode($nseSym));
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_TIMEOUT => 6, CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_COOKIE => $cookieStr,
         CURLOPT_HTTPHEADER => [
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -984,7 +997,7 @@ function growwQuoteFetch(string $nseSymbol): ?array
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_TIMEOUT => 8, CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_TIMEOUT => 5, CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_HTTPHEADER => [
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept: application/json',
@@ -1044,7 +1057,7 @@ function nseMarketFetch(string $symbol): ?array
         $ch = curl_init('https://www.nseindia.com/market-data/live-equity-market');
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_TIMEOUT => 5, CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_HEADERFUNCTION => function ($c, $h) use (&$rawHeaders) { $rawHeaders .= $h; return strlen($h); },
             CURLOPT_HTTPHEADER => [
                 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
@@ -1074,7 +1087,7 @@ function nseMarketFetch(string $symbol): ?array
     $ch = curl_init('https://www.nseindia.com/api/quote-equity?symbol=' . urlencode($sym));
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_TIMEOUT => 12, CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_TIMEOUT => 6, CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_ENCODING => 'gzip',
         CURLOPT_COOKIE => $cookieStr,
         CURLOPT_HTTPHEADER => [
@@ -1172,7 +1185,7 @@ function bseQuoteFetch(string $nseSymbol): ?array
     $ch  = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_TIMEOUT => 10, CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_TIMEOUT => 8, CURLOPT_CONNECTTIMEOUT => 4, CURLOPT_SSL_VERIFYPEER => false,
         CURLOPT_ENCODING => 'gzip',
         CURLOPT_HTTPHEADER => [
             'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',

@@ -737,12 +737,17 @@ async function loadWatchlist(force=false){
     // Step 1: get symbols
     const wlRes=await fetch(apiUrl('api/watchlist/list'));
     const wlData=await wlRes.json();
-    let symbols=wlData.watchlist||[];
+    // analysis_watchlist is the (possibly-truncated-to-24) list to actually
+    // fetch quotes for. 'watchlist' itself stays untouched full-size for the
+    // watchlist-manager chips elsewhere (renderWatchlistManager).
+    let symbols=wlData.analysis_watchlist||wlData.watchlist||[];
     const watchlistMeta=wlData.meta||{};
     if(!symbols.length) symbols=['RELIANCE.NS','TCS.NS','HDFCBANK.NS','INFY.NS','ICICIBANK.NS'];
     const sourceLabel = watchlistMeta.used_default_fallback ? 'Default universe' : 'Custom watchlist';
     const sourceBadge = document.getElementById('watchlistSourceBadge');
     if(sourceBadge){ sourceBadge.textContent = sourceLabel; }
+    const cacheNoteEl = document.getElementById('cacheNote');
+    if(cacheNoteEl){ cacheNoteEl.textContent = watchlistMeta.fallback_applied ? ('⚠️ '+(watchlistMeta.fallback_reason||'Using reliable subset')) : ''; }
 
     // Step 2: fetch quotes for the ENTIRE watchlist — no more pagination,
     // every stock is fetched and analysed together.

@@ -79,7 +79,31 @@ if ($uri === '/api/watchlist/list') {
     $pathExists = $path !== '' && file_exists($path);
     $wl = $username ? getUserWatchlist($username) : [];
     $meta = $username ? getUserWatchlistMeta($username, $pathExists) : ['watchlist_source' => 'default', 'used_default_fallback' => true, 'watchlist_count' => count($wl)];
-    echo json_encode(['watchlist' => $wl, 'meta' => $meta]);
+
+    // 'watchlist' stays the FULL list unchanged — the watchlist-manager UI
+    // (add/remove chips) needs to show/edit every symbol the user actually
+    // has, not a truncated view.
+    //
+    // 'analysis_watchlist' is what the browser should actually fetch live
+    // quotes for and hand to the analysis endpoints. Fetching quotes one
+    // symbol at a time for the full ~214-symbol universe from the browser
+    // is slow and fails for most of them, so above the same threshold used
+    // server-side in apiWatchlistPage()/apiWatchlist(), we hand back the 24
+    // reliably-covered symbols instead. This never touches the user's saved
+    // watchlist file.
+    $rawCount = count($wl);
+    $fallbackApplied = $rawCount > WATCHLIST_LARGE_THRESHOLD;
+    $meta['fallback_applied'] = $fallbackApplied;
+    if ($fallbackApplied) {
+        $meta['fallback_watchlist_size'] = $rawCount;
+        $meta['fallback_reason'] = 'Watchlist has ' . $rawCount . ' symbols — using the ' . count(RELIABLE_FALLBACK_SYMBOLS) . ' most reliably-covered large-caps instead.';
+    }
+
+    echo json_encode([
+        'watchlist' => $wl,
+        'analysis_watchlist' => $fallbackApplied ? RELIABLE_FALLBACK_SYMBOLS : $wl,
+        'meta' => $meta,
+    ]);
     exit;
 }
 if ($uri === '/api/watchlist/reset' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -172,6 +196,7 @@ if ($uri === '/api/cron') {
 // ($page kept as a harmless no-op param for backward compatibility with old cached JS.)
 if ($uri === '/api/watchlist/page') {
     header('Content-Type: application/json');
+    @set_time_limit(30); // same reasoning as /api/quotes/bulk above
     $page   = max(1, (int)($_GET['page']   ?? 1));
     $sector = trim($_GET['sector'] ?? '');
     $search = strtoupper(trim($_GET['search'] ?? ''));
@@ -352,6 +377,12 @@ if ($uri === '/api/eod/combined') {
 // ── Server-side bulk quotes via Stooq (replaces browser Yahoo fetch) ──
 if ($uri === '/api/quotes/bulk' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
+    // yahooQuoteBulk() now has its own internal ~20s hard deadline (see
+    // datasources.php), but shared hosting sometimes sets a lower default
+    // max_execution_time than that in php.ini — raise it here so PHP itself
+    // doesn't kill the request before our own deadline logic gets to return
+    // a (possibly partial) result gracefully.
+    @set_time_limit(30);
     $body    = file_get_contents('php://input');
     $data    = json_decode($body, true);
     $symbols = $data['symbols'] ?? [];
