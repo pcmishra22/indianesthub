@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\DataImportBatch;
+use App\Models\Property;
 use App\Services\CityDataDiscoveryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,10 +27,11 @@ class CityDataImportController extends Controller
         $validated = $request->validate([
             'city' => ['required', 'string', 'max:120'],
             'type' => ['required', 'in:builder,agent,property'],
+            'csv_file' => ['nullable', 'file', 'mimes:csv,txt', 'max:5120'],
         ]);
 
         try {
-            $result = $service->discover($validated['type'], $validated['city']);
+            $result = $service->discover($validated['type'], $validated['city'], $request->file('csv_file'));
         } catch (\RuntimeException $e) {
             return back()->withErrors(['discovery' => $e->getMessage()]);
         }
@@ -80,9 +82,10 @@ class CityDataImportController extends Controller
             }
 
             $ok = match ($batch->type) {
-                'builder' => $this->insertBuilder($item),
-                'agent'   => $this->insertAgent($item),
-                default   => false, // property inserts go through the CSV import path, not here
+                'builder'  => $this->insertBuilder($item),
+                'agent'    => $this->insertAgent($item),
+                'property' => $this->insertProperty($item),
+                default    => false,
             };
 
             $ok ? $inserted++ : $skipped++;
@@ -105,6 +108,76 @@ class CityDataImportController extends Controller
         return redirect()
             ->route('admin.city-import.create')
             ->with('status', "Batch for {$batch->city} discarded — nothing was written to the database.");
+    }
+
+    protected function insertProperty(array $item): bool
+    {
+        $title = $item['title'] ?? null;
+        $address = $item['address'] ?? null;
+        $city = $item['city'] ?? null;
+        if (!$title || !$address || !$city) {
+            return false;
+        }
+
+        // Dedup: skip if a property with the same title+address+city already exists.
+        $alreadyExists = DB::table('properties')
+            ->whereRaw('LOWER(title) = ?', [strtolower($title)])
+            ->whereRaw('LOWER(address) = ?', [strtolower($address)])
+            ->whereRaw('LOWER(city) = ?', [strtolower($city)])
+            ->exists();
+        if ($alreadyExists) {
+            return false;
+        }
+
+        // Uses the Eloquent model (not DB::table) so the model's `creating` event
+        // still auto-generates a unique slug — the frontend property page is
+        // routed by slug (`{property:slug}`), so a raw DB insert would leave
+        // these properties with no working URL.
+        Property::create([
+            'property_dealer_id' => $this->getImportDealerId(),
+            'title'              => $title,
+            'description'        => $item['description'] ?? null,
+            'property_type'      => $item['property_type'] ?? 'Apartment',
+            'looking_for'        => $item['looking_for'] ?? 'Sale',
+            'address'            => $address,
+            'city'               => $city,
+            'state'              => $item['state'] ?? '',
+            'price'              => $item['price'] ?? 0,
+            'bedrooms'           => $item['bedrooms'] ?? null,
+            'bathrooms'          => $item['bathrooms'] ?? null,
+            'area'               => $item['area'] ?? null,
+            'furnishing'         => $item['furnishing'] ?? null,
+            'amenities'          => $item['amenities'] ?? null,
+            'status'             => 'Available',
+        ]);
+
+        return true;
+    }
+
+    /**
+     * CSV-imported properties still need a property_dealer_id (required FK).
+     * Reuses (or creates once) a single system "CSV Import" dealer account to
+     * attribute them to, rather than inventing a fake dealer per row.
+     */
+    protected function getImportDealerId(): int
+    {
+        $email = 'csv-import@indianesthub.system';
+
+        $existing = DB::table('property_dealers')->where('email', $email)->value('id');
+        if ($existing) {
+            return $existing;
+        }
+
+        return DB::table('property_dealers')->insertGetId([
+            'first_name'   => 'CSV',
+            'last_name'    => 'Import',
+            'phone'        => '0000000000',
+            'email'        => $email,
+            'company_name' => 'Admin CSV Import',
+            'password'     => Hash::make(Str::random(32)),
+            'created_at'   => now(),
+            'updated_at'   => now(),
+        ]);
     }
 
     protected function insertBuilder(array $item): bool

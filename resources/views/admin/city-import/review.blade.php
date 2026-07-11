@@ -19,25 +19,49 @@
             @csrf
             <table class="table table-striped align-middle">
                 <thead>
-                    <tr>
-                        <th><input type="checkbox" onclick="document.querySelectorAll('.row-check').forEach(c => c.checked = this.checked)" checked></th>
-                        <th>Name</th>
-                        <th>Phone</th>
-                        <th>Website</th>
-                        <th>Address</th>
-                        <th>Rating</th>
-                    </tr>
+                    @if ($batch->type === 'property')
+                        <tr>
+                            <th><input type="checkbox" onclick="document.querySelectorAll('.row-check').forEach(c => c.checked = this.checked)" checked></th>
+                            <th>Title</th>
+                            <th>Type</th>
+                            <th>Purpose</th>
+                            <th>Address</th>
+                            <th>City</th>
+                            <th>Price</th>
+                        </tr>
+                    @else
+                        <tr>
+                            <th><input type="checkbox" onclick="document.querySelectorAll('.row-check').forEach(c => c.checked = this.checked)" checked></th>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Website</th>
+                            <th>Address</th>
+                            <th>Rating</th>
+                        </tr>
+                    @endif
                 </thead>
                 <tbody>
                     @foreach ($candidates as $i => $c)
-                        <tr>
-                            <td><input class="row-check" type="checkbox" name="selected[]" value="{{ $i }}" checked></td>
-                            <td>{{ $c['name'] ?? '—' }}</td>
-                            <td>{{ $c['phone'] ?? '—' }}</td>
-                            <td>{{ $c['website'] ?? '—' }}</td>
-                            <td>{{ $c['address'] ?? '—' }}</td>
-                            <td>{{ $c['rating'] ?? '—' }}</td>
-                        </tr>
+                        @if ($batch->type === 'property')
+                            <tr>
+                                <td><input class="row-check" type="checkbox" name="selected[]" value="{{ $i }}" checked></td>
+                                <td>{{ $c['title'] ?? '—' }}</td>
+                                <td>{{ $c['property_type'] ?? '—' }}</td>
+                                <td>{{ $c['looking_for'] ?? '—' }}</td>
+                                <td>{{ $c['address'] ?? '—' }}</td>
+                                <td>{{ $c['city'] ?? '—' }}</td>
+                                <td>{{ isset($c['price']) ? number_format((float) $c['price']) : '—' }}</td>
+                            </tr>
+                        @else
+                            <tr>
+                                <td><input class="row-check" type="checkbox" name="selected[]" value="{{ $i }}" checked></td>
+                                <td>{{ $c['name'] ?? '—' }}</td>
+                                <td>{{ $c['phone'] ?? '—' }}</td>
+                                <td>{{ $c['website'] ?? '—' }}</td>
+                                <td>{{ $c['address'] ?? '—' }}</td>
+                                <td>{{ $c['rating'] ?? '—' }}</td>
+                            </tr>
+                        @endif
                     @endforeach
                 </tbody>
             </table>

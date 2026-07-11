@@ -29,25 +29,14 @@ class CityDataDiscoveryService
     /**
      * @return array{candidates: array, notice: ?string}
      */
-    public function discover(string $type, string $city): array
+    public function discover(string $type, string $city, $csvFile = null): array
     {
         $normalizedCity = $this->normalizeCity($city);
 
         return match ($type) {
-            'builder' => (function () {
-                $res = $this->discoverAndDiagnose($normalizedCity, 'builder');
-                return $res;
-            })(),
-            'agent' => (function () {
-                $res = $this->discoverAndDiagnose($normalizedCity, 'agent');
-                return $res;
-            })(),
-            'property' => [
-                'candidates' => $this->discoverProperties($normalizedCity),
-                'notice'     => 'Live property-listing data cannot be auto-crawled from third-party portals '
-                    . '(it would violate their Terms of Service). Use the CSV import option below, or wire a '
-                    . 'licensed listings feed into CityDataDiscoveryService::discoverProperties().',
-            ],
+            'builder' => $this->discoverAndDiagnose($normalizedCity, 'builder'),
+            'agent'   => $this->discoverAndDiagnose($normalizedCity, 'agent'),
+            'property' => $this->discoverProperties($normalizedCity, $csvFile),
             default => ['candidates' => [], 'notice' => 'Unknown type.'],
         };
     }
@@ -69,8 +58,20 @@ class CityDataDiscoveryService
     protected function queryOverpass(string $query): array
     {
         try {
-            $response = Http::timeout(30)
-                ->post($this->overpassUrl, $query);
+            // The query strings are built with literal "\n" inside single-quoted
+            // PHP strings, which PHP does NOT convert to real newlines. Left as-is,
+            // Overpass receives a syntactically invalid query (stray backslashes)
+            // and rejects it. Normalize to real whitespace before sending.
+            $query = str_replace('\\n', "\n", $query);
+
+            // Overpass expects the query as a form field named "data" (like
+            // `curl -d "data=..."`), not as a raw string body or JSON payload.
+            // Http::post($url, $query) with a string was being JSON-encoded and
+            // sent with the wrong Content-Type, which Overpass can't parse.
+            $response = Http::asForm()
+                ->timeout(30)
+                ->withHeaders(['User-Agent' => 'IndianEstHub-CityImport/1.0 (contact: admin@indianesthub.com)'])
+                ->post($this->overpassUrl, ['data' => $query]);
 
             if ($response->failed()) {
                 throw new \RuntimeException('Overpass API request failed: ' . $response->status());
@@ -97,6 +98,7 @@ class CityDataDiscoveryService
         try {
             // Use Nominatim to get coordinates for the city
             $response = Http::timeout(10)
+                ->withHeaders(['User-Agent' => 'IndianEstHub-CityImport/1.0 (contact: admin@indianesthub.com)'])
                 ->get($this->nominatimUrl . '/search', [
                     'q' => $city . ', India',
                     'format' => 'json',
@@ -383,10 +385,141 @@ class CityDataDiscoveryService
         ];
     }
 
-    protected function discoverProperties(string $city): array
+    /**
+     * Property listings can't be auto-crawled from third-party portals or search
+     * engines — that would violate their Terms of Service (and Google/portal
+     * scraping is actively blocked/prohibited). Instead, admins upload a CSV and
+     * we stage the rows here for review exactly like the builder/agent flow —
+     * nothing is written to the properties table until confirmed.
+     *
+     * @return array{candidates: array, notice: ?string}
+     */
+    protected function discoverProperties(string $city, $csvFile = null): array
     {
-        // Properties (individual listings) are not available from OSM in a reliable way
-        // This would require scraping real estate portals which violates their ToS
-        return [];
+        if (!$csvFile) {
+            return [
+                'candidates' => [],
+                'notice' => 'Live property-listing data cannot be auto-crawled from third-party portals or '
+                    . 'search engines (it would violate their Terms of Service). Upload a CSV file below to '
+                    . 'import properties in bulk instead — nothing is saved until you review and confirm the rows.',
+            ];
+        }
+
+        $rows = self::readCsvRows($csvFile->getRealPath());
+        $parsed = self::parseCsvPropertyRows($rows, $city);
+
+        $notice = null;
+        if ($parsed['skipped'] > 0) {
+            $notice = $parsed['skipped'] . ' row(s) were skipped because they were missing a required '
+                . 'column (title, property_type, looking_for, address, city, state, price). '
+                . count($parsed['candidates']) . ' row(s) are ready to review below.';
+        }
+
+        return ['candidates' => $parsed['candidates'], 'notice' => $notice];
+    }
+
+    /**
+     * Reads a CSV file into an array of associative rows (header => value).
+     * Pulled out as its own method so it's trivial to unit test without a DB.
+     */
+    public static function readCsvRows(string $path): array
+    {
+        $rows = [];
+        $handle = fopen($path, 'r');
+        if ($handle === false) {
+            return $rows;
+        }
+
+        $header = fgetcsv($handle);
+        if ($header === false) {
+            fclose($handle);
+            return $rows;
+        }
+        // Strip a UTF-8 BOM if present on the first header cell (common with Excel exports).
+        $header[0] = preg_replace("/^\xEF\xBB\xBF/", '', $header[0]);
+        $header = array_map(fn ($h) => strtolower(trim($h)), $header);
+
+        while (($row = fgetcsv($handle)) !== false) {
+            // Skip fully blank lines (fgetcsv returns [null] for them).
+            if ($row === [null] || $row === false) {
+                continue;
+            }
+            // Pad/truncate the row to match the header length so array_combine never throws.
+            if (count($row) < count($header)) {
+                $row = array_pad($row, count($header), null);
+            } elseif (count($row) > count($header)) {
+                $row = array_slice($row, 0, count($header));
+            }
+            $rows[] = array_combine($header, $row);
+        }
+        fclose($handle);
+
+        return $rows;
+    }
+
+    /**
+     * Validates and normalizes raw CSV rows into candidate property records.
+     * Framework-independent (no DB/Http calls) so it can be unit tested directly.
+     *
+     * @return array{candidates: array, skipped: int}
+     */
+    public static function parseCsvPropertyRows(array $rows, string $defaultCity): array
+    {
+        $required = ['title', 'property_type', 'looking_for', 'address', 'city', 'state', 'price'];
+        $allowedLookingFor = ['Sale', 'Rent', 'PG', 'Renovate'];
+
+        $candidates = [];
+        $skipped = 0;
+
+        foreach ($rows as $row) {
+            // Normalize keys/values (trim whitespace, drop empty strings so isset() checks below work).
+            $row = array_map(fn ($v) => is_string($v) ? trim($v) : $v, $row);
+            $row = array_filter($row, fn ($v) => $v !== null && $v !== '');
+
+            $hasAllRequired = true;
+            foreach ($required as $field) {
+                if (!isset($row[$field]) || $row[$field] === '') {
+                    $hasAllRequired = false;
+                    break;
+                }
+            }
+            if (!$hasAllRequired) {
+                $skipped++;
+                continue;
+            }
+
+            // Normalize looking_for casing (e.g. "sale" / "SALE" -> "Sale"); fall back to "Sale" if unrecognized.
+            $lookingFor = ucfirst(strtolower($row['looking_for']));
+            if (!in_array($lookingFor, $allowedLookingFor, true)) {
+                $lookingFor = 'Sale';
+            }
+
+            // Price must be a plain positive number (strip commas/currency symbols admins often paste in).
+            $price = preg_replace('/[^0-9.]/', '', (string) $row['price']);
+            if ($price === '' || !is_numeric($price)) {
+                $skipped++;
+                continue;
+            }
+
+            $candidates[] = [
+                'source'        => 'manual_csv',
+                'title'         => $row['title'],
+                'description'   => $row['description'] ?? null,
+                'property_type' => $row['property_type'],
+                'looking_for'   => $lookingFor,
+                'address'       => $row['address'],
+                'city'          => $row['city'] ?: $defaultCity,
+                'state'         => $row['state'],
+                'country'       => $row['country'] ?? 'India',
+                'price'         => (float) $price,
+                'bedrooms'      => isset($row['bedrooms']) ? (int) $row['bedrooms'] : null,
+                'bathrooms'     => isset($row['bathrooms']) ? (int) $row['bathrooms'] : null,
+                'area'          => isset($row['area']) ? (int) $row['area'] : null,
+                'furnishing'    => $row['furnishing'] ?? null,
+                'amenities'     => $row['amenities'] ?? null,
+            ];
+        }
+
+        return ['candidates' => $candidates, 'skipped' => $skipped];
     }
 }
