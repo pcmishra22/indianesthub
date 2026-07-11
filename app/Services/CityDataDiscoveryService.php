@@ -162,12 +162,13 @@ class CityDataDiscoveryService
             return ['candidates' => $candidates, 'notice' => null];
         }
 
-        // 2) If empty, attempt a city-specific fallback center for Tricity
-        //    (Zirakpur is often inconsistently geocoded by free Nominatim results).
+        // 2) If empty, attempt a city-specific fallback center for major Indian
+        //    cities (free Nominatim geocoding is sometimes rate-limited or
+        //    inconsistent for smaller towns).
         $fallback = $this->getFallbackCoordinatesForCity($city);
         if ($fallback) {
             [$lat, $lon] = $fallback;
-            $radius = 10000;
+            $radius = 15000;
 
             $query = $this->buildOverpassQueryFromCoordinates($city, $queryPrefix, $lat, $lon, $radius);
             $elements = $this->queryOverpass($query);
@@ -182,19 +183,28 @@ class CityDataDiscoveryService
 
             $results = array_slice($results, 0, 50);
             if (!empty($results)) {
-                return ['candidates' => $results, 'notice' => 'No matches found using geocoding. Showing results using a fallback search center near ' . ucfirst($city) . '.'];
+                return ['candidates' => $results, 'notice' => 'Showing results using a fallback search center near ' . ucfirst($city) . '.'];
             }
         }
 
-        // 3) Final user-facing explanation
-        $notice = 'No candidates found for "' . $city . '". This can happen if Overpass/Nominatim is rate-limited or if the city name does not match OpenStreetMap data. Try again later or enter a nearby locality (e.g., Mohali/Chandigarh for Zirakpur).';
+        // 3) Final user-facing explanation. This is usually a genuine OpenStreetMap
+        // data-coverage gap rather than a bug — OSM's business-listing coverage in
+        // India is inconsistent outside a handful of well-mapped metros, so smaller
+        // or less-mapped cities can legitimately have zero tagged real estate
+        // businesses. If that's the case here, CSV import is the reliable option.
+        $notice = 'No real estate businesses found in OpenStreetMap for "' . $city . '" within a 15km radius. '
+            . 'This is usually because OpenStreetMap simply has no businesses tagged there yet (its coverage '
+            . 'varies a lot by city in India) — it is not necessarily an error. You can try again in a few '
+            . 'minutes in case Overpass was rate-limited, try a nearby larger city/locality name, or use the '
+            . 'CSV import option (choose "Property" as the type) to add listings manually instead.';
 
         return ['candidates' => [], 'notice' => $notice];
     }
 
     protected function getFallbackCoordinatesForCity(string $city): ?array
     {
-        // Approximate centers for common Tricity searches.
+        // Approximate centers for major Indian cities, used when Nominatim
+        // geocoding fails or is rate-limited.
         $map = [
             'zirakpur' => [30.6646, 76.7929],
             'mohali' => [30.6785, 76.7230],
@@ -204,110 +214,88 @@ class CityDataDiscoveryService
             'kharar' => [30.7490, 76.6500],
             'kharar mohali' => [30.7490, 76.6500],
             'pune' => [18.5204, 73.8567],
+            'lucknow' => [26.8467, 80.9462],
+            'delhi' => [28.6139, 77.2090],
+            'mumbai' => [19.0760, 72.8777],
+            'bangalore' => [12.9716, 77.5946],
+            'bengaluru' => [12.9716, 77.5946],
+            'hyderabad' => [17.3850, 78.4867],
+            'chennai' => [13.0827, 80.2707],
+            'kolkata' => [22.5726, 88.3639],
+            'ahmedabad' => [23.0225, 72.5714],
+            'jaipur' => [26.9124, 75.7873],
+            'surat' => [21.1702, 72.8311],
+            'kanpur' => [26.4499, 80.3319],
+            'nagpur' => [21.1458, 79.0882],
+            'indore' => [22.7196, 75.8577],
+            'bhopal' => [23.2599, 77.4126],
+            'patna' => [25.5941, 85.1376],
+            'noida' => [28.5355, 77.3910],
+            'gurugram' => [28.4595, 77.0266],
+            'gurgaon' => [28.4595, 77.0266],
+            'ghaziabad' => [28.6692, 77.4538],
+            'faridabad' => [28.4089, 77.3178],
         ];
 
         return $map[$city] ?? null;
     }
 
+    /**
+     * Builds the Overpass QL query for a given center point + radius.
+     *
+     * Strict OSM tagging (office=estate_agent, shop=real_estate_agency, etc.)
+     * has sparse coverage in most Indian cities outside a handful of
+     * well-mapped metros, so — in addition to the standard tags — this also
+     * matches on business name (e.g. "... Properties", "... Realty",
+     * "... Builders") to catch real-world listings that were mapped without
+     * the "correct" OSM tag. This trades a little precision for much better
+     * recall; the admin still reviews and ticks every row before anything
+     * is saved, so false positives are cheap to reject.
+     */
     protected function buildOverpassQueryFromCoordinates(string $city, string $queryPrefix, float $lat, float $lon, int $radius): string
     {
-        $query = '[out:json][timeout:25];\n';
-        $query .= '( \n';
+        $isBuilder = strpos(strtolower($queryPrefix), 'builder') !== false
+            || strpos(strtolower($queryPrefix), 'developer') !== false;
 
-        if (strpos(strtolower($queryPrefix), 'builder') !== false ||
-            strpos(strtolower($queryPrefix), 'developer') !== false) {
-            $query .= '  node["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  way["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  relation["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  node["shop"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  way["shop"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  relation["shop"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  node["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  way["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  relation["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-        } elseif (strpos(strtolower($queryPrefix), 'agent') !== false ||
-                 strpos(strtolower($queryPrefix), 'dealer') !== false) {
-            $query .= '  node["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  way["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  relation["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  node["shop"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  way["shop"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  relation["shop"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  node["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  way["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  relation["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-        } else {
-            $query .= '  node["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  way["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            $query .= '  relation["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-        }
+        $around = "around:{$radius},{$lat},{$lon}";
+        $lines = ['[out:json][timeout:30];', '('];
 
-        $query .= ');\n';
-        $query .= 'out center;\n';
+        // Standard OSM tags.
+        $lines[] = "  nwr[\"office\"=\"estate_agent\"]({$around});";
+        $lines[] = "  nwr[\"amenity\"=\"real_estate_agency\"]({$around});";
+        $lines[] = $isBuilder
+            ? "  nwr[\"shop\"=\"real_estate_agency\"]({$around});"
+            : "  nwr[\"shop\"=\"estate_agent\"]({$around});";
 
-        error_log("Overpass fallback query for $city ($queryPrefix): center=($lat,$lon), radius=$radius");
+        // Name-based fallback for businesses mapped without a real-estate-specific tag.
+        $namePattern = $isBuilder
+            ? 'builders|developers|realty|properties|infra|construction'
+            : 'real estate|realty|properties|property dealer|estate agent';
+        $lines[] = "  nwr[\"name\"~\"{$namePattern}\",i]({$around});";
+
+        $lines[] = ');';
+        $lines[] = 'out center;';
+
+        $query = implode("\n", $lines);
+        error_log("Overpass query for $city ($queryPrefix): center=($lat,$lon), radius=$radius");
 
         return $query;
     }
 
-
     protected function buildOverpassQuery(string $city, string $queryPrefix): string
     {
-        // Get coordinates for the city
         $coordinates = $this->getCityCoordinates($city);
 
-        if ($coordinates) {
-            [$lat, $lon] = $coordinates;
-            // Define a reasonable search radius (about 10km radius)
-            $radius = 10000; // meters
-
-            $query = '[out:json][timeout:25];\n';
-            $query .= '( \n';
-
-            // Define what we're looking for based on the query prefix
-            if (strpos(strtolower($queryPrefix), 'builder') !== false ||
-                strpos(strtolower($queryPrefix), 'developer') !== false) {
-                // Real estate builders and developers
-                $query .= '  node["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  way["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  relation["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  node["shop"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  way["shop"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  relation["shop"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  node["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  way["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  relation["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            } elseif (strpos(strtolower($queryPrefix), 'agent') !== false ||
-                     strpos(strtolower($queryPrefix), 'dealer') !== false) {
-                // Real estate agents and property dealers
-                $query .= '  node["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  way["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  relation["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  node["shop"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  way["shop"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  relation["shop"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  node["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  way["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  relation["amenity"="real_estate_agency"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            } else {
-                // Default to estate agents
-                $query .= '  node["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  way["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-                $query .= '  relation["office"="estate_agent"](around:' . $radius . ',' . $lat . ',' . $lon . ');\n';
-            }
-
-            $query .= ');\n';
-            $query .= 'out center; // Include center coordinates for ways and relations\n';
-
-            error_log("Overpass query for $city ($queryPrefix):\n$query");
-
-            return $query;
-        } else {
-            // Fallback: if we can't geocode the city, return an empty query
-            // This will result in no results but won't break the application
-            error_log("Could not geocode $city, returning empty query");
-            return '[out:json][timeout:5];\nout;';
+        if (!$coordinates) {
+            error_log("Could not geocode $city via Nominatim");
+            return '[out:json][timeout:5];out;';
         }
+
+        [$lat, $lon] = $coordinates;
+
+        // ~15km radius — wide enough to cover a city's business districts
+        // without the query becoming too slow/heavy for Overpass.
+        return $this->buildOverpassQueryFromCoordinates($city, $queryPrefix, $lat, $lon, 15000);
     }
 
 
