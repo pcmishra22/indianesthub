@@ -19,9 +19,8 @@
  * anyone who finds the URL.
  */
 
-// ---- CONFIG: fill these in, or export as environment variables before running ----
-$MAPPLS_CLIENT_ID     = getenv('MAPPLS_CLIENT_ID') ?: 'PASTE_YOUR_CLIENT_ID_HERE';
-$MAPPLS_CLIENT_SECRET = getenv('MAPPLS_CLIENT_SECRET') ?: 'PASTE_YOUR_CLIENT_SECRET_HERE';
+// ---- CONFIG: fill this in, or export as an environment variable before running ----
+$MAPPLS_API_KEY = getenv('MAPPLS_API_KEY') ?: 'PASTE_YOUR_STATIC_KEY_HERE';
 // ------------------------------------------------------------------------------
 
 $city = $argv[1] ?? 'lucknow';
@@ -75,64 +74,28 @@ echo "PHP version: " . PHP_VERSION . "\n";
 echo "curl extension: " . (extension_loaded('curl') ? 'available' : 'MISSING — install php-curl') . "\n";
 
 // ============================================================
-// TEST 1: Mappls OAuth2 token
+// TEST 1: Mappls — Static Key Search (Autosuggest API)
 // ============================================================
-section('TEST 1: Mappls — OAuth2 Token Request');
+section('TEST 1: Mappls — Static Key Search');
 
-$mapplsToken = null;
-if ($MAPPLS_CLIENT_ID === 'PASTE_YOUR_CLIENT_ID_HERE') {
-    echo "SKIPPED — no credentials filled in at the top of this script.\n";
+if ($MAPPLS_API_KEY === 'PASTE_YOUR_STATIC_KEY_HERE') {
+    echo "SKIPPED — no key filled in at the top of this script.\n";
     echo "(This is fine if you haven't set up Mappls yet — the app will just use the free OSM fallback.)\n";
-} else {
-    echo "Requesting token from https://outpost.mappls.com/api/security/oauth/token ...\n";
-    $result = httpRequest('POST', 'https://outpost.mappls.com/api/security/oauth/token', [
-        'form' => [
-            'grant_type' => 'client_credentials',
-            'client_id' => $MAPPLS_CLIENT_ID,
-            'client_secret' => $MAPPLS_CLIENT_SECRET,
-        ],
-    ]);
-
-    if (!$result['ok']) {
-        echo "❌ CONNECTION FAILED (curl errno {$result['curl_errno']}): {$result['curl_error']}\n";
-        echo "   -> Your server cannot reach outpost.mappls.com at all. Check outbound firewall rules.\n";
-    } else {
-        echo "HTTP Status: {$result['status']}\n";
-        echo "Raw response:\n{$result['body']}\n";
-        $decoded = json_decode($result['body'], true);
-        if ($result['status'] === 200 && isset($decoded['access_token'])) {
-            $mapplsToken = $decoded['access_token'];
-            echo "✅ SUCCESS — got an access token (expires in " . ($decoded['expires_in'] ?? '?') . "s)\n";
-        } else {
-            echo "❌ FAILED — did not get a valid access_token. Check MAPPLS_CLIENT_ID / MAPPLS_CLIENT_SECRET are correct\n";
-            echo "   and that your Mappls account is active (check email for a verification step).\n";
-        }
-    }
-}
-
-// ============================================================
-// TEST 2: Mappls Text Search (only if we got a token)
-// ============================================================
-section('TEST 2: Mappls — Text Search for Builders');
-
-if (!$mapplsToken) {
-    echo "SKIPPED — no valid token from Test 1.\n";
 } else {
     // Lucknow's approximate coordinates, used as a location bias.
     $coords = '26.8467,80.9462';
-    $url = 'https://atlas.mappls.com/api/places/textsearch/json?' . http_build_query([
+    $url = 'https://atlas.mappls.com/api/places/search/json?' . http_build_query([
         'query' => 'real estate builders and developers',
         'region' => 'ind',
         'location' => $coords,
+        'access_token' => $MAPPLS_API_KEY,
     ]);
-    echo "Requesting: $url\n";
-    $result = httpRequest('GET', $url, [
-        'headers' => ['Authorization' => 'bearer ' . $mapplsToken],
-    ]);
+    echo "Requesting: " . preg_replace('/access_token=[^&]+/', 'access_token=***', $url) . "\n";
+    $result = httpRequest('GET', $url);
 
     if (!$result['ok']) {
         echo "❌ CONNECTION FAILED (curl errno {$result['curl_errno']}): {$result['curl_error']}\n";
-        echo "   -> Your server cannot reach atlas.mappls.com. Check outbound firewall rules.\n";
+        echo "   -> Your server cannot reach atlas.mappls.com at all. Check outbound firewall rules.\n";
     } else {
         echo "HTTP Status: {$result['status']}\n";
         echo "Raw response:\n{$result['body']}\n";
@@ -142,8 +105,9 @@ if (!$mapplsToken) {
             echo "✅ SUCCESS — found $count result(s).\n";
         } elseif ($result['status'] === 200) {
             echo "⚠️  Request succeeded but found 0 results for this query/location.\n";
-        } elseif ($result['status'] === 204) {
-            echo "⚠️  HTTP 204 — valid request, genuinely zero matches.\n";
+        } elseif ($result['status'] === 401 || $result['status'] === 403) {
+            echo "❌ FAILED — HTTP {$result['status']}. The key was rejected — check it's correct, active, and\n";
+            echo "   not restricted to a different domain/IP under Whitelisting in the Mappls Console.\n";
         } else {
             echo "❌ FAILED — HTTP {$result['status']}.\n";
         }
@@ -151,9 +115,9 @@ if (!$mapplsToken) {
 }
 
 // ============================================================
-// TEST 3: Nominatim geocoding (OSM fallback path, step 1)
+// TEST 2: Nominatim geocoding (OSM fallback path, step 1)
 // ============================================================
-section('TEST 3: OpenStreetMap — Nominatim Geocoding');
+section('TEST 2: OpenStreetMap — Nominatim Geocoding');
 
 $nominatimUrl = 'https://nominatim.openstreetmap.org/search?' . http_build_query([
     'q' => $city . ', India',
@@ -191,9 +155,9 @@ if (!$result['ok']) {
 }
 
 // ============================================================
-// TEST 4: Overpass query (OSM fallback path, step 2)
+// TEST 3: Overpass query (OSM fallback path, step 2)
 // ============================================================
-section('TEST 4: OpenStreetMap — Overpass Business Search');
+section('TEST 3: OpenStreetMap — Overpass Business Search');
 
 $lat = $geocodedLat ?: '26.8467'; // fall back to Lucknow's known coordinates if geocoding failed
 $lon = $geocodedLon ?: '80.9462';

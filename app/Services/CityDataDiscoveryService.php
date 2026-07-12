@@ -22,8 +22,7 @@ class CityDataDiscoveryService
 {
     protected ?string $overpassUrl;
     protected ?string $nominatimUrl;
-    protected ?string $mapplsClientId;
-    protected ?string $mapplsClientSecret;
+    protected ?string $mapplsApiKey;
 
     /**
      * Diagnostic info from the most recent request, so the UI can tell the
@@ -34,14 +33,12 @@ class CityDataDiscoveryService
      */
     protected ?string $lastGeocodeError = null;
     protected ?string $lastOverpassError = null;
-    protected ?string $lastMapplsTokenError = null;
 
     public function __construct()
     {
         $this->overpassUrl = config('openstreetmap.overpass_url', 'https://overpass-api.de/api/interpreter');
         $this->nominatimUrl = config('openstreetmap.nominatim_url', 'https://nominatim.openstreetmap.org');
-        $this->mapplsClientId = config('mappls.client_id');
-        $this->mapplsClientSecret = config('mappls.client_secret');
+        $this->mapplsApiKey = config('mappls.key');
     }
 
     /**
@@ -74,27 +71,22 @@ class CityDataDiscoveryService
     }
 
     /**
-     * Mappls (MapmyIndia) Text Search — the primary data source when
-     * credentials are configured. An India-focused mapping company with
-     * "no credit card required" free signup and far deeper coverage of
-     * Indian cities/towns than global providers like OSM. Uses OAuth2
-     * client-credentials: exchanges MAPPLS_CLIENT_ID/MAPPLS_CLIENT_SECRET
-     * for a bearer token (cached ~24h), then calls the Text Search API.
-     * Set both env vars to enable; without them, this is skipped entirely
-     * and the service falls back to the free, zero-config OpenStreetMap
-     * path below.
+     * Mappls (MapmyIndia) Autosuggest/Search API — the primary data source
+     * when a key is configured. An India-focused mapping company with "no
+     * credit card required" free signup and far deeper coverage of Indian
+     * cities/towns than global providers like OSM. Uses the static REST API
+     * key directly as the `access_token` query parameter (no OAuth token
+     * exchange needed — this matches the "Static Key" shown in the Mappls
+     * Console under Credentials). Set MAPPLS_API_KEY to enable; without it,
+     * this is skipped entirely and the service falls back to the free,
+     * zero-config OpenStreetMap path below.
      *
      * @return array{results: array, error: ?string}
      */
     protected function queryMappls(string $city, string $queryPrefix): array
     {
-        if (!$this->mapplsClientId || !$this->mapplsClientSecret) {
+        if (!$this->mapplsApiKey) {
             return ['results' => [], 'error' => null]; // Not configured — silently skip, not an error.
-        }
-
-        $token = $this->getMapplsAccessToken();
-        if (!$token) {
-            return ['results' => [], 'error' => $this->lastMapplsTokenError ?? 'Could not obtain a Mappls access token.'];
         }
 
         // A location bias greatly improves result relevance/coverage per Mappls'
@@ -106,29 +98,24 @@ class CityDataDiscoveryService
             $params = [
                 'query' => $queryPrefix,
                 'region' => 'ind',
+                'access_token' => $this->mapplsApiKey,
             ];
             if ($coordinates) {
                 $params['location'] = $coordinates[0] . ',' . $coordinates[1];
             }
 
-            $response = Http::timeout(15)
-                ->withHeaders(['Authorization' => 'bearer ' . $token])
-                ->get('https://atlas.mappls.com/api/places/textsearch/json', $params);
+            $response = Http::timeout(15)->get('https://atlas.mappls.com/api/places/search/json', $params);
 
-            if ($response->status() === 401) {
-                // Token might have just expired server-side; don't cache a bad one.
-                \Cache::forget('mappls_access_token');
-                return ['results' => [], 'error' => 'Mappls rejected the access token (HTTP 401). It may have '
-                    . 'expired or your credentials may be invalid — this will self-correct on the next search.'];
-            }
-            if ($response->status() === 403) {
-                return ['results' => [], 'error' => 'Mappls key has hit its daily/hourly request limit (HTTP 403).'];
+            if ($response->status() === 401 || $response->status() === 403) {
+                return ['results' => [], 'error' => 'Mappls rejected the request (HTTP ' . $response->status() . '). '
+                    . 'Check that MAPPLS_API_KEY is correct and that the key is active in the Mappls Console '
+                    . '(Credentials tab), and that it isn\'t restricted to a different domain/IP under Whitelisting.'];
             }
             if ($response->status() === 204) {
                 return ['results' => [], 'error' => null]; // Valid request, genuinely zero matches.
             }
             if ($response->failed()) {
-                return ['results' => [], 'error' => 'Mappls Text Search request failed: HTTP ' . $response->status()];
+                return ['results' => [], 'error' => 'Mappls Search request failed: HTTP ' . $response->status()];
             }
 
             $locations = $response->json('suggestedLocations', []);
@@ -142,58 +129,16 @@ class CityDataDiscoveryService
 
             return ['results' => $results, 'error' => null];
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            return ['results' => [], 'error' => 'Could not connect to Mappls Text Search (' . $e->getMessage() . '). '
+            return ['results' => [], 'error' => 'Could not connect to Mappls (' . $e->getMessage() . '). '
                 . 'Check your server can reach atlas.mappls.com.'];
         } catch (\Exception $e) {
-            \Log::warning('Mappls Text Search error: ' . $e->getMessage());
+            \Log::warning('Mappls Search error: ' . $e->getMessage());
             return ['results' => [], 'error' => $e->getMessage()];
         }
     }
 
     /**
-     * Fetches (and caches for its stated lifetime) an OAuth2 bearer token via
-     * the client-credentials grant, per Mappls' Token Generation API.
-     */
-    protected function getMapplsAccessToken(): ?string
-    {
-        $this->lastMapplsTokenError = null;
-
-        return \Cache::remember('mappls_access_token', 3600 * 12, function () {
-            try {
-                $response = Http::asForm()
-                    ->timeout(10)
-                    ->post('https://outpost.mappls.com/api/security/oauth/token', [
-                        'grant_type' => 'client_credentials',
-                        'client_id' => $this->mapplsClientId,
-                        'client_secret' => $this->mapplsClientSecret,
-                    ]);
-
-                if ($response->failed()) {
-                    $this->lastMapplsTokenError = 'Mappls token request failed: HTTP ' . $response->status()
-                        . '. Check MAPPLS_CLIENT_ID / MAPPLS_CLIENT_SECRET are correct.';
-                    return null;
-                }
-
-                $token = $response->json('access_token');
-                if (!$token) {
-                    $this->lastMapplsTokenError = 'Mappls token response did not include an access_token.';
-                    return null;
-                }
-
-                return $token;
-            } catch (\Illuminate\Http\Client\ConnectionException $e) {
-                $this->lastMapplsTokenError = 'Could not connect to Mappls token endpoint (' . $e->getMessage() . '). '
-                    . 'Check your server can reach outpost.mappls.com.';
-                return null;
-            } catch (\Exception $e) {
-                $this->lastMapplsTokenError = $e->getMessage();
-                return null;
-            }
-        });
-    }
-
-    /**
-     * Maps one raw suggestedLocations entry from Mappls' Text Search response
+     * Maps one raw suggestedLocations entry from Mappls' Search response
      * into our candidate shape. Pure/static so it's directly unit-testable
      * against Mappls' documented JSON schema without a live API call.
      */
