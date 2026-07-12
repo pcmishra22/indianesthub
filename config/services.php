@@ -35,8 +35,9 @@ return [
         ],
     ],
 
-    'google_places' => [
-        'key' => env('GOOGLE_PLACES_API_KEY'),
+    'mappls' => [
+        'client_id' => env('MAPPLS_CLIENT_ID'),
+        'client_secret' => env('MAPPLS_CLIENT_SECRET'),
     ],
 
     'openstreetmap' => [

@@ -13,17 +13,35 @@ use Illuminate\Support\Facades\Log;
  * Finds candidate real-world businesses for a given city so an admin can
  * review and confirm them before they're written into the database.
  *
- * Uses OpenStreetMap Overpass API as a free alternative to Google Places.
+ * Uses Mappls (MapmyIndia) as the primary source when credentials are
+ * configured — free, no credit card required, India-focused business data.
+ * Falls back automatically to OpenStreetMap's Overpass API (free, no signup)
+ * when Mappls isn't configured or finds nothing.
  */
 class CityDataDiscoveryService
 {
     protected ?string $overpassUrl;
     protected ?string $nominatimUrl;
+    protected ?string $mapplsClientId;
+    protected ?string $mapplsClientSecret;
+
+    /**
+     * Diagnostic info from the most recent request, so the UI can tell the
+     * difference between "the request itself failed" (network/firewall/DNS/
+     * rate-limit) and "the request succeeded but found zero matches" (a
+     * genuine OSM data-coverage gap). Both look like "no candidates" to the
+     * end user otherwise, but they need very different fixes.
+     */
+    protected ?string $lastGeocodeError = null;
+    protected ?string $lastOverpassError = null;
+    protected ?string $lastMapplsTokenError = null;
 
     public function __construct()
     {
         $this->overpassUrl = config('openstreetmap.overpass_url', 'https://overpass-api.de/api/interpreter');
         $this->nominatimUrl = config('openstreetmap.nominatim_url', 'https://nominatim.openstreetmap.org');
+        $this->mapplsClientId = config('mappls.client_id');
+        $this->mapplsClientSecret = config('mappls.client_secret');
     }
 
     /**
@@ -55,8 +73,156 @@ class CityDataDiscoveryService
         return strtolower($first);
     }
 
+    /**
+     * Mappls (MapmyIndia) Text Search — the primary data source when
+     * credentials are configured. An India-focused mapping company with
+     * "no credit card required" free signup and far deeper coverage of
+     * Indian cities/towns than global providers like OSM. Uses OAuth2
+     * client-credentials: exchanges MAPPLS_CLIENT_ID/MAPPLS_CLIENT_SECRET
+     * for a bearer token (cached ~24h), then calls the Text Search API.
+     * Set both env vars to enable; without them, this is skipped entirely
+     * and the service falls back to the free, zero-config OpenStreetMap
+     * path below.
+     *
+     * @return array{results: array, error: ?string}
+     */
+    protected function queryMappls(string $city, string $queryPrefix): array
+    {
+        if (!$this->mapplsClientId || !$this->mapplsClientSecret) {
+            return ['results' => [], 'error' => null]; // Not configured — silently skip, not an error.
+        }
+
+        $token = $this->getMapplsAccessToken();
+        if (!$token) {
+            return ['results' => [], 'error' => $this->lastMapplsTokenError ?? 'Could not obtain a Mappls access token.'];
+        }
+
+        // A location bias greatly improves result relevance/coverage per Mappls'
+        // own docs ("STRONGLY RECOMMENDED"). Reuse the same geocoding used for
+        // the OSM fallback so we don't duplicate that logic.
+        $coordinates = $this->getCityCoordinates($city) ?? $this->getFallbackCoordinatesForCity($city);
+
+        try {
+            $params = [
+                'query' => $queryPrefix,
+                'region' => 'ind',
+            ];
+            if ($coordinates) {
+                $params['location'] = $coordinates[0] . ',' . $coordinates[1];
+            }
+
+            $response = Http::timeout(15)
+                ->withHeaders(['Authorization' => 'bearer ' . $token])
+                ->get('https://atlas.mappls.com/api/places/textsearch/json', $params);
+
+            if ($response->status() === 401) {
+                // Token might have just expired server-side; don't cache a bad one.
+                \Cache::forget('mappls_access_token');
+                return ['results' => [], 'error' => 'Mappls rejected the access token (HTTP 401). It may have '
+                    . 'expired or your credentials may be invalid — this will self-correct on the next search.'];
+            }
+            if ($response->status() === 403) {
+                return ['results' => [], 'error' => 'Mappls key has hit its daily/hourly request limit (HTTP 403).'];
+            }
+            if ($response->status() === 204) {
+                return ['results' => [], 'error' => null]; // Valid request, genuinely zero matches.
+            }
+            if ($response->failed()) {
+                return ['results' => [], 'error' => 'Mappls Text Search request failed: HTTP ' . $response->status()];
+            }
+
+            $locations = $response->json('suggestedLocations', []);
+            $results = [];
+            foreach ($locations as $place) {
+                $candidate = self::mapMapplsPlaceToCandidate($place, $city);
+                if ($candidate) {
+                    $results[] = $candidate;
+                }
+            }
+
+            return ['results' => $results, 'error' => null];
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            return ['results' => [], 'error' => 'Could not connect to Mappls Text Search (' . $e->getMessage() . '). '
+                . 'Check your server can reach atlas.mappls.com.'];
+        } catch (\Exception $e) {
+            \Log::warning('Mappls Text Search error: ' . $e->getMessage());
+            return ['results' => [], 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Fetches (and caches for its stated lifetime) an OAuth2 bearer token via
+     * the client-credentials grant, per Mappls' Token Generation API.
+     */
+    protected function getMapplsAccessToken(): ?string
+    {
+        $this->lastMapplsTokenError = null;
+
+        return \Cache::remember('mappls_access_token', 3600 * 12, function () {
+            try {
+                $response = Http::asForm()
+                    ->timeout(10)
+                    ->post('https://outpost.mappls.com/api/security/oauth/token', [
+                        'grant_type' => 'client_credentials',
+                        'client_id' => $this->mapplsClientId,
+                        'client_secret' => $this->mapplsClientSecret,
+                    ]);
+
+                if ($response->failed()) {
+                    $this->lastMapplsTokenError = 'Mappls token request failed: HTTP ' . $response->status()
+                        . '. Check MAPPLS_CLIENT_ID / MAPPLS_CLIENT_SECRET are correct.';
+                    return null;
+                }
+
+                $token = $response->json('access_token');
+                if (!$token) {
+                    $this->lastMapplsTokenError = 'Mappls token response did not include an access_token.';
+                    return null;
+                }
+
+                return $token;
+            } catch (\Illuminate\Http\Client\ConnectionException $e) {
+                $this->lastMapplsTokenError = 'Could not connect to Mappls token endpoint (' . $e->getMessage() . '). '
+                    . 'Check your server can reach outpost.mappls.com.';
+                return null;
+            } catch (\Exception $e) {
+                $this->lastMapplsTokenError = $e->getMessage();
+                return null;
+            }
+        });
+    }
+
+    /**
+     * Maps one raw suggestedLocations entry from Mappls' Text Search response
+     * into our candidate shape. Pure/static so it's directly unit-testable
+     * against Mappls' documented JSON schema without a live API call.
+     */
+    public static function mapMapplsPlaceToCandidate(array $place, string $city): ?array
+    {
+        $name = $place['placeName'] ?? null;
+        if (!$name) {
+            return null;
+        }
+
+        return [
+            'source'          => 'mappls',
+            'source_place_id' => $place['eLoc'] ?? null,
+            'name'            => $name,
+            'company_name'    => $name,
+            'phone'           => null,
+            'website'         => null,
+            'address'         => $place['placeAddress'] ?? null,
+            'city'            => $city,
+            'rating'          => null,
+            'latitude'        => null,
+            'longitude'       => null,
+        ];
+    }
+
     protected function queryOverpass(string $query): array
     {
+        $this->lastOverpassError = null;
+
         try {
             // The query strings are built with literal "\n" inside single-quoted
             // PHP strings, which PHP does NOT convert to real newlines. Left as-is,
@@ -74,7 +240,7 @@ class CityDataDiscoveryService
                 ->post($this->overpassUrl, ['data' => $query]);
 
             if ($response->failed()) {
-                throw new \RuntimeException('Overpass API request failed: ' . $response->status());
+                throw new \RuntimeException('Overpass API request failed: HTTP ' . $response->status());
             }
 
             $data = $response->json();
@@ -86,8 +252,16 @@ class CityDataDiscoveryService
             $elements = $data['elements'] ?? [];
             error_log("Overpass returned " . count($elements) . " elements");
             return $elements;
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            // This is what a firewall/network block, DNS failure, or timeout looks
+            // like — the request never got a response at all.
+            $this->lastOverpassError = 'Could not connect to Overpass API (' . $e->getMessage() . '). '
+                . 'This usually means your server cannot reach overpass-api.de — check your hosting '
+                . 'firewall / outbound network rules.';
+            \Log::warning('Overpass connection error: ' . $e->getMessage());
+            return [];
         } catch (\Exception $e) {
-            // Log the error but return empty results to avoid breaking the flow
+            $this->lastOverpassError = $e->getMessage();
             \Log::warning('Overpass API error: ' . $e->getMessage());
             return [];
         }
@@ -95,6 +269,8 @@ class CityDataDiscoveryService
 
     protected function getCityCoordinates(string $city): ?array
     {
+        $this->lastGeocodeError = null;
+
         try {
             // Use Nominatim to get coordinates for the city
             $response = Http::timeout(10)
@@ -104,7 +280,6 @@ class CityDataDiscoveryService
                     'format' => 'json',
                     'limit' => 1,
                     'addressdetails' => 1,
-                    'bounded' => 1
                 ]);
 
             if ($response->successful()) {
@@ -117,33 +292,24 @@ class CityDataDiscoveryService
                         return [(float)$lat, (float)$lon];
                     }
                 }
+                // Request succeeded but Nominatim had no match for this city name.
+                $this->lastGeocodeError = 'Nominatim returned no match for "' . $city . '".';
+                return null;
             }
 
+            $this->lastGeocodeError = 'Nominatim request failed: HTTP ' . $response->status();
+            return null;
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            $this->lastGeocodeError = 'Could not connect to Nominatim (' . $e->getMessage() . '). '
+                . 'This usually means your server cannot reach nominatim.openstreetmap.org — check your '
+                . 'hosting firewall / outbound network rules.';
+            \Log::warning('Nominatim connection error for city "' . $city . '": ' . $e->getMessage());
             return null;
         } catch (\Exception $e) {
-            // If geocoding fails, we'll fall back to a less precise search
+            $this->lastGeocodeError = $e->getMessage();
             \Log::warning('Nominatim geocoding failed for city "' . $city . '": ' . $e->getMessage());
             return null;
         }
-    }
-
-    protected function discoverBusinesses(string $city, string $queryPrefix): array
-    {
-        // Build Overpass QL query to find relevant businesses
-        $query = $this->buildOverpassQuery($city, $queryPrefix);
-
-        $elements = $this->queryOverpass($query);
-        $results = [];
-
-        foreach ($elements as $element) {
-            $candidate = $this->mapOsmElementToCandidate($element, $city);
-            if ($candidate) {
-                $results[] = $candidate;
-            }
-        }
-
-        // Limit results to prevent overwhelming the UI
-        return array_slice($results, 0, 50);
     }
 
     protected function discoverAndDiagnose(string $city, string $type): array
@@ -153,25 +319,38 @@ class CityDataDiscoveryService
             ? 'real estate builders and developers'
             : 'real estate agents and property dealers';
 
-        $notice = null;
+        // 1) Mappls (if credentials are configured) — real, actively-maintained,
+        // India-focused business data. Tried first because OSM's coverage of
+        // Indian cities is inconsistent. If it's not configured, errors out, or
+        // just finds nothing, we always continue on to the free OSM path below
+        // rather than stopping — broken/unset Mappls credentials should never
+        // block the free fallback from running.
+        $mapplsResult = $this->queryMappls($city, $queryPrefix);
+        if (!empty($mapplsResult['results'])) {
+            return ['candidates' => array_slice($mapplsResult['results'], 0, 50), 'notice' => null];
+        }
+        $mapplsError = $mapplsResult['error']; // kept for the final message only, doesn't stop execution
 
-        // 1) Try discovery with normal geocoding
-        $candidates = $this->discoverBusinesses($city, $queryPrefix);
+        $reachedOverpassWithRealCoordinates = false;
 
-        if (!empty($candidates)) {
-            return ['candidates' => $candidates, 'notice' => null];
+        // 2) Free OpenStreetMap fallback (used automatically when no Google key
+        // is configured, when Google errored, or when Google found nothing).
+        // 2a) Geocode the city via Nominatim.
+        $coordinates = $this->getCityCoordinates($city);
+
+        // 2b) If that failed, fall back to a hardcoded center for major Indian cities.
+        $usedFallbackCenter = false;
+        if (!$coordinates) {
+            $coordinates = $this->getFallbackCoordinatesForCity($city);
+            $usedFallbackCenter = (bool) $coordinates;
         }
 
-        // 2) If empty, attempt a city-specific fallback center for major Indian
-        //    cities (free Nominatim geocoding is sometimes rate-limited or
-        //    inconsistent for smaller towns).
-        $fallback = $this->getFallbackCoordinatesForCity($city);
-        if ($fallback) {
-            [$lat, $lon] = $fallback;
-            $radius = 15000;
-
-            $query = $this->buildOverpassQueryFromCoordinates($city, $queryPrefix, $lat, $lon, $radius);
+        // 2c) If we have coordinates from either source, actually query Overpass.
+        if ($coordinates) {
+            [$lat, $lon] = $coordinates;
+            $query = $this->buildOverpassQueryFromCoordinates($city, $queryPrefix, $lat, $lon, 15000);
             $elements = $this->queryOverpass($query);
+            $reachedOverpassWithRealCoordinates = ($this->lastOverpassError === null);
 
             $results = [];
             foreach ($elements as $element) {
@@ -180,25 +359,65 @@ class CityDataDiscoveryService
                     $results[] = $candidate;
                 }
             }
-
             $results = array_slice($results, 0, 50);
+
             if (!empty($results)) {
-                return ['candidates' => $results, 'notice' => 'Showing results using a fallback search center near ' . ucfirst($city) . '.'];
+                $notice = $usedFallbackCenter
+                    ? 'Showing results using a fallback search center near ' . ucfirst($city) . '.'
+                    : null;
+                return ['candidates' => $results, 'notice' => $notice];
             }
         }
 
-        // 3) Final user-facing explanation. This is usually a genuine OpenStreetMap
-        // data-coverage gap rather than a bug — OSM's business-listing coverage in
-        // India is inconsistent outside a handful of well-mapped metros, so smaller
-        // or less-mapped cities can legitimately have zero tagged real estate
-        // businesses. If that's the case here, CSV import is the reliable option.
-        $notice = 'No real estate businesses found in OpenStreetMap for "' . $city . '" within a 15km radius. '
-            . 'This is usually because OpenStreetMap simply has no businesses tagged there yet (its coverage '
-            . 'varies a lot by city in India) — it is not necessarily an error. You can try again in a few '
-            . 'minutes in case Overpass was rate-limited, try a nearby larger city/locality name, or use the '
-            . 'CSV import option (choose "Property" as the type) to add listings manually instead.';
+        // 3) Nothing found. Build a specific, honest explanation from whatever
+        // diagnostics were actually captured above, rather than assuming.
+        $notice = $this->buildDiagnosticNotice($city, $coordinates !== null, $reachedOverpassWithRealCoordinates, $mapplsError);
 
         return ['candidates' => [], 'notice' => $notice];
+    }
+
+    /**
+     * Turns the connection-level diagnostics captured during this request into
+     * a specific, actionable message — telling apart "the request itself never
+     * worked" (network/firewall problem — fixable on the server) from "the
+     * request worked but OSM just has no data here" (a coverage gap — CSV
+     * import is the real fix) from "we couldn't even geocode this city name".
+     */
+    protected function buildDiagnosticNotice(string $city, bool $hadCoordinates, bool $overpassSucceeded, ?string $mapplsError = null): string
+    {
+        if ($this->lastGeocodeError && str_contains($this->lastGeocodeError, 'Could not connect')) {
+            return '⚠️ ' . $this->lastGeocodeError;
+        }
+
+        if ($this->lastOverpassError && str_contains($this->lastOverpassError, 'Could not connect')) {
+            return '⚠️ ' . $this->lastOverpassError;
+        }
+
+        if (!$hadCoordinates) {
+            return '⚠️ Could not determine coordinates for "' . $city . '" — Nominatim did not recognize this '
+                . 'city name and no fallback center is configured for it. Try a nearby larger city name '
+                . '(e.g. the nearest state capital), or use the CSV import option (choose "Property" as the '
+                . 'type) to add listings manually instead.';
+        }
+
+        if (!$overpassSucceeded && $this->lastOverpassError) {
+            return '⚠️ The Overpass API request did not complete successfully: ' . $this->lastOverpassError
+                . '. This is a request-level failure (not just "no data") — check your server logs for the full '
+                . 'error, and confirm your hosting firewall allows outbound HTTPS requests to overpass-api.de.';
+        }
+
+        // Coordinates were resolved and the Overpass request completed without a
+        // connection/HTTP error — it just returned zero matches. This really is
+        // most likely a genuine OpenStreetMap data-coverage gap.
+        $mapplsNote = $mapplsError
+            ? ' (Note: Mappls credentials are configured but that request also failed: ' . $mapplsError . ')'
+            : '';
+
+        return 'No real estate businesses found in OpenStreetMap for "' . $city . '" within a 15km radius.'
+            . $mapplsNote . ' The request to OpenStreetMap completed successfully but returned zero matches, so '
+            . 'this looks like a genuine data-coverage gap rather than a connection problem — OSM\'s '
+            . 'business-listing coverage varies a lot by city in India. Try a nearby larger city/locality name, '
+            . 'or use the CSV import option (choose "Property" as the type) to add listings manually instead.';
     }
 
     protected function getFallbackCoordinatesForCity(string $city): ?array
@@ -280,22 +499,6 @@ class CityDataDiscoveryService
         error_log("Overpass query for $city ($queryPrefix): center=($lat,$lon), radius=$radius");
 
         return $query;
-    }
-
-    protected function buildOverpassQuery(string $city, string $queryPrefix): string
-    {
-        $coordinates = $this->getCityCoordinates($city);
-
-        if (!$coordinates) {
-            error_log("Could not geocode $city via Nominatim");
-            return '[out:json][timeout:5];out;';
-        }
-
-        [$lat, $lon] = $coordinates;
-
-        // ~15km radius — wide enough to cover a city's business districts
-        // without the query becoming too slow/heavy for Overpass.
-        return $this->buildOverpassQueryFromCoordinates($city, $queryPrefix, $lat, $lon, 15000);
     }
 
 
