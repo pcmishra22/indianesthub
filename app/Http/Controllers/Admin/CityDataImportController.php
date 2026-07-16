@@ -24,6 +24,15 @@ class CityDataImportController extends Controller
      */
     public function discover(Request $request, CityDataDiscoveryService $service)
     {
+        // Worst case (Mappls + Nominatim + Overpass mirror failover all timing
+        // out) can take up to ~45s. Request more time where the host allows it
+        // (silently ignored on hosts that disable this — harmless either way);
+        // the service's own per-request timeouts are the real bound, this is
+        // just a backstop so PHP itself doesn't kill the request first.
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(90);
+        }
+
         $validated = $request->validate([
             'city' => ['required', 'string', 'max:120'],
             'type' => ['required', 'in:builder,agent,property'],

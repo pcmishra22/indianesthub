@@ -20,7 +20,13 @@ use Illuminate\Support\Facades\Log;
  */
 class CityDataDiscoveryService
 {
-    protected ?string $overpassUrl;
+    /** @var string[] Tried in order; first success wins. Mirrors are tried before
+     * the main overpass-api.de instance because it's frequently overloaded by
+     * heavy automated traffic and returns 504/406 as a result — the mirrors
+     * below are community-recommended, actively-maintained alternatives as of
+     * 2026 (see wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances).
+     */
+    protected array $overpassUrls;
     protected ?string $nominatimUrl;
     protected ?string $mapplsApiKey;
 
@@ -36,7 +42,16 @@ class CityDataDiscoveryService
 
     public function __construct()
     {
-        $this->overpassUrl = config('openstreetmap.overpass_url', 'https://overpass-api.de/api/interpreter');
+        // If openstreetmap.overpass_url is explicitly configured, respect it as
+        // the only endpoint (someone deliberately pointed this at a specific
+        // instance, e.g. a self-hosted one). Otherwise, use the known-good
+        // mirror list with automatic failover.
+        $configuredUrl = config('openstreetmap.overpass_url');
+        $this->overpassUrls = $configuredUrl ? [$configuredUrl] : [
+            'https://overpass.kumi.systems/api/interpreter',
+            'https://overpass.private.coffee/api/interpreter',
+            'https://overpass-api.de/api/interpreter',
+        ];
         $this->nominatimUrl = config('openstreetmap.nominatim_url', 'https://nominatim.openstreetmap.org');
         $this->mapplsApiKey = config('mappls.key');
     }
@@ -104,7 +119,7 @@ class CityDataDiscoveryService
                 $params['location'] = $coordinates[0] . ',' . $coordinates[1];
             }
 
-            $response = Http::timeout(15)->get('https://atlas.mappls.com/api/places/search/json', $params);
+            $response = Http::timeout(8)->get('https://atlas.mappls.com/api/places/search/json', $params);
 
             if ($response->status() === 401 || $response->status() === 403) {
                 return ['results' => [], 'error' => 'Mappls rejected the request (HTTP ' . $response->status() . '). '
@@ -164,62 +179,84 @@ class CityDataDiscoveryService
         ];
     }
 
-    protected function queryOverpass(string $query): array
+    /**
+     * @param int $maxAttempts How many mirrors to try before giving up. Kept low
+     *   for the expensive name-regex phase (see discoverAndDiagnose) so a total
+     *   failure there can't blow the overall request past PHP's execution time
+     *   limit — full failover across all mirrors is reserved for the cheap tag
+     *   query, which is the common/important path.
+     */
+    protected function queryOverpass(string $query, int $maxAttempts = 3): array
     {
         $this->lastOverpassError = null;
 
-        try {
-            // The query strings are built with literal "\n" inside single-quoted
-            // PHP strings, which PHP does NOT convert to real newlines. Left as-is,
-            // Overpass receives a syntactically invalid query (stray backslashes)
-            // and rejects it. Normalize to real whitespace before sending.
-            $query = str_replace('\\n', "\n", $query);
+        // The query strings are built with literal "\n" inside single-quoted
+        // PHP strings, which PHP does NOT convert to real newlines. Left as-is,
+        // Overpass receives a syntactically invalid query (stray backslashes)
+        // and rejects it. Normalize to real whitespace before sending.
+        $query = str_replace('\\n', "\n", $query);
 
-            // Kept comfortably under typical shared-hosting PHP max_execution_time
-            // (commonly 30s) so a slow Overpass response causes a clean, catchable
-            // timeout here rather than PHP fatally killing the whole request first.
-            $response = Http::asForm()
-                ->timeout(20)
-                ->withHeaders(['User-Agent' => 'IndianEstHub-CityImport/1.0 (contact: admin@indianesthub.com)'])
-                ->post($this->overpassUrl, ['data' => $query]);
+        $errors = [];
+        $urlsToTry = array_slice($this->overpassUrls, 0, max(1, $maxAttempts));
 
-            if ($response->status() === 504 || $response->status() === 429) {
-                throw new \RuntimeException(
-                    $response->status() === 504
-                        ? 'Overpass API timed out (HTTP 504) — the public Overpass server is often overloaded '
-                            . 'and slow, especially for busy metro areas. This is usually transient; try again '
-                            . 'in a minute or two.'
-                        : 'Overpass API rate-limited this request (HTTP 429) — too many requests recently. '
-                            . 'Wait a minute and try again.'
-                );
+        foreach ($urlsToTry as $url) {
+            try {
+                // Kept short — comfortably under typical shared-hosting PHP
+                // max_execution_time (commonly 30-60s) even when multiplied
+                // across several mirror attempts within one page load (this
+                // service also calls Mappls + Nominatim in the same request).
+                $response = Http::asForm()
+                    ->timeout(6)
+                    ->withHeaders(['User-Agent' => 'IndianEstHub-CityImport/1.0 (contact: admin@indianesthub.com)'])
+                    ->post($url, ['data' => $query]);
+
+                if ($response->status() === 504 || $response->status() === 429) {
+                    $errors[] = parse_url($url, PHP_URL_HOST) . ': HTTP ' . $response->status()
+                        . ($response->status() === 504 ? ' (timeout)' : ' (rate-limited)');
+                    continue; // try the next mirror
+                }
+
+                if ($response->failed()) {
+                    $errors[] = parse_url($url, PHP_URL_HOST) . ': HTTP ' . $response->status();
+                    continue; // try the next mirror
+                }
+
+                $data = $response->json();
+
+                if (isset($data['error'])) {
+                    $errors[] = parse_url($url, PHP_URL_HOST) . ': ' . $data['error'];
+                    continue; // try the next mirror
+                }
+
+                $elements = $data['elements'] ?? [];
+                error_log("Overpass ($url) returned " . count($elements) . " elements");
+                return $elements; // success — no need to try further mirrors
+            } catch (\Illuminate\Http\Client\ConnectionException $e) {
+                $errors[] = parse_url($url, PHP_URL_HOST) . ': could not connect (' . $e->getMessage() . ')';
+                continue; // try the next mirror
+            } catch (\Exception $e) {
+                $errors[] = parse_url($url, PHP_URL_HOST) . ': ' . $e->getMessage();
+                continue; // try the next mirror
             }
-
-            if ($response->failed()) {
-                throw new \RuntimeException('Overpass API request failed: HTTP ' . $response->status());
-            }
-
-            $data = $response->json();
-
-            if (isset($data['error'])) {
-                throw new \RuntimeException('Overpass API error: ' . $data['error']);
-            }
-
-            $elements = $data['elements'] ?? [];
-            error_log("Overpass returned " . count($elements) . " elements");
-            return $elements;
-        } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            // This is what a firewall/network block, DNS failure, or timeout looks
-            // like — the request never got a response at all.
-            $this->lastOverpassError = 'Could not connect to Overpass API (' . $e->getMessage() . '). '
-                . 'This usually means your server cannot reach overpass-api.de — check your hosting '
-                . 'firewall / outbound network rules.';
-            \Log::warning('Overpass connection error: ' . $e->getMessage());
-            return [];
-        } catch (\Exception $e) {
-            $this->lastOverpassError = $e->getMessage();
-            \Log::warning('Overpass API error: ' . $e->getMessage());
-            return [];
         }
+
+        // Every attempted mirror failed.
+        $summary = implode(' | ', $errors);
+        $allConnectionErrors = count($errors) === count($urlsToTry)
+            && str_contains($summary, 'could not connect');
+
+        if ($allConnectionErrors) {
+            $this->lastOverpassError = 'Could not connect to any Overpass mirror (' . $summary . '). '
+                . 'This usually means your server cannot make outbound HTTPS requests at all — check your '
+                . 'hosting firewall / outbound network rules.';
+        } else {
+            $this->lastOverpassError = 'All Overpass mirrors failed: ' . $summary . '. This looks like the '
+                . 'public Overpass instances are having a rough moment right now (they\'re free, shared, '
+                . 'community-run servers) — usually transient, worth trying again shortly.';
+        }
+
+        \Log::warning('Overpass API: all mirrors failed — ' . $summary);
+        return [];
     }
 
     protected function getCityCoordinates(string $city): ?array
@@ -228,7 +265,7 @@ class CityDataDiscoveryService
 
         try {
             // Use Nominatim to get coordinates for the city
-            $response = Http::timeout(10)
+            $response = Http::timeout(8)
                 ->withHeaders(['User-Agent' => 'IndianEstHub-CityImport/1.0 (contact: admin@indianesthub.com)'])
                 ->get($this->nominatimUrl . '/search', [
                     'q' => $city . ', India',
@@ -311,7 +348,7 @@ class CityDataDiscoveryService
             $isBuilder = ($type === 'builder');
 
             $tagQuery = $this->buildOverpassTagQuery($lat, $lon, 15000, $isBuilder);
-            $elements = $this->queryOverpass($tagQuery);
+            $elements = $this->queryOverpass($tagQuery); // full failover across mirrors (cheap query)
             $reachedOverpassWithRealCoordinates = ($this->lastOverpassError === null);
 
             $results = $this->mapOsmElements($elements, $city);
@@ -320,7 +357,7 @@ class CityDataDiscoveryService
                 // Tag query succeeded but found nothing — try the pricier
                 // name-regex query over a smaller (5km) radius.
                 $nameQuery = $this->buildOverpassNameQuery($lat, $lon, 5000, $isBuilder);
-                $elements = $this->queryOverpass($nameQuery);
+                $elements = $this->queryOverpass($nameQuery, maxAttempts: 1); // expensive query — only 1 mirror, no failover
                 $reachedOverpassWithRealCoordinates = $reachedOverpassWithRealCoordinates && ($this->lastOverpassError === null);
                 $results = $this->mapOsmElements($elements, $city);
             }
