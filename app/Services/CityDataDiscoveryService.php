@@ -175,14 +175,24 @@ class CityDataDiscoveryService
             // and rejects it. Normalize to real whitespace before sending.
             $query = str_replace('\\n', "\n", $query);
 
-            // Overpass expects the query as a form field named "data" (like
-            // `curl -d "data=..."`), not as a raw string body or JSON payload.
-            // Http::post($url, $query) with a string was being JSON-encoded and
-            // sent with the wrong Content-Type, which Overpass can't parse.
+            // Kept comfortably under typical shared-hosting PHP max_execution_time
+            // (commonly 30s) so a slow Overpass response causes a clean, catchable
+            // timeout here rather than PHP fatally killing the whole request first.
             $response = Http::asForm()
-                ->timeout(30)
+                ->timeout(20)
                 ->withHeaders(['User-Agent' => 'IndianEstHub-CityImport/1.0 (contact: admin@indianesthub.com)'])
                 ->post($this->overpassUrl, ['data' => $query]);
+
+            if ($response->status() === 504 || $response->status() === 429) {
+                throw new \RuntimeException(
+                    $response->status() === 504
+                        ? 'Overpass API timed out (HTTP 504) — the public Overpass server is often overloaded '
+                            . 'and slow, especially for busy metro areas. This is usually transient; try again '
+                            . 'in a minute or two.'
+                        : 'Overpass API rate-limited this request (HTTP 429) — too many requests recently. '
+                            . 'Wait a minute and try again.'
+                );
+            }
 
             if ($response->failed()) {
                 throw new \RuntimeException('Overpass API request failed: HTTP ' . $response->status());
@@ -291,19 +301,30 @@ class CityDataDiscoveryService
         }
 
         // 2c) If we have coordinates from either source, actually query Overpass.
+        // Two phases to avoid timeouts (HTTP 504) in large, densely-mapped
+        // metros: a cheap tag-only query first at the full radius, and only if
+        // that finds nothing, a name-regex query — which is much more expensive
+        // for Overpass to evaluate — over a deliberately smaller radius so it
+        // stays fast enough to complete.
         if ($coordinates) {
             [$lat, $lon] = $coordinates;
-            $query = $this->buildOverpassQueryFromCoordinates($city, $queryPrefix, $lat, $lon, 15000);
-            $elements = $this->queryOverpass($query);
+            $isBuilder = ($type === 'builder');
+
+            $tagQuery = $this->buildOverpassTagQuery($lat, $lon, 15000, $isBuilder);
+            $elements = $this->queryOverpass($tagQuery);
             $reachedOverpassWithRealCoordinates = ($this->lastOverpassError === null);
 
-            $results = [];
-            foreach ($elements as $element) {
-                $candidate = $this->mapOsmElementToCandidate($element, $city);
-                if ($candidate) {
-                    $results[] = $candidate;
-                }
+            $results = $this->mapOsmElements($elements, $city);
+
+            if (empty($results) && $this->lastOverpassError === null) {
+                // Tag query succeeded but found nothing — try the pricier
+                // name-regex query over a smaller (5km) radius.
+                $nameQuery = $this->buildOverpassNameQuery($lat, $lon, 5000, $isBuilder);
+                $elements = $this->queryOverpass($nameQuery);
+                $reachedOverpassWithRealCoordinates = $reachedOverpassWithRealCoordinates && ($this->lastOverpassError === null);
+                $results = $this->mapOsmElements($elements, $city);
             }
+
             $results = array_slice($results, 0, 50);
 
             if (!empty($results)) {
@@ -405,47 +426,64 @@ class CityDataDiscoveryService
     }
 
     /**
-     * Builds the Overpass QL query for a given center point + radius.
-     *
-     * Strict OSM tagging (office=estate_agent, shop=real_estate_agency, etc.)
-     * has sparse coverage in most Indian cities outside a handful of
-     * well-mapped metros, so — in addition to the standard tags — this also
-     * matches on business name (e.g. "... Properties", "... Realty",
-     * "... Builders") to catch real-world listings that were mapped without
-     * the "correct" OSM tag. This trades a little precision for much better
-     * recall; the admin still reviews and ticks every row before anything
-     * is saved, so false positives are cheap to reject.
+     * Builds the cheap, tag-only Overpass QL query for a given center point +
+     * radius. Fast — Overpass can answer this from its tag index directly.
      */
-    protected function buildOverpassQueryFromCoordinates(string $city, string $queryPrefix, float $lat, float $lon, int $radius): string
+    protected function buildOverpassTagQuery(float $lat, float $lon, int $radius, bool $isBuilder): string
     {
-        $isBuilder = strpos(strtolower($queryPrefix), 'builder') !== false
-            || strpos(strtolower($queryPrefix), 'developer') !== false;
-
         $around = "around:{$radius},{$lat},{$lon}";
-        $lines = ['[out:json][timeout:30];', '('];
+        $lines = ['[out:json][timeout:25];', '('];
 
-        // Standard OSM tags.
         $lines[] = "  nwr[\"office\"=\"estate_agent\"]({$around});";
         $lines[] = "  nwr[\"amenity\"=\"real_estate_agency\"]({$around});";
         $lines[] = $isBuilder
             ? "  nwr[\"shop\"=\"real_estate_agency\"]({$around});"
             : "  nwr[\"shop\"=\"estate_agent\"]({$around});";
 
-        // Name-based fallback for businesses mapped without a real-estate-specific tag.
-        $namePattern = $isBuilder
-            ? 'builders|developers|realty|properties|infra|construction'
-            : 'real estate|realty|properties|property dealer|estate agent';
-        $lines[] = "  nwr[\"name\"~\"{$namePattern}\",i]({$around});";
-
         $lines[] = ');';
         $lines[] = 'out center;';
 
-        $query = implode("\n", $lines);
-        error_log("Overpass query for $city ($queryPrefix): center=($lat,$lon), radius=$radius");
-
-        return $query;
+        return implode("\n", $lines);
     }
 
+    /**
+     * Builds the name-regex Overpass QL query — catches real-world listings
+     * that were mapped without the "correct" OSM tag (very common in India),
+     * but regex scans over "name" are expensive for Overpass to evaluate and
+     * can time out over a large radius in a densely-mapped metro. Only called
+     * with a deliberately smaller radius than the tag query for that reason.
+     */
+    protected function buildOverpassNameQuery(float $lat, float $lon, int $radius, bool $isBuilder): string
+    {
+        $around = "around:{$radius},{$lat},{$lon}";
+        $namePattern = $isBuilder
+            ? 'builders|developers|realty|properties|infra|construction'
+            : 'real estate|realty|properties|property dealer|estate agent';
+
+        $lines = ['[out:json][timeout:25];', '('];
+        $lines[] = "  nwr[\"name\"~\"{$namePattern}\",i]({$around});";
+        $lines[] = ');';
+        $lines[] = 'out center;';
+
+        return implode("\n", $lines);
+    }
+
+
+    /**
+     * Maps a raw array of Overpass elements into candidate records, dropping
+     * any that couldn't be mapped (e.g. no usable name).
+     */
+    protected function mapOsmElements(array $elements, string $city): array
+    {
+        $results = [];
+        foreach ($elements as $element) {
+            $candidate = $this->mapOsmElementToCandidate($element, $city);
+            if ($candidate) {
+                $results[] = $candidate;
+            }
+        }
+        return $results;
+    }
 
     protected function mapOsmElementToCandidate(array $element, string $city): ?array
     {

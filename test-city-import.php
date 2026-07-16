@@ -161,47 +161,70 @@ section('TEST 3: OpenStreetMap — Overpass Business Search');
 
 $lat = $geocodedLat ?: '26.8467'; // fall back to Lucknow's known coordinates if geocoding failed
 $lon = $geocodedLon ?: '80.9462';
-$radius = 15000;
 
-$query = "[out:json][timeout:30];\n(\n"
-    . "  nwr[\"office\"=\"estate_agent\"](around:$radius,$lat,$lon);\n"
-    . "  nwr[\"amenity\"=\"real_estate_agency\"](around:$radius,$lat,$lon);\n"
-    . "  nwr[\"shop\"=\"real_estate_agency\"](around:$radius,$lat,$lon);\n"
-    . "  nwr[\"name\"~\"builders|developers|realty|properties|infra|construction\",i](around:$radius,$lat,$lon);\n"
-    . ");\nout center;";
+function runOverpassQuery(string $label, string $query): void
+{
+    echo "\n--- $label ---\n";
+    echo "Query:\n$query\n\n";
+    echo "Requesting: https://overpass-api.de/api/interpreter ...\n";
 
-echo "Using coordinates: lat=$lat, lon=$lon (radius: {$radius}m)\n";
-echo "Query:\n$query\n\n";
-echo "Requesting: https://overpass-api.de/api/interpreter ...\n";
+    $result = httpRequest('POST', 'https://overpass-api.de/api/interpreter', [
+        'headers' => [
+            'Content-Type' => 'application/x-www-form-urlencoded',
+            'User-Agent' => 'IndianEstHub-CityImport/1.0 (contact: admin@indianesthub.com)',
+        ],
+        'form' => ['data' => $query],
+        'timeout' => 25,
+    ]);
 
-$result = httpRequest('POST', 'https://overpass-api.de/api/interpreter', [
-    'headers' => [
-        'Content-Type' => 'application/x-www-form-urlencoded',
-        'User-Agent' => 'IndianEstHub-CityImport/1.0 (contact: admin@indianesthub.com)',
-    ],
-    'form' => ['data' => $query],
-    'timeout' => 35,
-]);
+    if (!$result['ok']) {
+        echo "❌ CONNECTION FAILED (curl errno {$result['curl_errno']}): {$result['curl_error']}\n";
+        echo "   -> Your server cannot reach overpass-api.de. Check outbound firewall / ask your host to\n";
+        echo "      whitelist this domain.\n";
+        return;
+    }
 
-if (!$result['ok']) {
-    echo "❌ CONNECTION FAILED (curl errno {$result['curl_errno']}): {$result['curl_error']}\n";
-    echo "   -> Your server cannot reach overpass-api.de. Check outbound firewall / ask your host to\n";
-    echo "      whitelist this domain.\n";
-} else {
     echo "HTTP Status: {$result['status']}\n";
-    $bodyPreview = strlen($result['body']) > 3000 ? substr($result['body'], 0, 3000) . "\n... (truncated)" : $result['body'];
+    $bodyPreview = strlen($result['body']) > 2000 ? substr($result['body'], 0, 2000) . "\n... (truncated)" : $result['body'];
     echo "Raw response:\n$bodyPreview\n";
+
+    if ($result['status'] === 504) {
+        echo "❌ TIMEOUT (HTTP 504) — the public Overpass server is overloaded/slow for this query. Usually\n";
+        echo "   transient; try again in a minute. This is a request-level failure, not \"no data\".\n";
+        return;
+    }
+    if ($result['status'] === 429) {
+        echo "❌ RATE LIMITED (HTTP 429) — too many requests recently. Wait a minute and try again.\n";
+        return;
+    }
+
     $decoded = json_decode($result['body'], true);
     $count = count($decoded['elements'] ?? []);
     if ($result['status'] === 200 && $count > 0) {
         echo "✅ SUCCESS — found $count element(s) in OpenStreetMap.\n";
     } elseif ($result['status'] === 200) {
-        echo "⚠️  Request succeeded but OpenStreetMap has 0 tagged/named real estate businesses near \"$city\".\n";
-        echo "    This is a genuine OSM data-coverage gap, not a bug.\n";
+        echo "⚠️  Request succeeded but found 0 matches for this query.\n";
     } else {
-        echo "❌ FAILED — HTTP {$result['status']}. This is a request-level failure, not just \"no data\".\n";
+        echo "❌ FAILED — HTTP {$result['status']}.\n";
     }
 }
+
+echo "Using coordinates: lat=$lat, lon=$lon\n";
+
+// Phase 1: cheap tag-only query at the full 15km radius.
+$tagQuery = "[out:json][timeout:25];\n(\n"
+    . "  nwr[\"office\"=\"estate_agent\"](around:15000,$lat,$lon);\n"
+    . "  nwr[\"amenity\"=\"real_estate_agency\"](around:15000,$lat,$lon);\n"
+    . "  nwr[\"shop\"=\"real_estate_agency\"](around:15000,$lat,$lon);\n"
+    . ");\nout center;";
+runOverpassQuery('Phase 1: Tag-only query (15km radius, fast)', $tagQuery);
+
+// Phase 2: pricier name-regex query at a smaller 5km radius (only run in the
+// real app if Phase 1 finds nothing — run here too so you can see both).
+$nameQuery = "[out:json][timeout:25];\n(\n"
+    . "  nwr[\"name\"~\"builders|developers|realty|properties|infra|construction\",i](around:5000,$lat,$lon);\n"
+    . ");\nout center;";
+runOverpassQuery('Phase 2: Name-regex query (5km radius, slower)', $nameQuery);
 
 // ============================================================
 section('SUMMARY');
