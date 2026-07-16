@@ -201,12 +201,14 @@ class CityDataDiscoveryService
 
         foreach ($urlsToTry as $url) {
             try {
-                // Kept short — comfortably under typical shared-hosting PHP
-                // max_execution_time (commonly 30-60s) even when multiplied
-                // across several mirror attempts within one page load (this
-                // service also calls Mappls + Nominatim in the same request).
+                // Loosened from 6s after seeing all 3 independent mirrors time out
+                // identically in real usage — that pattern points to the timeout
+                // being too aggressive for this server's network conditions, not
+                // three unrelated servers failing simultaneously. Kept well under
+                // typical shared-hosting PHP max_execution_time even when summed
+                // across a few mirror attempts (see maxAttempts docblock above).
                 $response = Http::asForm()
-                    ->timeout(6)
+                    ->timeout(12)
                     ->withHeaders(['User-Agent' => 'IndianEstHub-CityImport/1.0 (contact: admin@indianesthub.com)'])
                     ->post($url, ['data' => $query]);
 
@@ -348,7 +350,7 @@ class CityDataDiscoveryService
             $isBuilder = ($type === 'builder');
 
             $tagQuery = $this->buildOverpassTagQuery($lat, $lon, 15000, $isBuilder);
-            $elements = $this->queryOverpass($tagQuery); // full failover across mirrors (cheap query)
+            $elements = $this->queryOverpass($tagQuery, maxAttempts: 2); // cheap query — try 2 mirrors
             $reachedOverpassWithRealCoordinates = ($this->lastOverpassError === null);
 
             $results = $this->mapOsmElements($elements, $city);
