@@ -372,6 +372,11 @@ Route::get('/pricing', function () {
     return view('frontend.pricing');
 })->name('pricing');
 
+// Investor relations page
+Route::get('/investors', function () {
+    return view('frontend.investors');
+})->name('investors');
+
 // Property actions (public)
 Route::post('/property/inquiry/submit', [PropertyDetailsController::class, 'submitInquiry'])->name('property.inquiry.submit');
 Route::post('/property/schedule-viewing', [ScheduleViewingController::class, 'submit'])->name('property.schedule.viewing');

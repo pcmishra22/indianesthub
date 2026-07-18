@@ -11,6 +11,24 @@
     </div>
   </div>
 
+  {{-- ── Investor CTA Strip ─────────────────────────────────────── --}}
+  <div style="background:#0a2d5e; border-top:1px solid rgba(255,255,255,.08); border-bottom:1px solid rgba(255,255,255,.08); padding:18px 0;">
+    <div class="container d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <div>
+        <span style="color:#fff; font-weight:700; font-size:.95rem;">
+          <i class="bi bi-graph-up-arrow me-2" style="color:#50e6ff;"></i>Interested in Investing?
+        </span>
+        <span style="color:rgba(255,255,255,.7); font-size:.85rem; margin-left:6px;">
+          We're inviting angel investors, VCs &amp; strategic partners to join our growth journey.
+        </span>
+      </div>
+      <a href="{{ route('investors') }}" style="background:#50e6ff; color:#0a2d5e; border-radius:8px; padding:8px 20px; font-size:.82rem; font-weight:700; text-decoration:none; white-space:nowrap;">
+        Explore Investment Opportunity <i class="bi bi-arrow-right ms-1"></i>
+      </a>
+    </div>
+  </div>
+  {{-- ── End Investor CTA Strip ──────────────────────────────────── --}}
+
   {{-- ── Properties by Location ─────────────────────────────────── --}}
   <div class="footer-locations">
     <div class="container">
@@ -369,6 +387,7 @@
           <li><i class="bi bi-chevron-right"></i><a href="{{ route('builders.index') }}">Builders</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ url('/blog') }}">Blog</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ url('/pricing') }}" style="color:#fbbf24!important;">Pricing &amp; Plans</a></li>
+          <li><i class="bi bi-chevron-right"></i><a href="{{ route('investors') }}" style="color:#50e6ff!important;">Investors</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ url('/contact') }}">Contact</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ route('seo.sitemap') }}" target="_blank">XML Sitemap</a></li>
         </ul>

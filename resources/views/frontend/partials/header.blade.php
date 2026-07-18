@@ -15,6 +15,10 @@
         <i class="bi bi-tools"></i>
         <span>Offer a Service Free</span>
       </a>
+      <a href="{{ route('investors') }}" class="top-bar-cta" style="background:#0a2d5e;color:#50e6ff;">
+        <i class="bi bi-graph-up-arrow"></i>
+        <span>Partner With Us</span>
+      </a>
     </div>
 
     {{-- Scrolling ticker --}}
@@ -91,6 +95,11 @@
                 </a>
               </li>
             </ul>
+          </li>
+
+          {{-- Mobile-only Partner With Us link --}}
+          <li class="d-xl-none">
+            <a href="{{ route('investors') }}" style="color:#0078d4!important;font-weight:700;"><i class="bi bi-graph-up-arrow me-1"></i> Partner With Us</a>
           </li>
 
           {{-- Mobile-only Finance & Legal links --}}

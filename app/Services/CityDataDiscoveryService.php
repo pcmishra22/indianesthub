@@ -89,12 +89,22 @@ class CityDataDiscoveryService
         $city = str_replace(['-', '_'], ' ', $city);
         $city = preg_replace('/\s+/', ' ', $city);
 
-        // If admin passes a hyphenated slug (e.g. "zirakpur-city"), prefer the first token.
-        // This makes queries like "real estate builders ... in zirakpur" much more reliable.
-        $parts = explode(' ', $city);
-        $first = $parts[0] ?? $city;
+        return strtolower($city);
+    }
 
-        return strtolower($first);
+    /**
+     * A narrower version of normalizeCity() used only for looking up
+     * getFallbackCoordinatesForCity()'s hardcoded map, whose keys are single
+     * words (e.g. "zirakpur"). This intentionally keeps the old "just the
+     * first word" behavior, but ONLY as a fallback lookup key — never as the
+     * actual city text sent to search APIs, since that previously mangled
+     * genuine multi-word places (e.g. "Peer Muchalla" -> "peer", "New Delhi"
+     * -> "new") into near-meaningless single words.
+     */
+    protected function firstWordOf(string $normalizedCity): string
+    {
+        $parts = explode(' ', $normalizedCity);
+        return $parts[0] ?? $normalizedCity;
     }
 
     /**
@@ -123,7 +133,14 @@ class CityDataDiscoveryService
 
         try {
             $params = [
-                'query' => $queryPrefix,
+                // The city name is baked directly into the query text (not just
+                // passed as a location bias below) — Mappls' text search ranks
+                // primarily on the query string, so two different cities with
+                // an identical query text but only a soft location hint could
+                // return the same (or near-identical) nationally-popular
+                // results. Including "in <city>" makes the city itself part of
+                // what's being matched, not just a tiebreaker.
+                'query' => $queryPrefix . ' in ' . ucwords($city),
                 'region' => 'ind',
                 'access_token' => $this->mapplsApiKey,
             ];
@@ -437,22 +454,30 @@ class CityDataDiscoveryService
             . 'or use the CSV import option (choose "Property" as the type) to add listings manually instead.';
     }
 
-    protected function getFallbackCoordinatesForCity(string $city): ?array
+    protected function getFallbackCoordinatesForCity(string $normalizedCity): ?array
     {
-        // Approximate centers for major Indian cities, used when Nominatim
-        // geocoding fails or is rate-limited.
+        // Approximate centers for major Indian cities/localities, used when
+        // Nominatim geocoding fails or is rate-limited. Keys are full,
+        // space-separated normalized names (output of normalizeCity()) so
+        // multi-word localities need their own explicit entry here — a
+        // partial/first-word match is tried separately as a last resort,
+        // see below.
         $map = [
             'zirakpur' => [30.6646, 76.7929],
             'mohali' => [30.6785, 76.7230],
             'chandigarh' => [30.7333, 76.7794],
             'panchkula' => [30.7056, 76.8585],
             'derabassi' => [30.6630, 76.7140],
+            'dera bassi' => [30.6630, 76.7140],
             'kharar' => [30.7490, 76.6500],
             'kharar mohali' => [30.7490, 76.6500],
+            'peer muchalla' => [30.6616, 76.8633],
             'pune' => [18.5204, 73.8567],
             'lucknow' => [26.8467, 80.9462],
             'delhi' => [28.6139, 77.2090],
+            'new delhi' => [28.6139, 77.2090],
             'mumbai' => [19.0760, 72.8777],
+            'navi mumbai' => [19.0330, 73.0297],
             'bangalore' => [12.9716, 77.5946],
             'bengaluru' => [12.9716, 77.5946],
             'hyderabad' => [17.3850, 78.4867],
@@ -467,13 +492,30 @@ class CityDataDiscoveryService
             'bhopal' => [23.2599, 77.4126],
             'patna' => [25.5941, 85.1376],
             'noida' => [28.5355, 77.3910],
+            'greater noida' => [28.4744, 77.5040],
             'gurugram' => [28.4595, 77.0266],
             'gurgaon' => [28.4595, 77.0266],
             'ghaziabad' => [28.6692, 77.4538],
             'faridabad' => [28.4089, 77.3178],
         ];
 
-        return $map[$city] ?? null;
+        // 1) Exact match on the full (possibly multi-word) normalized city name.
+        if (isset($map[$normalizedCity])) {
+            return $map[$normalizedCity];
+        }
+
+        // 2) Last resort: try just the first word (e.g. an unlisted locality
+        // like "Peer Muchalla Extension" might still match "peer muchalla"'s
+        // neighboring town if we had "peer" mapped — in practice this mostly
+        // helps cases like "Zirakpur City" -> "zirakpur"). Deliberately tried
+        // only after the full-name match fails, and only as a coordinate
+        // fallback — never as what gets sent to the search APIs themselves.
+        $firstWord = $this->firstWordOf($normalizedCity);
+        if ($firstWord !== $normalizedCity && isset($map[$firstWord])) {
+            return $map[$firstWord];
+        }
+
+        return null;
     }
 
     /**
