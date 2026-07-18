@@ -39,9 +39,6 @@ class PropertyDetailsController extends Controller
             $property->builder->email = 'Login to view';
         }
 
-        // Increment views_count
-        $property->increment('views_count');
-
         // Detect device & browser from User-Agent
         $userAgent = request()->userAgent() ?? '';
         $device    = $this->detectDevice($userAgent);
@@ -54,19 +51,45 @@ class PropertyDetailsController extends Controller
             Cookie::queue('visitor_token', $visitorToken, 60 * 24 * 30); // ~180 days
         }
 
-        PropertyView::create([
-            'property_id'     => $property->id,
-            'event_type'      => 'page_view',
-            'user_id'         => Auth::id(),
-            'session_id'      => request()->session()->getId(),
-            'visitor_token'   => $visitorToken,
-            'ip_address'      => request()->ip(),
-            'device'          => $device,
-            'browser'         => $browser,
-            'referrer'        => request()->headers->get('referer'),
-            'page_url'        => request()->fullUrl(),
-            'viewed_at'       => now(),
-        ]);
+        // Only count this as a view if it looks like a real, distinct visit —
+        // this keeps both `views_count` (shown to dealers/agents/builders) and
+        // the admin's "Property Views" report meaningful instead of inflated by:
+        //   1) Link-preview bots. Every time someone shares a property link on
+        //      WhatsApp/Facebook/Twitter/etc, that platform's server fetches the
+        //      page once to build the preview card — that's not a human looking
+        //      at the listing, but without this check it counted as one.
+        //   2) Repeat hits from the same visitor. Refreshing the page, or
+        //      clicking back-and-forth into the same listing, previously
+        //      inserted a brand new row and incremented the counter every time.
+        if (!$this->isKnownBot($userAgent)) {
+            $recentDuplicate = PropertyView::where('property_id', $property->id)
+                ->where('event_type', 'page_view')
+                ->where('viewed_at', '>=', now()->subMinutes(30))
+                ->when(
+                    Auth::check(),
+                    fn ($q) => $q->where('user_id', Auth::id()),
+                    fn ($q) => $q->where('visitor_token', $visitorToken)
+                )
+                ->exists();
+
+            if (!$recentDuplicate) {
+                $property->increment('views_count');
+
+                PropertyView::create([
+                    'property_id'     => $property->id,
+                    'event_type'      => 'page_view',
+                    'user_id'         => Auth::id(),
+                    'session_id'      => request()->session()->getId(),
+                    'visitor_token'   => $visitorToken,
+                    'ip_address'      => request()->ip(),
+                    'device'          => $device,
+                    'browser'         => $browser,
+                    'referrer'        => request()->headers->get('referer'),
+                    'page_url'        => request()->fullUrl(),
+                    'viewed_at'       => now(),
+                ]);
+            }
+        }
 
         // Track in recently_viewed table
         $recentlyViewedData = [
@@ -261,6 +284,50 @@ class PropertyDetailsController extends Controller
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    /**
+     * Recognizes common search-engine crawlers and social-media link-preview
+     * bots so their automated page fetches don't get counted as real visits.
+     * Link-preview bots (WhatsApp, Facebook, Twitter/X, etc.) are the most
+     * important case here — every time someone shares a property link, the
+     * receiving platform's server fetches the page once to build the preview
+     * card, which is not a person looking at the listing.
+     *
+     * This is a pragmatic allowlist-of-known-signatures approach, not a
+     * security control — it won't catch every automated client, and that's
+     * fine: the goal is just to make the "Property Views" number reflect
+     * real interest, not to gate access to the page itself.
+     */
+    private function isKnownBot(string $ua): bool
+    {
+        if ($ua === '') {
+            return true; // A real browser always sends a User-Agent; an empty one is almost certainly a script.
+        }
+
+        $ua = strtolower($ua);
+
+        $signatures = [
+            // Link-preview / "unfurling" bots — the main source of inflated counts
+            // on a site whose links get shared over chat apps.
+            'whatsapp', 'facebookexternalhit', 'facebot', 'twitterbot',
+            'linkedinbot', 'telegrambot', 'discordbot', 'slackbot',
+            'skypeuripreview', 'pinterest',
+            // Search engine crawlers.
+            'googlebot', 'bingbot', 'yandexbot', 'duckduckbot', 'baiduspider',
+            'applebot', 'petalbot',
+            // Generic automation / scraping tool signatures.
+            'bot', 'crawler', 'spider', 'curl', 'wget', 'python-requests',
+            'headlesschrome', 'phantomjs', 'scrapy',
+        ];
+
+        foreach ($signatures as $signature) {
+            if (str_contains($ua, $signature)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private function detectDevice(string $ua): string
     {

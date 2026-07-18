@@ -20,11 +20,14 @@ use Illuminate\Support\Facades\Log;
  */
 class CityDataDiscoveryService
 {
-    /** @var string[] Tried in order; first success wins. Mirrors are tried before
-     * the main overpass-api.de instance because it's frequently overloaded by
-     * heavy automated traffic and returns 504/406 as a result — the mirrors
-     * below are community-recommended, actively-maintained alternatives as of
-     * 2026 (see wiki.openstreetmap.org/wiki/Overpass_API#Public_Overpass_API_instances).
+    /** @var string[] Tried in order; first success wins. overpass-api.de is
+     * first because it's the instance confirmed reachable from this
+     * deployment. The mirror alternatives after it exist for when
+     * overpass-api.de itself is overloaded (a known issue — it's a free,
+     * heavily-used shared server), but this deployment's own outbound
+     * connections to those specific mirrors have failed with 0-byte
+     * responses, consistent with a host-level firewall block on those
+     * domains rather than the mirrors being down.
      */
     protected array $overpassUrls;
     protected ?string $nominatimUrl;
@@ -46,11 +49,20 @@ class CityDataDiscoveryService
         // the only endpoint (someone deliberately pointed this at a specific
         // instance, e.g. a self-hosted one). Otherwise, use the known-good
         // mirror list with automatic failover.
+        // Order matters: overpass-api.de is tried first because it's the one
+        // confirmed reachable from this deployment (a real search succeeded
+        // through it). The mirrors below it are kept as fallbacks for when
+        // overpass-api.de itself is overloaded, but real-world testing showed
+        // "0 bytes received" connection failures to both of them specifically —
+        // consistent with a host-level firewall blocking those two domains by
+        // name/IP rather than general network trouble (which would affect all
+        // three equally). If your host later confirms/lifts a block on these,
+        // reordering here is the only change needed.
         $configuredUrl = config('openstreetmap.overpass_url');
         $this->overpassUrls = $configuredUrl ? [$configuredUrl] : [
+            'https://overpass-api.de/api/interpreter',
             'https://overpass.kumi.systems/api/interpreter',
             'https://overpass.private.coffee/api/interpreter',
-            'https://overpass-api.de/api/interpreter',
         ];
         $this->nominatimUrl = config('openstreetmap.nominatim_url', 'https://nominatim.openstreetmap.org');
         $this->mapplsApiKey = config('mappls.key');
