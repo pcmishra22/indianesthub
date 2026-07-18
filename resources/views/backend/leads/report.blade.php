@@ -234,7 +234,13 @@
                         <td>{{ $prop->city }}</td>
                         <td><span class="badge bg-secondary">{{ $prop->property_type }}</span></td>
                         <td>₹{{ number_format($prop->price) }}</td>
-                        <td><strong class="text-primary">{{ number_format($prop->view_count) }}</strong></td>
+                        <td>
+                            <a href="{{ route('admin.properties.viewers.index', ['property' => $prop->id, 'from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')]) }}"
+                               class="text-decoration-none fw-bold text-primary"
+                               title="See who viewed this property">
+                                {{ number_format($prop->view_count) }}
+                            </a>
+                        </td>
                         <td>{{ number_format($prop->views_count) }}</td>
                         <td>{{ number_format($prop->inquiries_count) }}</td>
                     </tr>
