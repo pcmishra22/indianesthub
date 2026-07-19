@@ -10,13 +10,23 @@
         right: 0;
         background: #fff;
         box-shadow: -2px 0 4px rgba(0,0,0,0.06);
+        border-left: 1px solid #e9ecef;
+        padding-left: 12px !important;
+        z-index: 2;
     }
     thead .sticky-action-col {
         background: #f8f9fa;
         z-index: 3;
     }
-    tbody .sticky-action-col {
-        z-index: 2;
+    /* `position: sticky` creates its own stacking context, which traps the
+       dropdown-menu's z-index inside it — so an open dropdown was being
+       painted UNDER the next row's sticky Actions cell (both sitting at the
+       same z-index: 2, with the later one in DOM order winning). Bumping the
+       z-index of just the cell whose dropdown is currently open (toggled via
+       JS below) lifts it above every other row's sticky column so the menu
+       is never clipped/overlapped. */
+    .sticky-action-col.dropdown-open {
+        z-index: 1055;
     }
 </style>
 
@@ -70,10 +80,10 @@
                         <th>Type</th>
                         <th>Status</th>
                         <th>Enabled</th>
-                        <th>Units</th>
-                        <th>Props</th>
-                        <th>Leads</th>
-                        <th>Featured</th>
+                        <th style="width:80px;" class="text-center">Units</th>
+                        <th style="width:60px;" class="text-center">Props</th>
+                        <th style="width:60px;" class="text-center">Leads</th>
+                        <th style="width:80px;" class="text-center">Featured</th>
                         <th>Date</th>
                         <th style="width:110px;" class="text-center sticky-action-col">Actions</th>
                     </tr>
@@ -190,5 +200,18 @@
     </div>
     @endif
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.sticky-action-col .dropdown').forEach(function (dropdown) {
+        dropdown.addEventListener('show.bs.dropdown', function () {
+            dropdown.closest('.sticky-action-col')?.classList.add('dropdown-open');
+        });
+        dropdown.addEventListener('hide.bs.dropdown', function () {
+            dropdown.closest('.sticky-action-col')?.classList.remove('dropdown-open');
+        });
+    });
+});
+</script>
 
 @endsection
