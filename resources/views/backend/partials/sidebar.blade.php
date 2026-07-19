@@ -12,7 +12,7 @@
             </li>
             <li class="sidebar-item {{ request()->routeIs('admin.users.*') ? 'active' : '' }}">
                 <a class="sidebar-link" href="{{ route('admin.users.index') }}">
-                    <i class="align-middle" data-feather="users"></i> <span class="align-middle">Users</span>
+                    <i class="align-middle" data-feather="users"></i> <span class="align-middle">All Accounts</span>
                 </a>
             </li>
             <li class="sidebar-item {{ request()->routeIs('admin.users.bulk-email.*') ? 'active' : '' }}">
