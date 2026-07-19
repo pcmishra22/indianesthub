@@ -8,6 +8,8 @@ use App\Mail\PropertyInquiryToDealer;
 use App\Models\Dealer;
 use App\Models\Inquiry;
 use App\Models\LoanLead;
+use App\Models\MarketplaceCategory;
+use App\Models\MarketplaceProduct;
 use App\Models\Property;
 use App\Models\PropertyView;
 use App\Models\RecentlyViewed;
@@ -158,13 +160,53 @@ class PropertyDetailsController extends Controller
             $builderTotalProjects = $property->builder->projects()->count();
         }
 
+        // ── Home Marketplace widget ───────────────────────────────────────
+        // Load 3 active products in the property's city, preferring
+        // products tagged for this BHK. Falls back to any active products
+        // if nothing matches. Other categories are shown as "coming soon".
+        $marketplaceProducts = collect();
+        $marketplaceCategories = collect();
+
+        try {
+            $marketplaceCategories = MarketplaceCategory::active()
+                ->orderBy('sort_order')
+                ->get()
+                ->map(function ($c) {
+                    $c->product_count = MarketplaceProduct::where('category_id', $c->id)
+                        ->where('is_active', true)
+                        ->count();
+                    return $c;
+                });
+
+            $base = MarketplaceProduct::with('vendor', 'category')
+                ->where('is_active', true)
+                ->whereHas('vendor', function ($v) {
+                    $v->where('is_active', true);
+                });
+
+            $marketplaceProducts = $base
+                ->orderByDesc('is_featured')
+                ->orderByDesc('leads_count')
+                ->orderBy('sort_order')
+                ->limit(24)
+                ->get()
+                ->filter(fn ($p) => $p->fitsBhk($property->bhk_type))
+                ->take(3)
+                ->values();
+        } catch (\Throwable $e) {
+            // Marketplace tables not migrated yet — fail silently.
+            Log::info('Marketplace widget skipped: ' . $e->getMessage());
+        }
+
         return view('frontend.property-details', compact(
             'property',
             'similarProperties',
             'viewsThisWeek',
             'inquiriesThisWeek',
             'builderProperties',
-            'builderTotalProjects'
+            'builderTotalProjects',
+            'marketplaceProducts',
+            'marketplaceCategories'
         ));
     }
 

@@ -381,6 +381,18 @@ Route::get('/investors', function () {
 Route::post('/property/inquiry/submit', [PropertyDetailsController::class, 'submitInquiry'])->name('property.inquiry.submit');
 Route::post('/property/schedule-viewing', [ScheduleViewingController::class, 'submit'])->name('property.schedule.viewing');
 
+// Home Marketplace — public browsing (homepage → category → product)
+Route::get('/marketplace', [\App\Http\Controllers\Frontend\MarketplaceController::class, 'index'])
+    ->name('marketplace.index');
+Route::get('/marketplace/{category:slug}', [\App\Http\Controllers\Frontend\MarketplaceController::class, 'category'])
+    ->name('marketplace.category');
+Route::get('/marketplace/{category:slug}/{product:slug}', [\App\Http\Controllers\Frontend\MarketplaceController::class, 'product'])
+    ->name('marketplace.product');
+
+// Home Marketplace — public lead capture
+Route::post('/marketplace/lead', [\App\Http\Controllers\Frontend\MarketplaceLeadController::class, 'submit'])
+    ->name('marketplace.lead.submit');
+
 // Visitor interaction tracking (public, fire-and-forget beacon from call/whatsapp buttons)
 Route::post('/track/interaction', [\App\Http\Controllers\Frontend\InteractionTrackingController::class, 'track'])->name('track.interaction');
 
@@ -620,6 +632,42 @@ Route::post('/properties/{property:id}/toggle-status', [AdminPropertyController:
 
         // Manage Services (service categories)
         Route::resource('services', \App\Http\Controllers\Admin\ServiceCategoryController::class);
+
+        // ── Home Marketplace ───────────────────────────────────────────────
+        Route::resource('marketplace/categories', \App\Http\Controllers\Admin\MarketplaceCategoryController::class)
+            ->except(['show'])
+            ->names('marketplace.categories');
+        Route::post('marketplace/categories/{category}/toggle-active',
+            [\App\Http\Controllers\Admin\MarketplaceCategoryController::class, 'toggleActive'])
+            ->name('marketplace.categories.toggle-active');
+
+        Route::resource('marketplace/vendors', \App\Http\Controllers\Admin\MarketplaceVendorController::class)
+            ->names('marketplace.vendors');
+        Route::post('marketplace/vendors/{vendor}/toggle-verified',
+            [\App\Http\Controllers\Admin\MarketplaceVendorController::class, 'toggleVerified'])
+            ->name('marketplace.vendors.toggle-verified');
+        Route::post('marketplace/vendors/{vendor}/toggle-active',
+            [\App\Http\Controllers\Admin\MarketplaceVendorController::class, 'toggleActive'])
+            ->name('marketplace.vendors.toggle-active');
+
+        Route::resource('marketplace/products', \App\Http\Controllers\Admin\MarketplaceProductController::class)
+            ->names('marketplace.products');
+
+        Route::get('marketplace/leads',
+            [\App\Http\Controllers\Admin\MarketplaceLeadController::class, 'index'])
+            ->name('marketplace.leads.index');
+        Route::get('marketplace/leads/{lead}',
+            [\App\Http\Controllers\Admin\MarketplaceLeadController::class, 'show'])
+            ->name('marketplace.leads.show');
+        Route::put('marketplace/leads/{lead}',
+            [\App\Http\Controllers\Admin\MarketplaceLeadController::class, 'update'])
+            ->name('marketplace.leads.update');
+        Route::delete('marketplace/leads/{lead}',
+            [\App\Http\Controllers\Admin\MarketplaceLeadController::class, 'destroy'])
+            ->name('marketplace.leads.destroy');
+        Route::post('marketplace/leads/{lead}/nudge',
+            [\App\Http\Controllers\Admin\MarketplaceLeadController::class, 'nudgeVendor'])
+            ->name('marketplace.leads.nudge');
 
 require __DIR__ . '/admin_properties.php';
 

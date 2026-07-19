@@ -55,6 +55,7 @@ class DatabaseSeeder extends Seeder
             InquirySeeder::class,
             InvoiceSeeder::class,
             LeadSourceSeeder::class,
+            MarketplaceCategorySeeder::class,
             MessageSeeder::class,
             MmrBuildersBatch1::class,
             MmrBuildersBatch2::class,

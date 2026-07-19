@@ -750,6 +750,9 @@
         </div>
         @endif
 
+        {{-- ===== HOME MARKETPLACE — FURNISH THIS HOME ===== --}}
+        @include('frontend.partials.marketplace-widget')
+
         {{-- ===== WHY BUY HERE? ===== --}}
         @if($property->city || $property->locality || $property->nearby_schools || $property->nearby_hospitals)
         <div class="pd-card pd-why-buy-card">

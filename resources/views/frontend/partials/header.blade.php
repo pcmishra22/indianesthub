@@ -19,6 +19,10 @@
         <i class="bi bi-graph-up-arrow"></i>
         <span>Partner With Us</span>
       </a>
+      <a href="{{ route('marketplace.index') }}" class="top-bar-cta" style="background:#0a2d5e;color:#fbbf24;">
+        <i class="bi bi-shop"></i>
+        <span>Marketplace</span>
+      </a>
     </div>
 
     {{-- Scrolling ticker --}}

@@ -156,6 +156,34 @@
                     <i class="align-middle" data-feather="mail"></i> <span class="align-middle">Inquiries</span>
                 </a>
             </li>
+
+            {{-- Home Marketplace --}}
+            <li class="sidebar-header">Home Marketplace</li>
+            <li class="sidebar-item {{ request()->routeIs('admin.marketplace.leads.*') ? 'active' : '' }}">
+                <a class="sidebar-link" href="{{ route('admin.marketplace.leads.index') }}">
+                    <i class="align-middle" data-feather="shopping-bag"></i>
+                    <span class="align-middle">Marketplace Leads</span>
+                    @php $newMktLeads = \App\Models\MarketplaceLead::where('status','new')->count(); @endphp
+                    @if($newMktLeads > 0)
+                        <span class="badge bg-danger rounded-pill ms-auto" style="font-size:.65rem;">{{ $newMktLeads }}</span>
+                    @endif
+                </a>
+            </li>
+            <li class="sidebar-item {{ request()->routeIs('admin.marketplace.categories.*') ? 'active' : '' }}">
+                <a class="sidebar-link" href="{{ route('admin.marketplace.categories.index') }}">
+                    <i class="align-middle" data-feather="grid"></i> <span class="align-middle">Categories</span>
+                </a>
+            </li>
+            <li class="sidebar-item {{ request()->routeIs('admin.marketplace.vendors.*') ? 'active' : '' }}">
+                <a class="sidebar-link" href="{{ route('admin.marketplace.vendors.index') }}">
+                    <i class="align-middle" data-feather="users"></i> <span class="align-middle">Vendors</span>
+                </a>
+            </li>
+            <li class="sidebar-item {{ request()->routeIs('admin.marketplace.products.*') ? 'active' : '' }}">
+                <a class="sidebar-link" href="{{ route('admin.marketplace.products.index') }}">
+                    <i class="align-middle" data-feather="package"></i> <span class="align-middle">Products</span>
+                </a>
+            </li>
             <li class="sidebar-item {{ request()->routeIs('admin.contacts.*') ? 'active' : '' }}">
                 <a class="sidebar-link" href="{{ route('admin.contacts.index') }}">
                     <i class="align-middle" data-feather="phone"></i> <span class="align-middle">Contacts</span>
