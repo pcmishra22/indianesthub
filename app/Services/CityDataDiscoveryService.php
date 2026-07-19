@@ -58,14 +58,14 @@ class CityDataDiscoveryService
         // name/IP rather than general network trouble (which would affect all
         // three equally). If your host later confirms/lifts a block on these,
         // reordering here is the only change needed.
-        $configuredUrl = config('openstreetmap.overpass_url');
+        $configuredUrl = config('services.openstreetmap.overpass_url');
         $this->overpassUrls = $configuredUrl ? [$configuredUrl] : [
             'https://overpass-api.de/api/interpreter',
             'https://overpass.kumi.systems/api/interpreter',
             'https://overpass.private.coffee/api/interpreter',
         ];
-        $this->nominatimUrl = config('openstreetmap.nominatim_url', 'https://nominatim.openstreetmap.org');
-        $this->mapplsApiKey = config('mappls.key');
+        $this->nominatimUrl = config('services.openstreetmap.nominatim_url', 'https://nominatim.openstreetmap.org');
+        $this->mapplsApiKey = config('services.mappls.key');
     }
 
     /**
@@ -290,7 +290,41 @@ class CityDataDiscoveryService
         return [];
     }
 
-    protected function getCityCoordinates(string $city): ?array
+    /**
+     * Merges two candidate lists (e.g. tag-query + name-query OSM results),
+     * keeping the first occurrence of each and dropping later duplicates.
+     * Prefers source_place_id when present (exact OSM element match); falls
+     * back to a normalized name+city key for elements without one.
+     */
+    protected function mergeUniqueCandidates(array $first, array $second): array
+    {
+        $merged = $first;
+        $seen = [];
+        foreach ($merged as $candidate) {
+            $seen[$this->candidateDedupeKey($candidate)] = true;
+        }
+
+        foreach ($second as $candidate) {
+            $key = $this->candidateDedupeKey($candidate);
+            if (!isset($seen[$key])) {
+                $seen[$key] = true;
+                $merged[] = $candidate;
+            }
+        }
+
+        return $merged;
+    }
+
+    protected function candidateDedupeKey(array $candidate): string
+    {
+        if (!empty($candidate['source_place_id'])) {
+            return 'id:' . $candidate['source_place_id'];
+        }
+
+        return 'name:' . strtolower(trim($candidate['name'] ?? '')) . '|' . strtolower(trim($candidate['city'] ?? ''));
+    }
+
+
     {
         $this->lastGeocodeError = null;
 
@@ -369,11 +403,17 @@ class CityDataDiscoveryService
         }
 
         // 2c) If we have coordinates from either source, actually query Overpass.
-        // Two phases to avoid timeouts (HTTP 504) in large, densely-mapped
-        // metros: a cheap tag-only query first at the full radius, and only if
-        // that finds nothing, a name-regex query — which is much more expensive
-        // for Overpass to evaluate — over a deliberately smaller radius so it
-        // stays fast enough to complete.
+        // Two phases: a cheap tag-only query first at the full radius, and a
+        // name-regex query over a smaller radius (name-regex is much pricier
+        // for Overpass to evaluate, hence the smaller radius + single mirror).
+        // Both are always run and merged — previously the name-regex query
+        // only ran when the tag query found literally nothing, which meant a
+        // city with 1-2 tagged businesses would show only those same 1-2
+        // results on every search, forever, even though a broader name-based
+        // search over the same area could well turn up different builders
+        // that just weren't tagged with the "correct" OSM office/shop tag
+        // (very common in India). Merging catches those without giving up
+        // the performance benefit of trying the cheap query first.
         if ($coordinates) {
             [$lat, $lon] = $coordinates;
             $isBuilder = ($type === 'builder');
@@ -384,13 +424,17 @@ class CityDataDiscoveryService
 
             $results = $this->mapOsmElements($elements, $city);
 
-            if (empty($results) && $this->lastOverpassError === null) {
-                // Tag query succeeded but found nothing — try the pricier
-                // name-regex query over a smaller (5km) radius.
+            if ($this->lastOverpassError === null) {
+                // Also run the broader name-regex query and merge in anything
+                // new it finds, regardless of whether the tag query already
+                // found something — this is what surfaces different builders
+                // on repeat searches instead of the same handful every time.
                 $nameQuery = $this->buildOverpassNameQuery($lat, $lon, 5000, $isBuilder);
-                $elements = $this->queryOverpass($nameQuery, maxAttempts: 1); // expensive query — only 1 mirror, no failover
+                $nameElements = $this->queryOverpass($nameQuery, maxAttempts: 1); // expensive query — only 1 mirror, no failover
                 $reachedOverpassWithRealCoordinates = $reachedOverpassWithRealCoordinates && ($this->lastOverpassError === null);
-                $results = $this->mapOsmElements($elements, $city);
+                $nameResults = $this->mapOsmElements($nameElements, $city);
+
+                $results = $this->mergeUniqueCandidates($results, $nameResults);
             }
 
             $results = array_slice($results, 0, 50);
