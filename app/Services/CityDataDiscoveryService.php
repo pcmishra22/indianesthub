@@ -324,7 +324,7 @@ class CityDataDiscoveryService
         return 'name:' . strtolower(trim($candidate['name'] ?? '')) . '|' . strtolower(trim($candidate['city'] ?? ''));
     }
 
-
+    protected function getCityCoordinates(string $city): ?array
     {
         $this->lastGeocodeError = null;
 
