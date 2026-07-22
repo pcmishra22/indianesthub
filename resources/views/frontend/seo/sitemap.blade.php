@@ -122,12 +122,14 @@
 
     {{-- 6. Builder Projects --}}
     @foreach($projects as $project)
+    @if(!empty($project->slug))
     <url>
         <loc>{{ route('projects.show', $project->slug) }}</loc>
         <lastmod>{{ $project->updated_at->tz('UTC')->toAtomString() }}</lastmod>
         <changefreq>weekly</changefreq>
         <priority>0.8</priority>
     </url>
+    @endif
     @endforeach
 
     {{-- 7. Blog Posts --}}
