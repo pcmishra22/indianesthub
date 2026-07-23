@@ -94,6 +94,12 @@ class MarketplaceProduct extends Model
     public function getCoverUrlAttribute(): string
     {
         if ($this->cover_image) {
+            // Allow pre-bundled public assets (e.g. seeder data) to bypass the
+            // storage/ prefix. Real uploads from admin still live under
+            // storage/marketplace/products/... so default to that path.
+            if (str_starts_with($this->cover_image, 'assets/')) {
+                return asset($this->cover_image);
+            }
             return asset('storage/' . $this->cover_image);
         }
         // first gallery image
