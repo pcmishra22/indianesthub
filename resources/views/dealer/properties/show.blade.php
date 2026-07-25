@@ -11,9 +11,14 @@
             </a>
             <span class="fw-bold fs-6">{{ $property->title }}</span>
         </div>
-        <a href="{{ route('dealer.properties.edit', $property->slug) }}" class="btn btn-warning btn-sm">
-            <i class="align-middle" data-feather="edit-2"></i> Edit Property
-        </a>
+        <div>
+            <a href="{{ route('dealer.properties.marketing', $property->slug) }}" class="btn btn-primary btn-sm me-2">
+                <i class="align-middle" data-feather="volume-2"></i> Marketing Studio
+            </a>
+            <a href="{{ route('dealer.properties.edit', $property->slug) }}" class="btn btn-warning btn-sm">
+                <i class="align-middle" data-feather="edit-2"></i> Edit Property
+            </a>
+        </div>
     </div>
 
     <div class="row justify-content-center">
