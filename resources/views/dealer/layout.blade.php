@@ -51,8 +51,8 @@
 					</li>
 
 					<li class="sidebar-item {{ request()->routeIs('dealer.properties.marketing*') ? 'active' : '' }}">
-					<a class="sidebar-link" href="{{ route('dealer.properties.index') }}">
-						<i class="align-middle" data-feather="megaphone"></i> <span class="align-middle">Marketing Studio</span>
+					<a class="sidebar-link" href="{{ route('dealer.properties.index', ['marketing' => 1]) }}">
+						<i class="align-middle" data-feather="volume-2"></i> <span class="align-middle">Marketing Studio</span>
 					</a>
 				</li>
 

@@ -12,6 +12,13 @@
         </a>
     </div>
 
+    @if(request()->boolean('marketing'))
+        <div class="alert alert-primary d-flex align-items-center gap-2" role="alert">
+            <i data-feather="volume-2" style="width:18px;height:18px;flex-shrink:0;"></i>
+            <div>Pick a property below and click its <strong>Marketing Studio</strong> icon (<i data-feather="volume-2" style="width:14px;height:14px;"></i>) in the Actions column to generate a brochure or share it on WhatsApp.</div>
+        </div>
+    @endif
+
     <div class="card">
         <div class="card-header">
             <h5 class="card-title mb-0">Property List</h5>
