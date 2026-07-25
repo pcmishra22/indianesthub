@@ -77,12 +77,14 @@
             <div class="col-md-6 col-lg-3 mb-4">
                 <div class="card h-100">
                     <div class="card-body d-flex flex-column">
-                        <i class="align-middle mb-2" data-feather="mail" style="width:32px;height:32px;color:#a3a3a3;"></i>
+                        <i class="align-middle mb-2" data-feather="mail" style="width:32px;height:32px;color:#1e3a5f;"></i>
                         <h5 class="card-title">EDM (Email Blast)</h5>
                         <p class="card-text text-muted small flex-grow-1">
                             Send a designed email campaign for this unit to your contact list.
                         </p>
-                        <span class="badge bg-secondary align-self-start">Coming soon</span>
+                        <a href="{{ route('builder.projects.properties.marketing.edm', [$project, $property]) }}" class="btn btn-primary btn-sm">
+                            <i class="align-middle" data-feather="send"></i> Compose Campaign
+                        </a>
                     </div>
                 </div>
             </div>

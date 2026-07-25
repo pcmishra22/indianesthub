@@ -11,6 +11,9 @@ class EmailTracking extends Model
         'recipient_email',
         'recipient_name',
         'recipient_type',
+        'property_id',
+        'sender_type',
+        'sender_id',
         'token',
         'status',           // 'sent' | 'failed' | 'pending'
         'failure_reason',

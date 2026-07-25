@@ -488,6 +488,8 @@ Route::prefix('dealer')->middleware('auth:dealer')->name('dealer.')->group(funct
     Route::get('/properties/{property}/marketing', [\App\Http\Controllers\Dealer\MarketingController::class, 'index'])->name('properties.marketing');
     Route::get('/properties/{property}/marketing/brochure', [\App\Http\Controllers\Dealer\MarketingController::class, 'brochure'])->name('properties.marketing.brochure');
     Route::get('/properties/{property}/marketing/social-post', [\App\Http\Controllers\Dealer\MarketingController::class, 'socialPost'])->name('properties.marketing.social-post');
+    Route::get('/properties/{property}/marketing/edm', [\App\Http\Controllers\Dealer\MarketingController::class, 'edm'])->name('properties.marketing.edm');
+    Route::post('/properties/{property}/marketing/edm', [\App\Http\Controllers\Dealer\MarketingController::class, 'sendEdm'])->name('properties.marketing.edm.send');
     // Bulk CSV upload
     Route::get('/properties/upload-csv', [DealerPropertyController::class, 'showCsvUploadForm'])->name('properties.uploadCsvForm');
         Route::post('/properties/upload-csv', [DealerPropertyController::class, 'uploadCsv'])->name('properties.uploadCsv');
@@ -548,6 +550,8 @@ Route::prefix('builder')->middleware('auth:builder')->name('builder.')->group(fu
     Route::get('/projects/{project}/properties/{property}/marketing', [\App\Http\Controllers\Builder\MarketingController::class, 'index'])->name('projects.properties.marketing');
     Route::get('/projects/{project}/properties/{property}/marketing/brochure', [\App\Http\Controllers\Builder\MarketingController::class, 'brochure'])->name('projects.properties.marketing.brochure');
     Route::get('/projects/{project}/properties/{property}/marketing/social-post', [\App\Http\Controllers\Builder\MarketingController::class, 'socialPost'])->name('projects.properties.marketing.social-post');
+    Route::get('/projects/{project}/properties/{property}/marketing/edm', [\App\Http\Controllers\Builder\MarketingController::class, 'edm'])->name('projects.properties.marketing.edm');
+    Route::post('/projects/{project}/properties/{property}/marketing/edm', [\App\Http\Controllers\Builder\MarketingController::class, 'sendEdm'])->name('projects.properties.marketing.edm.send');
 
     // Leads
     Route::get('/leads', [\App\Http\Controllers\Builder\LeadsController::class, 'index'])->name('leads.index');
