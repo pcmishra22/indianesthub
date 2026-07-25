@@ -60,12 +60,14 @@
         <div class="col-md-6 col-lg-3 mb-4">
             <div class="card h-100">
                 <div class="card-body d-flex flex-column">
-                    <i class="align-middle mb-2" data-feather="image" style="width:32px;height:32px;color:#a3a3a3;"></i>
+                    <i class="align-middle mb-2" data-feather="image" style="width:32px;height:32px;color:#1e3a5f;"></i>
                     <h5 class="card-title">Social Media Post</h5>
                     <p class="card-text text-muted small flex-grow-1">
                         Auto-generate an Instagram/Facebook-ready post image with caption for this listing.
                     </p>
-                    <span class="badge bg-secondary align-self-start">Coming soon</span>
+                    <a href="{{ route('dealer.properties.marketing.social-post', $property->slug) }}" class="btn btn-primary btn-sm">
+                        <i class="align-middle" data-feather="edit-3"></i> Create Post
+                    </a>
                 </div>
             </div>
         </div>

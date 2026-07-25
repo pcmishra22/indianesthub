@@ -6,12 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Models\BuilderProject;
 use App\Models\Property;
 use App\Services\PropertyBrochureService;
+use App\Services\SocialPostContentService;
 use Illuminate\Support\Facades\Auth;
 
 class MarketingController extends Controller
 {
-    public function __construct(protected PropertyBrochureService $brochures)
-    {
+    public function __construct(
+        protected PropertyBrochureService $brochures,
+        protected SocialPostContentService $socialContent,
+    ) {
     }
 
     private function authorizeProperty(BuilderProject $project, Property $property): void
@@ -48,5 +51,18 @@ class MarketingController extends Controller
 
         return $this->brochures->render($property)
             ->download($this->brochures->downloadFilename($property));
+    }
+
+    /**
+     * Social media post generator (canvas-based image + caption).
+     */
+    public function socialPost(BuilderProject $project, Property $property)
+    {
+        $this->authorizeProperty($project, $property);
+
+        $publicUrl = $property->slug ? route('property-details', $property) : null;
+        $caption = $this->socialContent->caption($property, $publicUrl);
+
+        return view('builder.properties.social-post', compact('project', 'property', 'publicUrl', 'caption'));
     }
 }
