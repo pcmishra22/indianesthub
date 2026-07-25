@@ -125,6 +125,10 @@
                                                class="btn btn-sm btn-outline-secondary" title="Edit">
                                                 <i data-feather="edit-2" style="width:13px;height:13px;"></i>
                                             </a>
+                                            <a href="{{ route('builder.projects.properties.marketing', [$project, $property]) }}"
+                                               class="btn btn-sm btn-outline-primary" title="Marketing Studio">
+                                                <i data-feather="megaphone" style="width:13px;height:13px;"></i>
+                                            </a>
                                             <form action="{{ route('builder.projects.properties.destroy', [$project, $property]) }}"
                                                   method="POST" onsubmit="return confirm('Delete this unit?')">
                                                 @csrf @method('DELETE')

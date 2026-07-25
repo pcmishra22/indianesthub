@@ -37,10 +37,16 @@ class CityDataImportController extends Controller
             'city' => ['required', 'string', 'max:120'],
             'type' => ['required', 'in:builder,agent,property'],
             'csv_file' => ['nullable', 'file', 'mimes:csv,txt', 'max:5120'],
+            'builder_name' => ['nullable', 'string', 'max:120'],
         ]);
 
         try {
-            $result = $service->discover($validated['type'], $validated['city'], $request->file('csv_file'));
+            $result = $service->discover(
+                $validated['type'],
+                $validated['city'],
+                $request->file('csv_file'),
+                $validated['builder_name'] ?? null
+            );
         } catch (\RuntimeException $e) {
             return back()->withErrors(['discovery' => $e->getMessage()]);
         }

@@ -27,11 +27,20 @@
 
         <div class="mb-3">
             <label class="form-label">Type</label>
-            <select name="type" id="import-type" class="form-select" required onchange="document.getElementById('csv-field').style.display = this.value === 'property' ? 'block' : 'none'">
+            <select name="type" id="import-type" class="form-select" required onchange="document.getElementById('csv-field').style.display = this.value === 'property' ? 'block' : 'none'; document.getElementById('builder-name-field').style.display = this.value === 'builder' ? 'block' : 'none';">
                 <option value="builder">Builder</option>
                 <option value="agent">Agent</option>
                 <option value="property" {{ old('type') == 'property' ? 'selected' : '' }}>Property</option>
             </select>
+        </div>
+
+        <div class="mb-3" id="builder-name-field" style="display: {{ old('type') == 'builder' ? 'block' : 'none' }};">
+            <label class="form-label">Builder name <span class="text-muted">(optional)</span></label>
+            <input type="text" name="builder_name" class="form-control" placeholder="e.g. Prestige Group, Sobha, Brigade" value="{{ old('builder_name') }}">
+            <div class="form-text">
+                Leave blank to discover all builders in the city, or type a name to narrow the search
+                to a specific builder (e.g. "Prestige", "Sobha").
+            </div>
         </div>
 
         <div class="mb-3" id="csv-field" style="display: {{ old('type') == 'property' ? 'block' : 'none' }};">

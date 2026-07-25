@@ -71,16 +71,32 @@ class CityDataDiscoveryService
     /**
      * @return array{candidates: array, notice: ?string}
      */
-    public function discover(string $type, string $city, $csvFile = null): array
+    public function discover(string $type, string $city, $csvFile = null, ?string $builderName = null): array
     {
         $normalizedCity = $this->normalizeCity($city);
+        $normalizedBuilderName = $builderName !== null ? $this->normalizeBuilderName($builderName) : null;
 
         return match ($type) {
-            'builder' => $this->discoverAndDiagnose($normalizedCity, 'builder'),
+            'builder' => $this->discoverAndDiagnose($normalizedCity, 'builder', $normalizedBuilderName),
             'agent'   => $this->discoverAndDiagnose($normalizedCity, 'agent'),
             'property' => $this->discoverProperties($normalizedCity, $csvFile),
             default => ['candidates' => [], 'notice' => 'Unknown type.'],
         };
+    }
+
+    /**
+     * Cleans up the user-typed builder name before it's woven into search
+     * queries. Multi-spaces collapsed, trimmed; never lowercased because
+     * Mappls/Overpass match names case-insensitively but the case the admin
+     * typed is the case the user expects to see in the result list.
+     */
+    protected function normalizeBuilderName(string $name): ?string
+    {
+        $name = trim($name);
+        if ($name === '') {
+            return null;
+        }
+        return preg_replace('/\s+/', ' ', $name);
     }
 
     protected function normalizeCity(string $city): string

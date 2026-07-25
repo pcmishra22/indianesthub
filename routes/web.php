@@ -483,6 +483,10 @@ Route::prefix('dealer')->middleware('auth:dealer')->name('dealer.')->group(funct
     // Properties CRUD
     Route::resource('properties', DealerPropertyController::class);
     Route::post('/properties/{property}/pay', [DealerPropertyController::class, 'payProperty'])->name('properties.pay');
+
+    // Marketing Studio (brochure generator, WhatsApp share, social post, EDM)
+    Route::get('/properties/{property}/marketing', [\App\Http\Controllers\Dealer\MarketingController::class, 'index'])->name('properties.marketing');
+    Route::get('/properties/{property}/marketing/brochure', [\App\Http\Controllers\Dealer\MarketingController::class, 'brochure'])->name('properties.marketing.brochure');
     // Bulk CSV upload
     Route::get('/properties/upload-csv', [DealerPropertyController::class, 'showCsvUploadForm'])->name('properties.uploadCsvForm');
         Route::post('/properties/upload-csv', [DealerPropertyController::class, 'uploadCsv'])->name('properties.uploadCsv');
@@ -538,6 +542,10 @@ Route::prefix('builder')->middleware('auth:builder')->name('builder.')->group(fu
     Route::get('/projects/{project}/properties/{property}/edit', [\App\Http\Controllers\Builder\PropertyController::class, 'edit'])->name('projects.properties.edit');
     Route::put('/projects/{project}/properties/{property}', [\App\Http\Controllers\Builder\PropertyController::class, 'update'])->name('projects.properties.update');
     Route::delete('/projects/{project}/properties/{property}', [\App\Http\Controllers\Builder\PropertyController::class, 'destroy'])->name('projects.properties.destroy');
+
+    // Marketing Studio (brochure generator, WhatsApp share, social post, EDM)
+    Route::get('/projects/{project}/properties/{property}/marketing', [\App\Http\Controllers\Builder\MarketingController::class, 'index'])->name('projects.properties.marketing');
+    Route::get('/projects/{project}/properties/{property}/marketing/brochure', [\App\Http\Controllers\Builder\MarketingController::class, 'brochure'])->name('projects.properties.marketing.brochure');
 
     // Leads
     Route::get('/leads', [\App\Http\Controllers\Builder\LeadsController::class, 'index'])->name('leads.index');
