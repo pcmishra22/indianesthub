@@ -65,7 +65,7 @@
                             <td class="table-action">
                                 <a href="{{ route('dealer.properties.show', $property->slug) }}" class="text-primary me-2" title="View"><i class="align-middle" data-feather="eye"></i></a>
                                 <a href="{{ route('dealer.properties.edit', $property->slug) }}" class="text-warning me-2" title="Edit"><i class="align-middle" data-feather="edit-2"></i></a>
-                                <a href="{{ route('dealer.properties.marketing', $property->slug) }}" class="text-primary me-2" title="Marketing Studio"><i class="align-middle" data-feather="megaphone"></i></a>
+                                <a href="{{ route('dealer.properties.marketing', $property->slug) }}" class="text-primary me-2" title="Marketing Studio"><i class="align-middle" data-feather="volume-2"></i></a>
                                 <form method="POST" action="{{ route('dealer.properties.destroy', $property->slug) }}" style="display:inline;">
                                     @csrf
                                     @method('DELETE')
