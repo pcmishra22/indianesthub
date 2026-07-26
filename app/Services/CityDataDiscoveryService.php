@@ -535,23 +535,36 @@ class CityDataDiscoveryService
      */
     protected function buildDiagnosticNotice(string $city, bool $hadCoordinates, bool $overpassSucceeded, ?string $mapplsError = null): string
     {
+        // Every branch below now leads with what actually happened on the
+        // Mappls side, since it's supposed to be the primary source — without
+        // this, an admin has no way to tell "Mappls wasn't even configured",
+        // "Mappls errored (e.g. bad key)", and "Mappls ran fine but found
+        // nothing" apart from each other; they all used to fall through to
+        // whatever the OSM/Overpass branch happened to say, with no mention
+        // of Mappls at all in most of those branches.
+        $mapplsStatus = match (true) {
+            !$this->mapplsApiKey => 'Mappls: not configured (MAPPLS_API_KEY is empty) — skipped, went straight to the free OpenStreetMap path.',
+            $mapplsError !== null => 'Mappls: request failed — ' . $mapplsError,
+            default => 'Mappls: request completed successfully but found zero matches for this city/query.',
+        };
+
         if ($this->lastGeocodeError && str_contains($this->lastGeocodeError, 'Could not connect')) {
-            return '⚠️ ' . $this->lastGeocodeError;
+            return "⚠️ {$mapplsStatus}\n⚠️ " . $this->lastGeocodeError;
         }
 
         if ($this->lastOverpassError && str_contains($this->lastOverpassError, 'Could not connect')) {
-            return '⚠️ ' . $this->lastOverpassError;
+            return "⚠️ {$mapplsStatus}\n⚠️ " . $this->lastOverpassError;
         }
 
         if (!$hadCoordinates) {
-            return '⚠️ Could not determine coordinates for "' . $city . '" — Nominatim did not recognize this '
+            return "⚠️ {$mapplsStatus}\n⚠️ Could not determine coordinates for \"" . $city . '" — Nominatim did not recognize this '
                 . 'city name and no fallback center is configured for it. Try a nearby larger city name '
                 . '(e.g. the nearest state capital), or use the CSV import option (choose "Property" as the '
                 . 'type) to add listings manually instead.';
         }
 
         if (!$overpassSucceeded && $this->lastOverpassError) {
-            return '⚠️ The Overpass API request did not complete successfully: ' . $this->lastOverpassError
+            return "⚠️ {$mapplsStatus}\n⚠️ The Overpass API request did not complete successfully: " . $this->lastOverpassError
                 . '. This is a request-level failure (not just "no data") — check your server logs for the full '
                 . 'error, and confirm your hosting firewall allows outbound HTTPS requests to overpass-api.de.';
         }
@@ -559,12 +572,8 @@ class CityDataDiscoveryService
         // Coordinates were resolved and the Overpass request completed without a
         // connection/HTTP error — it just returned zero matches. This really is
         // most likely a genuine OpenStreetMap data-coverage gap.
-        $mapplsNote = $mapplsError
-            ? ' (Note: Mappls credentials are configured but that request also failed: ' . $mapplsError . ')'
-            : '';
-
-        return 'No real estate businesses found in OpenStreetMap for "' . $city . '" within a 15km radius.'
-            . $mapplsNote . ' The request to OpenStreetMap completed successfully but returned zero matches, so '
+        return "{$mapplsStatus}\nNo real estate businesses found in OpenStreetMap for \"" . $city . '" within a 15km radius. '
+            . 'The request to OpenStreetMap completed successfully but returned zero matches, so '
             . 'this looks like a genuine data-coverage gap rather than a connection problem — OSM\'s '
             . 'business-listing coverage varies a lot by city in India. Try a nearby larger city/locality name, '
             . 'or use the CSV import option (choose "Property" as the type) to add listings manually instead.';

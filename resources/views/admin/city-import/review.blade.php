@@ -8,7 +8,7 @@
     <p class="text-muted">Nothing has been saved yet. Tick the rows to keep, then confirm once.</p>
 
     @if ($notice)
-        <div class="alert alert-warning">{{ $notice }}</div>
+        <div class="alert alert-warning" style="white-space: pre-line;">{{ $notice }}</div>
     @endif
 
     @if (empty($candidates))
