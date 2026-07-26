@@ -716,6 +716,9 @@ require __DIR__ . '/admin_properties.php';
     Route::get('/settings',      [\App\Http\Controllers\Admin\SettingsController::class, 'index'])->name('settings.index');
     Route::put('/settings',      [\App\Http\Controllers\Admin\SettingsController::class, 'update'])->name('settings.update');
 
+    // Scheduled Content
+    Route::resource('schedule', \App\Http\Controllers\Admin\ScheduledContentController::class)->except(['show']);
+
     // Manage Inquiries & Contacts
     Route::get('/inquiries', [AdminInquiryController::class, 'index'])->name('inquiries.index');
     Route::get('/contacts', [AdminContactController::class, 'index'])->name('contacts.index');

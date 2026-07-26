@@ -6,10 +6,14 @@
         <div class="col-md-8">
             <div class="card shadow-sm">
                 <div class="card-header bg-primary text-white">
-                    <h3 class="mb-0">UPI Payment for Subscription</h3>
+                    <h3 class="mb-0">UPI Payment for {{ $type === 'property_listing' ? 'Property Listing' : 'Subscription' }}</h3>
                 </div>
                 <div class="card-body">
-                    <p class="lead">You are subscribing to the <strong>{{ $plan }}</strong> plan ({{ ucfirst($type) }})</p>
+                    @if($type === 'property_listing')
+                        <p class="lead">You are paying to activate the listing: <strong>{{ $plan }}</strong></p>
+                    @else
+                        <p class="lead">You are subscribing to the <strong>{{ $plan }}</strong> plan ({{ ucfirst($type) }})</p>
+                    @endif
                     <h4 class="mb-3">Amount: <span class="text-success">₹{{ number_format($amount) }}</span></h4>
                     <hr>
                     <p>Scan the QR code below or click the button to pay via UPI:</p>

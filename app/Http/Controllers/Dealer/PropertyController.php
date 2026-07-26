@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Dealer;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Property;
+use App\Models\Payment;
 use Illuminate\Support\Facades\Auth;
 
 class PropertyController extends Controller
@@ -471,5 +472,43 @@ public function show(Property $property)
             ->exists();
 
         return view('dealer.properties.show', compact('property', 'hasValidPayment'));
+    }
+
+    /**
+     * Start a UPI payment to activate/renew this property's listing.
+     * Reuses the existing dealer.payment view + generic markPaid flow
+     * that the Subscription checkout already uses.
+     */
+    public function payProperty(Property $property)
+    {
+        $this->authorizeDealer($property);
+
+        $isRent = str_contains(strtolower((string) $property->listing_type), 'rent')
+            || str_contains(strtolower((string) $property->listing_type), 'pg');
+        $amount = $isRent ? 100 : 500;
+        $durationDays = 30;
+
+        $payment = Payment::create([
+            'dealer_id'              => $property->property_dealer_id,
+            'property_id'            => $property->id,
+            'plan_type'               => 'property_listing',
+            'plan_name'               => $property->title,
+            'amount'                  => $amount,
+            'status'                  => 'pending',
+            'payment_method'          => 'upi',
+            'payment_type'            => 'property_listing',
+            'listing_duration_days'   => $durationDays,
+        ]);
+
+        $upi_id = env('UPI_ID', 'your-upi-id@bank');
+        $upi_url = "upi://pay?pa={$upi_id}&pn=PropertyDealer&am={$amount}&tn=" . urlencode('Listing Payment - ' . $property->title);
+
+        return view('dealer.payment', [
+            'type'    => 'property_listing',
+            'plan'    => $property->title,
+            'amount'  => $amount,
+            'upi_url' => $upi_url,
+            'payment' => $payment,
+        ]);
     }
 }

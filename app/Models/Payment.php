@@ -26,4 +26,14 @@ class Payment extends Model
         'card_last_four',
         'card_brand',
     ];
+
+    public function dealer()
+    {
+        return $this->belongsTo(Dealer::class, 'dealer_id');
+    }
+
+    public function property()
+    {
+        return $this->belongsTo(Property::class, 'property_id');
+    }
 }

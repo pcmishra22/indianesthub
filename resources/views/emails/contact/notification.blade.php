@@ -38,7 +38,7 @@
 </div>
 
 <div class="bw">
-  <a href="{{ route('admin.contacts') }}" class="btn btn-p">🗂️ View All Contacts</a>
+  <a href="{{ route('admin.contacts.index') }}" class="btn btn-p">🗂️ View All Contacts</a>
   &nbsp;
   <a href="mailto:{{ $contact->email }}?subject={{ urlencode('Re: ' . $contact->subject) }}" class="btn btn-o">✉️ Reply Now</a>
 </div>

@@ -44,6 +44,13 @@ class SubscriptionController extends Controller
         $payment = Payment::findOrFail($paymentId);
         // Optionally, check if the payment belongs to the current dealer
         $payment->status = 'completed';
+
+        if ($payment->payment_type === 'property_listing') {
+            $days = $payment->listing_duration_days ?: 30;
+            $payment->listing_start_date = $payment->listing_start_date ?: now();
+            $payment->listing_end_date = now()->addDays($days);
+        }
+
         $payment->save();
         return redirect()->back()->with('success', 'Payment marked as completed!');
     }

@@ -136,6 +136,11 @@
                     <i class="align-middle" data-feather="book-open"></i> <span class="align-middle">Blog</span>
                 </a>
             </li>
+            <li class="sidebar-item {{ request()->routeIs('admin.schedule.*') ? 'active' : '' }}">
+                <a class="sidebar-link" href="{{ route('admin.schedule.index') }}">
+                    <i class="align-middle" data-feather="calendar"></i> <span class="align-middle">Scheduled Content</span>
+                </a>
+            </li>
             <li class="sidebar-item {{ request()->routeIs('admin.reviews.*') ? 'active' : '' }}">
                 <a class="sidebar-link" href="{{ route('admin.reviews.index') }}">
                     <i class="align-middle" data-feather="star"></i>
