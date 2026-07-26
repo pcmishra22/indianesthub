@@ -516,8 +516,29 @@ class CityDataDiscoveryService
             [$lat, $lon] = $coordinates;
             $isBuilder = ($type === 'builder');
 
+            // Cache successful results per city+type for a few hours. Overpass
+            // is a free, shared, rate-limited public resource — while Mappls
+            // stays unavailable, every search (including repeat/retry clicks
+            // for the same city) funnels through here, which is exactly what
+            // trips the 429s and timeouts seen in the logs. Caching the merged
+            // result set means a retry or a second admin searching the same
+            // city within the window gets an instant answer without adding
+            // to that load at all.
+            $cacheKey = 'city-import:overpass:' . $type . ':' . $city;
+
+            $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
+            if ($cached !== null) {
+                return ['candidates' => $cached, 'notice' => $usedFallbackCenter
+                    ? 'Showing cached results (from the last few hours) using a fallback search center near ' . ucfirst($city) . '.'
+                    : 'Showing cached results from the last few hours — Overpass is a shared public service, so repeat searches reuse recent results instead of adding extra load.'];
+            }
+
+            // Try all 3 mirrors now rather than giving up after 1-2 — the
+            // 2026-07-26 logs show overpass-api.de itself intermittently
+            // timing out and rate-limiting (429), not a hard per-mirror
+            // block, so it's worth exhausting the full list before failing.
             $tagQuery = $this->buildOverpassTagQuery($lat, $lon, 15000, $isBuilder);
-            $elements = $this->queryOverpass($tagQuery, maxAttempts: 2); // cheap query — try 2 mirrors
+            $elements = $this->queryOverpass($tagQuery, maxAttempts: 3);
             $reachedOverpassWithRealCoordinates = ($this->lastOverpassError === null);
 
             $results = $this->mapOsmElements($elements, $city);
@@ -528,7 +549,7 @@ class CityDataDiscoveryService
                 // found something — this is what surfaces different builders
                 // on repeat searches instead of the same handful every time.
                 $nameQuery = $this->buildOverpassNameQuery($lat, $lon, 5000, $isBuilder);
-                $nameElements = $this->queryOverpass($nameQuery, maxAttempts: 1); // expensive query — only 1 mirror, no failover
+                $nameElements = $this->queryOverpass($nameQuery, maxAttempts: 2); // expensive query — 2 mirrors, same reasoning as above
                 $reachedOverpassWithRealCoordinates = $reachedOverpassWithRealCoordinates && ($this->lastOverpassError === null);
                 $nameResults = $this->mapOsmElements($nameElements, $city);
 
@@ -538,6 +559,7 @@ class CityDataDiscoveryService
             $results = array_slice($results, 0, 50);
 
             if (!empty($results)) {
+                \Illuminate\Support\Facades\Cache::put($cacheKey, $results, now()->addHours(6));
                 $notice = $usedFallbackCenter
                     ? 'Showing results using a fallback search center near ' . ucfirst($city) . '.'
                     : null;
