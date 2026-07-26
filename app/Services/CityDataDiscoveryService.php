@@ -202,11 +202,18 @@ class CityDataDiscoveryService
         try {
             // Fire all variants concurrently — total wall time is bounded by
             // the slowest single response, not the sum of all of them.
+            // Referer header: Mappls keys can be domain-whitelisted (checked
+            // via this header) the same way for server-side calls as for
+            // browser-side ones — without it, a domain-restricted key gets
+            // rejected as invalid_token even though it's the correct key.
+            $refererDomain = parse_url(config('app.url', 'https://indianesthub.com'), PHP_URL_HOST) ?: 'indianesthub.com';
             $responses = Http::pool(fn ($pool) => array_map(
-                fn ($variantQuery) => $pool->timeout(7)->get(
-                    'https://atlas.mappls.com/api/places/search/json',
-                    $buildParams($variantQuery)
-                ),
+                fn ($variantQuery) => $pool->timeout(7)
+                    ->withHeaders(['Referer' => 'https://' . $refererDomain])
+                    ->get(
+                        'https://atlas.mappls.com/api/places/search/json',
+                        $buildParams($variantQuery)
+                    ),
                 $variants
             ));
 
