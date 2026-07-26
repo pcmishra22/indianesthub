@@ -43,6 +43,17 @@ class CityDataDiscoveryService
     protected ?string $lastGeocodeError = null;
     protected ?string $lastOverpassError = null;
 
+    /**
+     * Set true the moment any external call gets back an actual HTTP
+     * response — even an error one like 401/403 — since that alone proves
+     * the server completed a real TCP+TLS+HTTP round trip to *some* host.
+     * Lets the Overpass "could not connect" message avoid overclaiming
+     * "your server can't make outbound HTTPS requests at all" when we
+     * already have direct evidence that it can (just not to that specific
+     * domain) — a much more useful, accurate thing to tell an admin.
+     */
+    protected bool $confirmedOutboundHttpsWorks = false;
+
     public function __construct()
     {
         // If openstreetmap.overpass_url is explicitly configured, respect it as
@@ -210,6 +221,11 @@ class CityDataDiscoveryService
                 if (!($response instanceof \Illuminate\Http\Client\Response)) {
                     continue;
                 }
+
+                // A real HTTP response (any status) proves outbound HTTPS
+                // works in general, regardless of what this specific status
+                // code turns out to mean below.
+                $this->confirmedOutboundHttpsWorks = true;
 
                 if ($response->status() === 401 || $response->status() === 403) {
                     $lastAuthError = 'Mappls rejected the request (HTTP ' . $response->status() . '). '
@@ -409,6 +425,9 @@ class CityDataDiscoveryService
                     'addressdetails' => 1,
                 ]);
 
+            // A real HTTP response (any status) proves outbound HTTPS works.
+            $this->confirmedOutboundHttpsWorks = true;
+
             if ($response->successful()) {
                 $data = $response->json();
                 if (!empty($data)) {
@@ -549,11 +568,17 @@ class CityDataDiscoveryService
         };
 
         if ($this->lastGeocodeError && str_contains($this->lastGeocodeError, 'Could not connect')) {
-            return "⚠️ {$mapplsStatus}\n⚠️ " . $this->lastGeocodeError;
+            $scopeNote = $this->confirmedOutboundHttpsWorks
+                ? ' (Your server did successfully reach another host during this same request, so general outbound HTTPS works — this looks specific to nominatim.openstreetmap.org: a DNS issue, a firewall rule naming that domain, or that host rate-limiting/blocking your server\'s IP.)'
+                : '';
+            return "⚠️ {$mapplsStatus}\n⚠️ " . $this->lastGeocodeError . $scopeNote;
         }
 
         if ($this->lastOverpassError && str_contains($this->lastOverpassError, 'Could not connect')) {
-            return "⚠️ {$mapplsStatus}\n⚠️ " . $this->lastOverpassError;
+            $scopeNote = $this->confirmedOutboundHttpsWorks
+                ? ' (Your server did successfully reach another host during this same request, so general outbound HTTPS works — this looks specific to overpass-api.de: a DNS issue, a firewall rule naming that domain, or that host rate-limiting/blocking your server\'s IP, rather than outbound HTTPS being blocked entirely.)'
+                : '';
+            return "⚠️ {$mapplsStatus}\n⚠️ " . $this->lastOverpassError . $scopeNote;
         }
 
         if (!$hadCoordinates) {
