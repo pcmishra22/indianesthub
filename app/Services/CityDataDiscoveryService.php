@@ -124,6 +124,21 @@ class CityDataDiscoveryService
     }
 
     /**
+     * Query text variants tried per type. Mappls' search is a deterministic
+     * "top N for this exact query string" lookup — sending the same single
+     * query every time (as this used to) means a repeat search for the same
+     * city always returns the identical result set. Running several
+     * different-but-related query strings and merging the results surfaces a
+     * meaningfully wider set of real businesses instead.
+     */
+    protected function mapplsQueryVariants(string $type): array
+    {
+        return $type === 'builder'
+            ? ['real estate builders', 'property developers', 'construction company', 'real estate developers']
+            : ['real estate agents', 'property dealers', 'real estate agency', 'real estate consultants'];
+    }
+
+    /**
      * Mappls (MapmyIndia) Autosuggest/Search API — the primary data source
      * when a key is configured. An India-focused mapping company with "no
      * credit card required" free signup and far deeper coverage of Indian
@@ -134,6 +149,13 @@ class CityDataDiscoveryService
      * this is skipped entirely and the service falls back to the free,
      * zero-config OpenStreetMap path below.
      *
+     * Fires several query-text variants (see mapplsQueryVariants()) at once
+     * via Http::pool() so the wall-clock cost stays roughly the same as a
+     * single request (bounded by the slowest of the batch, not their sum)
+     * while returning a meaningfully more varied result set than any one
+     * query alone — this is what fixes "always the same data" without
+     * making the timeout problem worse.
+     *
      * @return array{results: array, error: ?string}
      */
     protected function queryMappls(string $city, string $queryPrefix): array
@@ -142,55 +164,87 @@ class CityDataDiscoveryService
             return ['results' => [], 'error' => null]; // Not configured — silently skip, not an error.
         }
 
-        // A location bias greatly improves result relevance/coverage per Mappls'
-        // own docs ("STRONGLY RECOMMENDED"). Reuse the same geocoding used for
-        // the OSM fallback so we don't duplicate that logic.
-        $coordinates = $this->getCityCoordinates($city) ?? $this->getFallbackCoordinatesForCity($city);
+        // Check the free, instant hardcoded map first — most searches are for
+        // a handful of major metros/NCR towns that are already in it, so this
+        // avoids an ~8s Nominatim round-trip for the common case. Only falls
+        // through to the network geocoder for cities not in that list.
+        $coordinates = $this->getFallbackCoordinatesForCity($city) ?? $this->getCityCoordinates($city);
 
-        try {
+        // $queryPrefix's caller-provided value is kept as the type ('builder'
+        // vs 'agent') isn't otherwise available here — infer it from which
+        // variant list it matches so this stays a drop-in replacement.
+        $isBuilder = str_contains($queryPrefix, 'builder');
+        $variants = $this->mapplsQueryVariants($isBuilder ? 'builder' : 'agent');
+
+        $buildParams = function (string $variantQuery) use ($city, $coordinates) {
             $params = [
-                // The city name is baked directly into the query text (not just
-                // passed as a location bias below) — Mappls' text search ranks
-                // primarily on the query string, so two different cities with
-                // an identical query text but only a soft location hint could
-                // return the same (or near-identical) nationally-popular
-                // results. Including "in <city>" makes the city itself part of
-                // what's being matched, not just a tiebreaker.
-                'query' => $queryPrefix . ' in ' . ucwords($city),
+                'query' => $variantQuery . ' in ' . ucwords($city),
                 'region' => 'ind',
                 'access_token' => $this->mapplsApiKey,
             ];
             if ($coordinates) {
                 $params['location'] = $coordinates[0] . ',' . $coordinates[1];
             }
+            return $params;
+        };
 
-            $response = Http::timeout(8)->get('https://atlas.mappls.com/api/places/search/json', $params);
+        try {
+            // Fire all variants concurrently — total wall time is bounded by
+            // the slowest single response, not the sum of all of them.
+            $responses = Http::pool(fn ($pool) => array_map(
+                fn ($variantQuery) => $pool->timeout(7)->get(
+                    'https://atlas.mappls.com/api/places/search/json',
+                    $buildParams($variantQuery)
+                ),
+                $variants
+            ));
 
-            if ($response->status() === 401 || $response->status() === 403) {
-                return ['results' => [], 'error' => 'Mappls rejected the request (HTTP ' . $response->status() . '). '
-                    . 'Check that MAPPLS_API_KEY is correct and that the key is active in the Mappls Console '
-                    . '(Credentials tab), and that it isn\'t restricted to a different domain/IP under Whitelisting.'];
-            }
-            if ($response->status() === 204) {
-                return ['results' => [], 'error' => null]; // Valid request, genuinely zero matches.
-            }
-            if ($response->failed()) {
-                return ['results' => [], 'error' => 'Mappls Search request failed: HTTP ' . $response->status()];
-            }
+            $allResults = [];
+            $lastAuthError = null;
+            $anySucceeded = false;
 
-            $locations = $response->json('suggestedLocations', []);
-            $results = [];
-            foreach ($locations as $place) {
-                $candidate = self::mapMapplsPlaceToCandidate($place, $city);
-                if ($candidate) {
-                    $results[] = $candidate;
+            foreach ($responses as $response) {
+                // Http::pool() returns a ConnectionException object (not a
+                // Response) for entries that failed to connect/timed out —
+                // skip those individually rather than failing the whole batch.
+                if (!($response instanceof \Illuminate\Http\Client\Response)) {
+                    continue;
+                }
+
+                if ($response->status() === 401 || $response->status() === 403) {
+                    $lastAuthError = 'Mappls rejected the request (HTTP ' . $response->status() . '). '
+                        . 'Check that MAPPLS_API_KEY is correct and active in the Mappls Console '
+                        . '(Credentials tab), and that it isn\'t restricted to a different domain/IP under Whitelisting.';
+                    continue;
+                }
+                if ($response->status() === 204 || $response->failed()) {
+                    continue;
+                }
+
+                $anySucceeded = true;
+                $locations = $response->json('suggestedLocations', []);
+                foreach ($locations as $place) {
+                    $candidate = self::mapMapplsPlaceToCandidate($place, $city);
+                    if ($candidate) {
+                        $allResults[] = $candidate;
+                    }
                 }
             }
 
-            return ['results' => $results, 'error' => null];
-        } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            return ['results' => [], 'error' => 'Could not connect to Mappls (' . $e->getMessage() . '). '
-                . 'Check your server can reach atlas.mappls.com.'];
+            $merged = [];
+            foreach ($allResults as $candidate) {
+                $merged = $this->mergeUniqueCandidates($merged, [$candidate]);
+            }
+
+            if (!$anySucceeded && $lastAuthError) {
+                return ['results' => [], 'error' => $lastAuthError];
+            }
+            if (!$anySucceeded && empty($merged)) {
+                return ['results' => [], 'error' => 'Could not connect to Mappls, or all requests timed out. '
+                    . 'Check your server can reach atlas.mappls.com within a few seconds.'];
+            }
+
+            return ['results' => $merged, 'error' => null];
         } catch (\Exception $e) {
             \Log::warning('Mappls Search error: ' . $e->getMessage());
             return ['results' => [], 'error' => $e->getMessage()];
@@ -408,14 +462,16 @@ class CityDataDiscoveryService
 
         // 2) Free OpenStreetMap fallback (used automatically when no Google key
         // is configured, when Google errored, or when Google found nothing).
-        // 2a) Geocode the city via Nominatim.
-        $coordinates = $this->getCityCoordinates($city);
+        // 2a) Check the free, instant hardcoded map first (same reasoning as
+        // the Mappls path above — most searches are for cities already in it,
+        // so this skips an ~8s Nominatim round-trip for the common case).
+        $coordinates = $this->getFallbackCoordinatesForCity($city);
+        $usedFallbackCenter = (bool) $coordinates;
 
-        // 2b) If that failed, fall back to a hardcoded center for major Indian cities.
-        $usedFallbackCenter = false;
+        // 2b) Only hit Nominatim over the network for cities not in that map.
         if (!$coordinates) {
-            $coordinates = $this->getFallbackCoordinatesForCity($city);
-            $usedFallbackCenter = (bool) $coordinates;
+            $coordinates = $this->getCityCoordinates($city);
+            $usedFallbackCenter = false;
         }
 
         // 2c) If we have coordinates from either source, actually query Overpass.
