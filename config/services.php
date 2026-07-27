@@ -39,6 +39,14 @@ return [
         'key' => env('MAPPLS_API_KEY'),
     ],
 
+    'locationiq' => [
+        'key' => env('LOCATIONIQ_API_KEY'),
+    ],
+
+    'geoapify' => [
+        'key' => env('GEOAPIFY_API_KEY'),
+    ],
+
     'openstreetmap' => [
         'overpass_url' => env('OSM_OVERPASS_URL', 'https://overpass-api.de/api/interpreter'),
         'nominatim_url' => env('OSM_NOMINATIM_URL', 'https://nominatim.openstreetmap.org'),

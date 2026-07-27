@@ -32,6 +32,8 @@ class CityDataDiscoveryService
     protected array $overpassUrls;
     protected ?string $nominatimUrl;
     protected ?string $mapplsApiKey;
+    protected ?string $locationiqApiKey;
+    protected ?string $geoapifyApiKey;
 
     /**
      * Diagnostic info from the most recent request, so the UI can tell the
@@ -77,6 +79,8 @@ class CityDataDiscoveryService
         ];
         $this->nominatimUrl = config('services.openstreetmap.nominatim_url', 'https://nominatim.openstreetmap.org');
         $this->mapplsApiKey = config('services.mappls.key');
+        $this->locationiqApiKey = config('services.locationiq.key');
+        $this->geoapifyApiKey = config('services.geoapify.key');
     }
 
     /**
@@ -275,6 +279,157 @@ class CityDataDiscoveryService
     }
 
     /**
+     * LocationIQ — a hosted, reliable, rate-limit-friendly Nominatim-compatible
+     * geocoding/search API. Free tier historically ~5,000 requests/day, no
+     * credit card required at signup. Unlike the free public Overpass
+     * mirrors (which are shared, unauthenticated, and get rate-limited under
+     * load), this is a dedicated per-account free tier — meaningfully more
+     * reliable for a small app like this. Set LOCATIONIQ_API_KEY to enable;
+     * skipped silently if unset.
+     *
+     * @return array{results: array, error: ?string}
+     */
+    protected function queryLocationIQ(string $city, bool $isBuilder, ?array $coordinates): array
+    {
+        if (!$this->locationiqApiKey) {
+            return ['results' => [], 'error' => null];
+        }
+
+        $variants = $isBuilder
+            ? ['real estate builders', 'property developers']
+            : ['real estate agents', 'property dealers'];
+
+        try {
+            $responses = Http::pool(fn ($pool) => array_map(function ($variantQuery) use ($pool, $city, $coordinates) {
+                $params = [
+                    'key' => $this->locationiqApiKey,
+                    'q' => $variantQuery . ' in ' . ucwords($city),
+                    'format' => 'json',
+                    'countrycodes' => 'in',
+                    'limit' => 20,
+                ];
+                if ($coordinates) {
+                    // Loose bias box (~0.5 degree, roughly 50km) around the
+                    // city center — not `bounded=1`, so this nudges ranking
+                    // without excluding genuinely relevant results outside it.
+                    [$lat, $lon] = $coordinates;
+                    $params['viewbox'] = ($lon - 0.5) . ',' . ($lat + 0.5) . ',' . ($lon + 0.5) . ',' . ($lat - 0.5);
+                }
+                return $pool->timeout(7)
+                    ->withHeaders(['User-Agent' => 'IndianEstHub-CityImport/1.0 (contact: admin@indianesthub.com)'])
+                    ->get('https://us1.locationiq.com/v1/search.php', $params);
+            }, $variants));
+
+            $allResults = [];
+            $lastError = null;
+            $anySucceeded = false;
+
+            foreach ($responses as $response) {
+                if (!($response instanceof \Illuminate\Http\Client\Response)) {
+                    continue;
+                }
+                $this->confirmedOutboundHttpsWorks = true;
+
+                if ($response->status() === 401 || $response->status() === 403) {
+                    $lastError = 'LocationIQ rejected the request (HTTP ' . $response->status() . '). '
+                        . 'Check LOCATIONIQ_API_KEY is correct and active.';
+                    continue;
+                }
+                if ($response->status() === 429) {
+                    $lastError = 'LocationIQ rate-limited this request (HTTP 429) — free tier daily/per-second limit reached.';
+                    continue;
+                }
+                if ($response->failed()) {
+                    continue; // 404 = genuinely zero matches for this query, not an error
+                }
+
+                $anySucceeded = true;
+                $places = $response->json() ?? [];
+                foreach ($places as $place) {
+                    $candidate = self::mapLocationIQPlaceToCandidate($place, $city);
+                    if ($candidate) {
+                        $allResults[] = $candidate;
+                    }
+                }
+            }
+
+            $merged = [];
+            foreach ($allResults as $candidate) {
+                $merged = $this->mergeUniqueCandidates($merged, [$candidate]);
+            }
+
+            if (!$anySucceeded && $lastError) {
+                return ['results' => [], 'error' => $lastError];
+            }
+
+            return ['results' => $merged, 'error' => null];
+        } catch (\Exception $e) {
+            \Log::warning('LocationIQ Search error: ' . $e->getMessage());
+            return ['results' => [], 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Geoapify Places API — category-based POI search (not a text query),
+     * built on OSM data but served from Geoapify's own reliable
+     * infrastructure. Free tier historically ~3,000 requests/day, no credit
+     * card required. Requires coordinates (the `filter=circle:...` param is
+     * mandatory), so this is skipped when geocoding failed entirely. Set
+     * GEOAPIFY_API_KEY to enable; skipped silently if unset.
+     *
+     * @return array{results: array, error: ?string}
+     */
+    protected function queryGeoapify(string $city, bool $isBuilder, ?array $coordinates): array
+    {
+        if (!$this->geoapifyApiKey) {
+            return ['results' => [], 'error' => null];
+        }
+        if (!$coordinates) {
+            return ['results' => [], 'error' => null]; // can't build the required circle filter without a center point
+        }
+
+        [$lat, $lon] = $coordinates;
+
+        try {
+            $response = Http::timeout(7)->get('https://api.geoapify.com/v2/places', [
+                'categories' => 'commercial.real_estate',
+                'filter' => "circle:{$lon},{$lat},15000",
+                'limit' => 30,
+                'apiKey' => $this->geoapifyApiKey,
+            ]);
+
+            $this->confirmedOutboundHttpsWorks = true;
+
+            if ($response->status() === 401 || $response->status() === 403) {
+                return ['results' => [], 'error' => 'Geoapify rejected the request (HTTP ' . $response->status() . '). '
+                    . 'Check GEOAPIFY_API_KEY is correct and active.'];
+            }
+            if ($response->status() === 429) {
+                return ['results' => [], 'error' => 'Geoapify rate-limited this request (HTTP 429) — free tier limit reached.'];
+            }
+            if ($response->failed()) {
+                return ['results' => [], 'error' => 'Geoapify request failed: HTTP ' . $response->status()];
+            }
+
+            $features = $response->json('features', []);
+            $results = [];
+            foreach ($features as $feature) {
+                $candidate = self::mapGeoapifyPlaceToCandidate($feature, $city);
+                if ($candidate) {
+                    $results[] = $candidate;
+                }
+            }
+
+            return ['results' => $results, 'error' => null];
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            return ['results' => [], 'error' => 'Could not connect to Geoapify (' . $e->getMessage() . ').'];
+        } catch (\Exception $e) {
+            \Log::warning('Geoapify Search error: ' . $e->getMessage());
+            return ['results' => [], 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
      * Maps one raw suggestedLocations entry from Mappls' Search response
      * into our candidate shape. Pure/static so it's directly unit-testable
      * against Mappls' documented JSON schema without a live API call.
@@ -298,6 +453,69 @@ class CityDataDiscoveryService
             'rating'          => null,
             'latitude'        => null,
             'longitude'       => null,
+        ];
+    }
+
+    /**
+     * Maps one raw result from LocationIQ's /v1/search.php (a hosted,
+     * reliable Nominatim-compatible geocoding/search API) into our
+     * candidate shape. Docs: https://locationiq.com/docs — response shape
+     * mirrors standard Nominatim JSON output (display_name, lat, lon, etc.),
+     * so this is intentionally similar to mapOsmElementToCandidate() below.
+     */
+    public static function mapLocationIQPlaceToCandidate(array $place, string $city): ?array
+    {
+        $name = $place['display_name'] ?? null;
+        if (!$name) {
+            return null;
+        }
+        // display_name is a full "Name, Street, City, State, ..." string —
+        // use just the first segment as the business name.
+        $namePart = trim(explode(',', $name)[0] ?? $name);
+        if ($namePart === '') {
+            return null;
+        }
+
+        return [
+            'source'          => 'locationiq',
+            'source_place_id' => $place['place_id'] ?? null,
+            'name'            => $namePart,
+            'company_name'    => $namePart,
+            'phone'           => null,
+            'website'         => null,
+            'address'         => $name,
+            'city'            => $city,
+            'rating'          => null,
+            'latitude'        => isset($place['lat']) ? (float) $place['lat'] : null,
+            'longitude'       => isset($place['lon']) ? (float) $place['lon'] : null,
+        ];
+    }
+
+    /**
+     * Maps one raw GeoJSON feature from Geoapify's /v2/places (category-based
+     * POI search) into our candidate shape. Docs: https://apidocs.geoapify.com/docs/places/
+     * Each feature's business data lives under `properties`.
+     */
+    public static function mapGeoapifyPlaceToCandidate(array $feature, string $city): ?array
+    {
+        $props = $feature['properties'] ?? [];
+        $name = $props['name'] ?? null;
+        if (!$name) {
+            return null;
+        }
+
+        return [
+            'source'          => 'geoapify',
+            'source_place_id' => $props['place_id'] ?? null,
+            'name'            => $name,
+            'company_name'    => $name,
+            'phone'           => $props['contact']['phone'] ?? null,
+            'website'         => $props['website'] ?? $props['contact']['website'] ?? null,
+            'address'         => $props['formatted'] ?? $props['address_line2'] ?? null,
+            'city'            => $city,
+            'rating'          => null,
+            'latitude'        => $props['lat'] ?? null,
+            'longitude'       => $props['lon'] ?? null,
         ];
     }
 
@@ -472,33 +690,54 @@ class CityDataDiscoveryService
             ? 'real estate builders and developers'
             : 'real estate agents and property dealers';
 
-        // 1) Mappls (if credentials are configured) — real, actively-maintained,
-        // India-focused business data. Tried first because OSM's coverage of
-        // Indian cities is inconsistent. If it's not configured, errors out, or
-        // just finds nothing, we always continue on to the free OSM path below
-        // rather than stopping — broken/unset Mappls credentials should never
-        // block the free fallback from running.
-        $mapplsResult = $this->queryMappls($city, $queryPrefix);
-        if (!empty($mapplsResult['results'])) {
-            return ['candidates' => array_slice($mapplsResult['results'], 0, 50), 'notice' => null];
-        }
-        $mapplsError = $mapplsResult['error']; // kept for the final message only, doesn't stop execution
-
-        $reachedOverpassWithRealCoordinates = false;
-
-        // 2) Free OpenStreetMap fallback (used automatically when no Google key
-        // is configured, when Google errored, or when Google found nothing).
-        // 2a) Check the free, instant hardcoded map first (same reasoning as
-        // the Mappls path above — most searches are for cities already in it,
-        // so this skips an ~8s Nominatim round-trip for the common case).
+        // 0) Resolve coordinates once, up front — Geoapify requires them,
+        // Mappls/LocationIQ use them as an optional ranking bias, and the
+        // Overpass fallback below needs them too. Checking the free, instant
+        // hardcoded map first (30+ major Indian cities/NCR towns) avoids an
+        // ~8s Nominatim round-trip for the common case; only uncommon city
+        // names fall through to the network geocoder.
         $coordinates = $this->getFallbackCoordinatesForCity($city);
         $usedFallbackCenter = (bool) $coordinates;
-
-        // 2b) Only hit Nominatim over the network for cities not in that map.
         if (!$coordinates) {
             $coordinates = $this->getCityCoordinates($city);
             $usedFallbackCenter = false;
         }
+
+        // 1) Query every configured free/paid API provider and merge their
+        // results together (rather than stopping at the first success) —
+        // different providers index different businesses, so combining them
+        // gives noticeably broader, more varied coverage than any one alone,
+        // and it means one provider being down/rate-limited/misconfigured
+        // doesn't block the others from contributing. Any provider without
+        // an API key configured returns immediately with no error (silently
+        // skipped) — see each method's own doc comment for signup details.
+        $isBuilder = ($type === 'builder');
+
+        $mapplsResult = $this->queryMappls($city, $queryPrefix);
+        $locationiqResult = $this->queryLocationIQ($city, $isBuilder, $coordinates);
+        $geoapifyResult = $this->queryGeoapify($city, $isBuilder, $coordinates);
+
+        $apiResults = [];
+        foreach ([$mapplsResult, $locationiqResult, $geoapifyResult] as $providerResult) {
+            $apiResults = $this->mergeUniqueCandidates($apiResults, $providerResult['results']);
+        }
+
+        // Kept for the final diagnostic message only — none of these stop
+        // execution on their own; broken/unset credentials for any single
+        // provider should never block the others (or the free OSM fallback
+        // further below) from running.
+        $mapplsError = $mapplsResult['error'];
+        $locationiqError = $locationiqResult['error'];
+        $geoapifyError = $geoapifyResult['error'];
+
+        if (!empty($apiResults)) {
+            $notice = $usedFallbackCenter
+                ? 'Showing results using a fallback search center near ' . ucfirst($city) . '.'
+                : null;
+            return ['candidates' => array_slice($apiResults, 0, 50), 'notice' => $notice];
+        }
+
+        $reachedOverpassWithRealCoordinates = false;
 
         // 2c) If we have coordinates from either source, actually query Overpass.
         // Two phases: a cheap tag-only query first at the full radius, and a
@@ -569,7 +808,7 @@ class CityDataDiscoveryService
 
         // 3) Nothing found. Build a specific, honest explanation from whatever
         // diagnostics were actually captured above, rather than assuming.
-        $notice = $this->buildDiagnosticNotice($city, $coordinates !== null, $reachedOverpassWithRealCoordinates, $mapplsError);
+        $notice = $this->buildDiagnosticNotice($city, $coordinates !== null, $reachedOverpassWithRealCoordinates, $mapplsError, $locationiqError, $geoapifyError);
 
         return ['candidates' => [], 'notice' => $notice];
     }
@@ -581,44 +820,61 @@ class CityDataDiscoveryService
      * request worked but OSM just has no data here" (a coverage gap — CSV
      * import is the real fix) from "we couldn't even geocode this city name".
      */
-    protected function buildDiagnosticNotice(string $city, bool $hadCoordinates, bool $overpassSucceeded, ?string $mapplsError = null): string
-    {
-        // Every branch below now leads with what actually happened on the
-        // Mappls side, since it's supposed to be the primary source — without
-        // this, an admin has no way to tell "Mappls wasn't even configured",
-        // "Mappls errored (e.g. bad key)", and "Mappls ran fine but found
-        // nothing" apart from each other; they all used to fall through to
-        // whatever the OSM/Overpass branch happened to say, with no mention
-        // of Mappls at all in most of those branches.
-        $mapplsStatus = match (true) {
-            !$this->mapplsApiKey => 'Mappls: not configured (MAPPLS_API_KEY is empty) — skipped, went straight to the free OpenStreetMap path.',
+    protected function buildDiagnosticNotice(
+        string $city,
+        bool $hadCoordinates,
+        bool $overpassSucceeded,
+        ?string $mapplsError = null,
+        ?string $locationiqError = null,
+        ?string $geoapifyError = null,
+    ): string {
+        // Every branch below now leads with what actually happened on each
+        // configured API provider — without this, an admin has no way to
+        // tell "not configured" apart from "errored" apart from "ran fine
+        // but found nothing" for any of them; they used to all fall through
+        // to whatever the OSM/Overpass branch happened to say, with no
+        // mention of the API providers at all in most of those branches.
+        $providerStatus = match (true) {
+            !$this->mapplsApiKey => 'Mappls: not configured (MAPPLS_API_KEY is empty).',
             $mapplsError !== null => 'Mappls: request failed — ' . $mapplsError,
-            default => 'Mappls: request completed successfully but found zero matches for this city/query.',
+            default => 'Mappls: request completed successfully but found zero matches.',
         };
+        $locationiqStatus = match (true) {
+            !$this->locationiqApiKey => 'LocationIQ: not configured (LOCATIONIQ_API_KEY is empty).',
+            $locationiqError !== null => 'LocationIQ: request failed — ' . $locationiqError,
+            default => 'LocationIQ: request completed successfully but found zero matches.',
+        };
+        $geoapifyStatus = match (true) {
+            !$this->geoapifyApiKey => 'Geoapify: not configured (GEOAPIFY_API_KEY is empty).',
+            !$hadCoordinates => 'Geoapify: skipped — needs a resolved city center point, and geocoding failed (see below).',
+            $geoapifyError !== null => 'Geoapify: request failed — ' . $geoapifyError,
+            default => 'Geoapify: request completed successfully but found zero matches.',
+        };
+        $providerStatus = "{$providerStatus}\n{$locationiqStatus}\n{$geoapifyStatus}\nAll configured providers went straight to the free OpenStreetMap path below since none returned usable results.";
 
         if ($this->lastGeocodeError && str_contains($this->lastGeocodeError, 'Could not connect')) {
             $scopeNote = $this->confirmedOutboundHttpsWorks
                 ? ' (Your server did successfully reach another host during this same request, so general outbound HTTPS works — this looks specific to nominatim.openstreetmap.org: a DNS issue, a firewall rule naming that domain, or that host rate-limiting/blocking your server\'s IP.)'
                 : '';
-            return "⚠️ {$mapplsStatus}\n⚠️ " . $this->lastGeocodeError . $scopeNote;
+            return "⚠️ {$providerStatus}\n⚠️ " . $this->lastGeocodeError . $scopeNote;
         }
 
         if ($this->lastOverpassError && str_contains($this->lastOverpassError, 'Could not connect')) {
             $scopeNote = $this->confirmedOutboundHttpsWorks
                 ? ' (Your server did successfully reach another host during this same request, so general outbound HTTPS works — this looks specific to overpass-api.de: a DNS issue, a firewall rule naming that domain, or that host rate-limiting/blocking your server\'s IP, rather than outbound HTTPS being blocked entirely.)'
                 : '';
-            return "⚠️ {$mapplsStatus}\n⚠️ " . $this->lastOverpassError . $scopeNote;
+            return "⚠️ {$providerStatus}\n⚠️ " . $this->lastOverpassError . $scopeNote;
         }
 
         if (!$hadCoordinates) {
-            return "⚠️ {$mapplsStatus}\n⚠️ Could not determine coordinates for \"" . $city . '" — Nominatim did not recognize this '
+            return "⚠️ {$providerStatus}\n⚠️ Could not determine coordinates for \"" . $city . '" — Nominatim did not recognize this '
                 . 'city name and no fallback center is configured for it. Try a nearby larger city name '
                 . '(e.g. the nearest state capital), or use the CSV import option (choose "Property" as the '
                 . 'type) to add listings manually instead.';
         }
 
         if (!$overpassSucceeded && $this->lastOverpassError) {
-            return "⚠️ {$mapplsStatus}\n⚠️ The Overpass API request did not complete successfully: " . $this->lastOverpassError
+            return "⚠️ {$providerStatus}\n⚠️ The Overpass API request did not complete successfully: " . $this->lastOverpassError
                 . '. This is a request-level failure (not just "no data") — check your server logs for the full '
                 . 'error, and confirm your hosting firewall allows outbound HTTPS requests to overpass-api.de.';
         }
@@ -626,7 +882,7 @@ class CityDataDiscoveryService
         // Coordinates were resolved and the Overpass request completed without a
         // connection/HTTP error — it just returned zero matches. This really is
         // most likely a genuine OpenStreetMap data-coverage gap.
-        return "{$mapplsStatus}\nNo real estate businesses found in OpenStreetMap for \"" . $city . '" within a 15km radius. '
+        return "{$providerStatus}\nNo real estate businesses found in OpenStreetMap for \"" . $city . '" within a 15km radius. '
             . 'The request to OpenStreetMap completed successfully but returned zero matches, so '
             . 'this looks like a genuine data-coverage gap rather than a connection problem — OSM\'s '
             . 'business-listing coverage varies a lot by city in India. Try a nearby larger city/locality name, '
