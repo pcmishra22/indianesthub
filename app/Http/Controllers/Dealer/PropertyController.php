@@ -103,7 +103,6 @@ class PropertyController extends Controller
             'property_type' => 'required|string|max:255',
             'looking_for' => 'required|string|in:Rent,Sale,Renovate',
             'address' => 'required|string|max:255',
-            'floor' => 'nullable|string|max:255',
             'floor_plan_details' => 'nullable|string',
             'city' => 'required|string|max:255',
             'state' => 'required|string|max:255',
@@ -126,7 +125,6 @@ class PropertyController extends Controller
             'property_age' => 'nullable|string|max:50',
             'furnishing_status' => 'nullable|string|in:Furnished,Semi,Unfurnished',
             'area' => 'nullable|integer',
-            'furnishing' => 'nullable|string|max:255',
             'amenities' => 'nullable|array',
             'virtual_tour_url' => 'nullable|string|max:255',
             'status' => 'nullable|string|max:255',
@@ -163,7 +161,6 @@ class PropertyController extends Controller
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string',
             'search_tags' => 'nullable|string|max:255',
-            'featured' => 'nullable|boolean',
             'priority_score' => 'nullable|integer',
         ]);
 
@@ -173,6 +170,15 @@ class PropertyController extends Controller
         $data['is_featured'] = $request->has('is_featured');
         $data['is_premium'] = $request->has('is_premium');
         $data['property_dealer_id'] = $dealerId;
+
+        // Compatibility sync: 'floor', 'furnishing' and 'featured' are older
+        // columns some display views still read (e.g. dealer property show
+        // page). The form only collects their newer replacements
+        // (floor_number, furnishing_status, is_featured) now — this keeps
+        // the legacy columns populated too rather than leaving them blank.
+        $data['floor'] = isset($data['floor_number']) ? (string) $data['floor_number'] : null;
+        $data['furnishing'] = $data['furnishing_status'] ?? null;
+        $data['featured'] = $data['is_featured'];
 
         // Convert amenities array to JSON string for storage
         if (!empty($data['amenities']) && is_array($data['amenities'])) {
@@ -310,7 +316,6 @@ class PropertyController extends Controller
             'property_type' => 'required|string|max:255',
             'looking_for' => 'required|string|in:Rent,Sale,Renovate',
             'address' => 'required|string|max:255',
-            'floor' => 'nullable|string|max:255',
             'floor_plan_details' => 'nullable|string',
             'city' => 'required|string|max:255',
             'state' => 'required|string|max:255',
@@ -333,7 +338,6 @@ class PropertyController extends Controller
             'property_age' => 'nullable|string|max:50',
             'furnishing_status' => 'nullable|string|in:Furnished,Semi,Unfurnished',
             'area' => 'nullable|integer',
-            'furnishing' => 'nullable|string|max:255',
             'amenities' => 'nullable|array',
             'virtual_tour_url' => 'nullable|string|max:255',
             'status' => 'nullable|string|max:255',
@@ -370,7 +374,6 @@ class PropertyController extends Controller
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string',
             'search_tags' => 'nullable|string|max:255',
-            'featured' => 'nullable|boolean',
             'priority_score' => 'nullable|integer',
             // File fields validation to prevent silent failures
             'cover_image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
@@ -386,6 +389,11 @@ class PropertyController extends Controller
         $data['isreal'] = $request->has('isreal');
         $data['is_featured'] = $request->has('is_featured');
         $data['is_premium'] = $request->has('is_premium');
+
+        // Compatibility sync: see the same note in store() above.
+        $data['floor'] = isset($data['floor_number']) ? (string) $data['floor_number'] : null;
+        $data['furnishing'] = $data['furnishing_status'] ?? null;
+        $data['featured'] = $data['is_featured'];
 
         // Convert amenities array to JSON string for storage
         if (!empty($data['amenities']) && is_array($data['amenities'])) {

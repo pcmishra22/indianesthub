@@ -52,6 +52,32 @@ define('PRAKASH_MAX_PLAUSIBLE_MOVE_PCT', (float)(getenv('PRAKASH_MAX_PLAUSIBLE_M
 // across the day even though it doesn't fit in the visible box.
 define('PRAKASH_TOP_N', (int)(getenv('PRAKASH_TOP_N') ?: 10));
 
+// ─── Sector Momentum (laggard) signal ─────────────────────────────
+// A sector counts as "moving" for the day if at least this many of its
+// members appear in the current Top-N gainers (bullish sector) or Top-N
+// losers (bearish sector) — e.g. 3 of the current Top 10 gainers being
+// IT stocks. Once a sector qualifies, the pick is the *laggard*: the
+// sector's own member with the smallest |%change| that ISN'T already
+// one of the movers, on the theory that it hasn't caught up yet. A
+// bullish sector's laggard is a Buy (expected to catch up); a bearish
+// sector's laggard is a Sell (expected to catch down).
+define('PRAKASH_SECTOR_MIN_COUNT', (int)(getenv('PRAKASH_SECTOR_MIN_COUNT') ?: 3));
+define('PRAKASH_SECTOR_MIN_RATIO', (float)(getenv('PRAKASH_SECTOR_MIN_RATIO') ?: 0.3)); // 30% of Top N
+
+// ─── 5-Day Reversal vs Sector Strength signal ──────────────────────
+// Buy: a stock trading within PRAKASH_5D_NEAR_PCT of its own 5-day low,
+// while its sector's average %change today isn't very negative (sector
+// is "not going down much") — e.g. SBI near its 5-day low while Banking
+// as a whole is flat/resilient. The stock is underperforming a sector
+// that isn't actually weak, which is the divergence this signal looks
+// for. Sell is the mirror: a stock near its 5-day high while its sector
+// isn't running (sector "not going up much") — the stock has likely
+// overextended relative to a sector that isn't actually strong.
+// PRAKASH_SECTOR_RESILIENCE_PCT is the "not moving much" threshold for
+// the sector's own average %change.
+define('PRAKASH_5D_NEAR_PCT', (float)(getenv('PRAKASH_5D_NEAR_PCT') ?: 2.0)); // within 2% of the 5-day low/high
+define('PRAKASH_SECTOR_RESILIENCE_PCT', (float)(getenv('PRAKASH_SECTOR_RESILIENCE_PCT') ?: 0.5)); // sector avg move considered "flat"
+
 // Confidence-score weights for the Buy/Sell candidate ranking. Kept in one
 // place so the formula is auditable. Each sub-score is normalized to 0..1
 // first, multiplied by its weight, and the weighted sum is clamped to

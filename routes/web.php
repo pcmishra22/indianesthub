@@ -130,7 +130,7 @@ Route::get('/properties-in/{city}', function ($city) {
     return redirect()->route('properties.city', ['city' => $city], 301);
 });
 
-Route::get('/properties/{property:slug}', [PropertyDetailsController::class, 'show'])->name('property-details');
+Route::get('/properties/{slug}', [PropertyDetailsController::class, 'show'])->name('property-details');
 
 /*
 |--------------------------------------------------------------------------
@@ -555,8 +555,8 @@ Route::prefix('builder')->middleware('auth:builder')->name('builder.')->group(fu
 
     // Leads
     Route::get('/leads', [\App\Http\Controllers\Builder\LeadsController::class, 'index'])->name('leads.index');
-    Route::put('/leads/{lead}/status', [\App\Http\Controllers\Builder\LeadsController::class, 'updateStatus'])->name('leads.updateStatus');
-    Route::put('/leads/{lead}/notes', [\App\Http\Controllers\Builder\LeadsController::class, 'saveNotes'])->name('leads.save-notes');
+    Route::patch('/leads/{lead}/status', [\App\Http\Controllers\Builder\LeadsController::class, 'updateStatus'])->name('leads.update-status');
+    Route::post('/leads/{lead}/notes', [\App\Http\Controllers\Builder\LeadsController::class, 'saveNotes'])->name('leads.save-notes');
     Route::post('/leads/{lead}/call-log', [\App\Http\Controllers\Builder\LeadsController::class, 'addCallLog'])->name('leads.add-call-log');
     Route::get('/leads/export', [\App\Http\Controllers\Builder\LeadsController::class, 'export'])->name('leads.export');
     Route::delete('/leads/{lead}', [\App\Http\Controllers\Builder\LeadsController::class, 'destroy'])->name('leads.destroy');
@@ -722,6 +722,8 @@ require __DIR__ . '/admin_properties.php';
     // Manage Inquiries & Contacts
     Route::get('/inquiries', [AdminInquiryController::class, 'index'])->name('inquiries.index');
     Route::get('/contacts', [AdminContactController::class, 'index'])->name('contacts.index');
+    Route::get('/contacts/{contact}', [AdminContactController::class, 'show'])->name('contacts.show');
+    Route::delete('/contacts/{contact}', [AdminContactController::class, 'destroy'])->name('contacts.destroy');
     Route::post('/contacts/{contact}/mark-read', [AdminContactController::class, 'markRead'])->name('contacts.mark-read');
     
         // Reports
@@ -783,53 +785,6 @@ require __DIR__ . '/admin_properties.php';
         Route::post('city-import/discover',        [CityDataImportController::class, 'discover'])->name('city-import.discover');
         Route::post('city-import/{batch}/confirm', [CityDataImportController::class, 'confirm'])->name('city-import.confirm');
         Route::post('city-import/{batch}/reject',  [CityDataImportController::class, 'reject'])->name('city-import.reject');
-});
-
-/*
-|--------------------------------------------------------------------------
-| Builder Authentication Routes
-|--------------------------------------------------------------------------
-*/
-Route::prefix('builder')->name('builder.')->group(function () {
-    Route::get('/login',     [BuilderAuthController::class, 'showLogin'])->name('login');
-    Route::post('/login',    [BuilderAuthController::class, 'login']);
-    Route::post('/logout',   [BuilderAuthController::class, 'logout'])->name('logout');
-    Route::get('/register',  [BuilderAuthController::class, 'showRegister'])->name('register');
-    Route::post('/register', [BuilderAuthController::class, 'register']);
-});
-
-/*
-|--------------------------------------------------------------------------
-| Builder Dashboard Routes (auth:builder)
-|--------------------------------------------------------------------------
-*/
-Route::prefix('builder')->middleware('auth:builder')->name('builder.')->group(function () {
-    Route::get('/dashboard', [BuilderDashboardController::class, 'index'])->name('dashboard');
-
-    // Projects CRUD
-    Route::resource('projects', BuilderProjectController::class);
-
-    // Properties nested under a project
-    Route::prefix('projects/{project}/properties')->name('projects.properties.')->group(function () {
-        Route::get('/',            [BuilderPropertyController::class, 'index'])->name('index');
-        Route::get('/create',      [BuilderPropertyController::class, 'create'])->name('create');
-        Route::post('/',           [BuilderPropertyController::class, 'store'])->name('store');
-        Route::get('/{property}/edit',   [BuilderPropertyController::class, 'edit'])->name('edit');
-        Route::put('/{property}',        [BuilderPropertyController::class, 'update'])->name('update');
-        Route::delete('/{property}',     [BuilderPropertyController::class, 'destroy'])->name('destroy');
-    });
-
-    // Profile
-    Route::get('/profile',  [BuilderProfileController::class, 'show'])->name('profile');
-    Route::put('/profile',  [BuilderProfileController::class, 'update'])->name('profile.update');
-
-    // Leads Management
-    Route::get('/leads',                         [BuilderLeadsController::class, 'index'])->name('leads.index');
-    Route::get('/leads/export',                  [BuilderLeadsController::class, 'export'])->name('leads.export');
-    Route::patch('/leads/{lead}/status',         [BuilderLeadsController::class, 'updateStatus'])->name('leads.update-status');
-    Route::post('/leads/{lead}/notes',           [BuilderLeadsController::class, 'saveNotes'])->name('leads.save-notes');
-    Route::post('/leads/{lead}/call-log',        [BuilderLeadsController::class, 'addCallLog'])->name('leads.add-call-log');
-    Route::delete('/leads/{lead}',               [BuilderLeadsController::class, 'destroy'])->name('leads.destroy');
 });
 
 // Virtual Tours AR (public)

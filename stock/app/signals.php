@@ -339,6 +339,32 @@ function change5d(array $history): float
     return $prev > 0 ? round(($now - $prev) / $prev * 100, 2) : 0.0;
 }
 
+/**
+ * 5-day low / high / simple moving average from history — used by the
+ * "near 5-day low/high vs sector strength" reversal signal. Uses the last
+ * 5 candles' actual high/low (not just closes) for the range, and the
+ * average close for the SMA. Falls back to the latest close for all three
+ * if there isn't enough history yet, so callers never see zeros.
+ */
+function fiveDayRange(array $history): array
+{
+    $n = count($history);
+    if ($n === 0) return ['low' => 0.0, 'high' => 0.0, 'sma' => 0.0];
+    $window = array_slice($history, -5);
+    $lows   = array_map(fn($c) => (float)($c['low']  ?? $c['close'] ?? 0), $window);
+    $highs  = array_map(fn($c) => (float)($c['high'] ?? $c['close'] ?? 0), $window);
+    $closes = array_map(fn($c) => (float)($c['close'] ?? 0), $window);
+    $lows   = array_filter($lows,  fn($v) => $v > 0);
+    $highs  = array_filter($highs, fn($v) => $v > 0);
+    $closes = array_filter($closes, fn($v) => $v > 0);
+    $lastClose = (float)($history[$n-1]['close'] ?? 0);
+    return [
+        'low'  => !empty($lows)  ? round(min($lows), 2)  : $lastClose,
+        'high' => !empty($highs) ? round(max($highs), 2) : $lastClose,
+        'sma'  => !empty($closes) ? round(array_sum($closes) / count($closes), 2) : $lastClose,
+    ];
+}
+
 function momentumScore(array $quote, array $history, array $indicators): array
 {
     $price    = $quote['regularMarketPrice'] ?? 0;

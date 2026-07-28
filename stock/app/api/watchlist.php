@@ -876,6 +876,9 @@ function analyzeSymbolsBatch(array $syms, array $allQuotes): array
                     'price'         => $price,
                     'change_pct'    => round($chg, 2),
                     'change_5d'     => 0,
+                    'low_5d'        => $price,
+                    'high_5d'       => $price,
+                    'sma_5d'        => $price,
                     'momentum_score'=> 0,
                     'signal'        => 'Hold',
                     'confidence'    => 0,
@@ -935,6 +938,7 @@ function analyzeSymbolsBatch(array $syms, array $allQuotes): array
             $price    = (float)($quote['regularMarketPrice'] ?? 0);
             $chg      = (float)($quote['regularMarketChangePercent'] ?? 0);
             $chg5d    = change5d($history);
+            $range5d  = fiveDayRange($history);
             $rsiLast  = lastNonNull($rsiArr) ?: 50;
             $topPat   = !empty($candlePats) ? $candlePats[0]['name'] : '';
             $atrV     = $atrVal ?? $price * 0.015;
@@ -948,6 +952,9 @@ function analyzeSymbolsBatch(array $syms, array $allQuotes): array
                 'price'         => $price,
                 'change_pct'    => round($chg, 2),
                 'change_5d'     => $chg5d,
+                'low_5d'        => $range5d['low'],
+                'high_5d'       => $range5d['high'],
+                'sma_5d'        => $range5d['sma'],
                 'momentum_score'=> $mom['score'],
                 'signal'        => $sig['signal'],
                 'confidence'    => $sig['confidence'],

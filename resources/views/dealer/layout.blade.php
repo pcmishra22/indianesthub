@@ -50,6 +50,12 @@
 						</a>
 					</li>
 
+					<li class="sidebar-item {{ request()->routeIs('dealer.properties.uploadCsv*') ? 'active' : '' }}">
+						<a class="sidebar-link" href="{{ route('dealer.properties.uploadCsvForm') }}">
+							<i class="align-middle" data-feather="upload"></i> <span class="align-middle">Bulk Upload (CSV)</span>
+						</a>
+					</li>
+
 					<li class="sidebar-item {{ request()->routeIs('dealer.properties.marketing*') ? 'active' : '' }}">
 					<a class="sidebar-link" href="{{ route('dealer.properties.index', ['marketing' => 1]) }}">
 						<i class="align-middle" data-feather="volume-2"></i> <span class="align-middle">Marketing Studio</span>

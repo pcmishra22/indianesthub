@@ -12,7 +12,7 @@
 	<link rel="preconnect" href="https://fonts.gstatic.com">
 	<link rel="shortcut icon" href="{{ asset('backend/img/icons/icon-48x48.png') }}" />
 
-	<link rel="canonical" href="{{ url()->current() }}{{ request()->getQueryString() ? '?' . request()->getQueryString() : '' }}" />
+	<link rel="canonical" href="@yield('canonical', url()->current())" />
 
 	<title>@yield('title', 'IndianestHub - Real Estate Portal') | {{ config('app.name') }}</title>
 

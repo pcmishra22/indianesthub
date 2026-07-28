@@ -77,19 +77,6 @@
             </div>
         </div>
         <div class="mb-3">
-            <label class="form-label">Furnishing</label>
-            <select name="furnishing" class="form-control" required>
-                <option value="">Select Furnishing</option>
-                <option value="Fully Furnished" {{ old('furnishing', $property->furnishing ?? '') == 'Fully Furnished' ? 'selected' : '' }}>Fully Furnished</option>
-                <option value="Semi Furnished" {{ old('furnishing', $property->furnishing ?? '') == 'Semi Furnished' ? 'selected' : '' }}>Semi Furnished</option>
-                <option value="Unfurnished" {{ old('furnishing', $property->furnishing ?? '') == 'Unfurnished' ? 'selected' : '' }}>Unfurnished</option>
-            </select>
-        </div>
-        <div class="mb-3">
-            <label class="form-label">Floor</label>
-            <input type="text" name="floor" class="form-control" value="{{ old('floor', $property->floor ?? '') }}" placeholder="e.g. Ground, 1, 2, 3, etc.">
-        </div>
-        <div class="mb-3">
             <label class="form-label">Floor Plan Details</label>
             <textarea name="floor_plan_details" class="form-control" rows="3" placeholder="Describe the floor plan here...">{{ old('floor_plan_details', $property->floor_plan_details ?? '') }}</textarea>
         </div>
@@ -230,7 +217,7 @@
             </div>
             <div class="col-md-3 mb-3">
                 <label class="form-label">Furnishing Status</label>
-                <select name="furnishing_status" class="form-control">
+                <select name="furnishing_status" class="form-control" required>
                     <option value="">Select Status</option>
                     <option value="Furnished" {{ old('furnishing_status', $property->furnishing_status ?? '') == 'Furnished' ? 'selected' : '' }}>Furnished</option>
                     <option value="Semi" {{ old('furnishing_status', $property->furnishing_status ?? '') == 'Semi' ? 'selected' : '' }}>Semi</option>
@@ -653,18 +640,11 @@
             </div>
         </div>
         <div class="row">
-            <div class="col-md-4 mb-3">
+            <div class="col-md-6 mb-3">
                 <label class="form-label">Search Tags (comma separated)</label>
                 <input type="text" name="search_tags" class="form-control" value="{{ old('search_tags', $property->search_tags ?? '') }}">
             </div>
-            <div class="col-md-4 mb-3">
-                <label class="form-label">Featured</label>
-                <select name="featured" class="form-control">
-                    <option value="0" {{ old('featured', $property->featured ?? 0) == 0 ? 'selected' : '' }}>No</option>
-                    <option value="1" {{ old('featured', $property->featured ?? 0) == 1 ? 'selected' : '' }}>Yes</option>
-                </select>
-            </div>
-            <div class="col-md-4 mb-3">
+            <div class="col-md-6 mb-3">
                 <label class="form-label">Priority Score</label>
                 <input type="number" name="priority_score" class="form-control" value="{{ old('priority_score', $property->priority_score ?? '') }}">
             </div>

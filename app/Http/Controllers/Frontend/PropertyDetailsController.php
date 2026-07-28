@@ -23,9 +23,48 @@ use Illuminate\Support\Facades\Mail;
 class PropertyDetailsController extends Controller
 {
     /**
-     * Show property detail page — /properties/{property:slug}
+     * Show property detail page — /properties/{slug}
      */
-    public function show(Property $property)
+    public function show(string $slug)
+    {
+        $property = Property::withTrashed()->where('slug', $slug)->first();
+
+        if (!$property) {
+            abort(404); // genuinely never existed — a real 404 is correct here
+        }
+
+        if ($property->trashed()) {
+            return $this->showUnavailable($property);
+        }
+
+        return $this->render($property);
+    }
+
+    /**
+     * Graceful page for a listing that used to exist but was removed
+     * (soft-deleted) — returns HTTP 410 Gone, which tells search engines
+     * this is an intentional, permanent removal (a stronger, more decisive
+     * signal than a plain 404), while still giving a real visitor something
+     * useful: similar active listings instead of a dead end.
+     */
+    protected function showUnavailable(Property $property)
+    {
+        $similar = Property::where('id', '!=', $property->id)
+            ->when($property->city, fn ($q) => $q->where('city', $property->city))
+            ->when($property->listing_type, fn ($q) => $q->where('listing_type', $property->listing_type))
+            ->whereNotIn('status', ['sold', 'rented', 'inactive', 'draft', 'expired', 'Sold', 'Rented'])
+            ->latest()
+            ->take(4)
+            ->get();
+
+        return response()
+            ->view('frontend.property-unavailable', [
+                'property' => $property,
+                'similar'  => $similar,
+            ], 410);
+    }
+
+    protected function render(Property $property)
     {
         $property->load('images', 'dealer', 'builder', 'builderProject');
 

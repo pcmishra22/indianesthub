@@ -140,7 +140,7 @@
                                     @endif
                                 </p>
                             @endif
-                            <p class="mb-1"><strong>Furnishing:</strong> {{ $property->furnishing }}</p>
+                            <p class="mb-1"><strong>Furnishing:</strong> {{ $property->furnishing_status }}</p>
                             <p class="mb-1"><strong>Amenities:</strong> 
                                 @php
                                     $amenitiesArr = [];
@@ -255,7 +255,6 @@
                                                                             <tr><th>Meta Title</th><td>{{ $property->meta_title }}</td></tr>
                                                                             <tr><th>Meta Description</th><td>{{ $property->meta_description }}</td></tr>
                                                                             <tr><th>Search Tags</th><td>{{ $property->search_tags }}</td></tr>
-                                                                            <tr><th>Featured</th><td>{{ $property->featured ? 'Yes' : 'No' }}</td></tr>
                                                                             <tr><th>Priority Score</th><td>{{ $property->priority_score }}</td></tr>
                                                                         </tbody>
                                                                     </table>

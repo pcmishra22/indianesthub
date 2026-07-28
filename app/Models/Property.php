@@ -4,11 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
 class Property extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
 protected $fillable = [
         'property_dealer_id', 'title', 'description', 'property_type', 'bhk_type', 'option_type',
@@ -109,7 +110,7 @@ protected $fillable = [
         $original = $slug;
         $count    = 1;
 
-        while (static::where('slug', $slug)->where('id', '!=', $property->id ?? 0)->exists()) {
+        while (static::withTrashed()->where('slug', $slug)->where('id', '!=', $property->id ?? 0)->exists()) {
             $slug = $original . '-' . $count++;
         }
 

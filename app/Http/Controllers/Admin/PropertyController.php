@@ -40,8 +40,9 @@ class PropertyController extends Controller
 
     public function destroy($id)
     {
-        // delete logic (existing placeholder)
-        return back();
+        $property = Property::findOrFail($id);
+        $property->delete(); // soft delete — row is retained so the public listing URL can show a graceful "no longer available" page instead of a hard 404
+        return back()->with('success', 'Property deleted successfully.');
     }
 
     public function toggleFeatured(Property $property)

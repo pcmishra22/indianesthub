@@ -475,6 +475,223 @@ function prakashTopGainersLosers(array $tracked, int $topN): array
     return ['gainers' => $gainers, 'losers' => $losers];
 }
 
+// ── Sector lookup ────────────────────────────────────────────────
+// Reverse lookup against config.php's SECTOR_MAP (sector => bare symbols).
+// Returns null for any symbol not classified (SECTOR_MAP doesn't cover
+// every NSE stock — that's expected, not a bug).
+function prakashSectorOf(string $symbol): ?string
+{
+    $bare = strtoupper(str_replace('.NS', '', $symbol));
+    foreach (SECTOR_MAP as $sector => $members) {
+        if (in_array($bare, $members, true)) return $sector;
+    }
+    return null;
+}
+
+// ── Sector Momentum (laggard) signal — the "3rd logic" ─────────────
+// Step 1: does any sector dominate the current Top-N gainers (or
+// losers)? E.g. 5 of today's Top 10 gainers being IT stocks means IT is
+// "moving forward" today. A sector qualifies once it has at least
+// PRAKASH_SECTOR_MIN_COUNT members in the Top-N AND that count is at
+// least PRAKASH_SECTOR_MIN_RATIO of the Top-N.
+//
+// Step 2: once a sector qualifies, the pick is NOT one of the movers
+// already in the Top-N (those already ran) — it's the sector's own
+// member with the smallest |%change| among the stocks actually being
+// tracked, i.e. the laggard that hasn't caught up yet.
+//
+// Step 3: direction follows the sector, not the laggard's own current
+// sign — a bullish sector's laggard is a Buy (expected to catch up), a
+// bearish sector's laggard is a Sell (expected to catch down).
+function prakashSectorMomentumSignal(array $tracked, array $topGainersList, array $topLosersList): array
+{
+    $minCount = (int)(defined('PRAKASH_SECTOR_MIN_COUNT') ? PRAKASH_SECTOR_MIN_COUNT : 3);
+    $minRatio = (float)(defined('PRAKASH_SECTOR_MIN_RATIO') ? PRAKASH_SECTOR_MIN_RATIO : 0.3);
+    $topN     = max(count($topGainersList), count($topLosersList));
+
+    $gainerSectorCounts = [];
+    foreach ($topGainersList as $sym) {
+        $sector = prakashSectorOf($sym);
+        if ($sector !== null) $gainerSectorCounts[$sector] = ($gainerSectorCounts[$sector] ?? 0) + 1;
+    }
+    $loserSectorCounts = [];
+    foreach ($topLosersList as $sym) {
+        $sector = prakashSectorOf($sym);
+        if ($sector !== null) $loserSectorCounts[$sector] = ($loserSectorCounts[$sector] ?? 0) + 1;
+    }
+
+    $qualifies = function (int $count) use ($minCount, $minRatio, $topN): bool {
+        if ($count < $minCount) return false;
+        if ($topN > 0 && ($count / $topN) < $minRatio) return false;
+        return true;
+    };
+
+    arsort($gainerSectorCounts);
+    arsort($loserSectorCounts);
+
+    $bullSector = null; $bullCount = 0;
+    foreach ($gainerSectorCounts as $sector => $count) {
+        if ($qualifies($count)) { $bullSector = $sector; $bullCount = $count; break; }
+    }
+    $bearSector = null; $bearCount = 0;
+    foreach ($loserSectorCounts as $sector => $count) {
+        if ($qualifies($count)) { $bearSector = $sector; $bearCount = $count; break; }
+    }
+
+    $gainerSet = array_flip($topGainersList);
+    $loserSet  = array_flip($topLosersList);
+
+    $findLaggard = function (?string $sector, array $excludeSet) use ($tracked): ?array {
+        if ($sector === null) return null;
+        $members = SECTOR_MAP[$sector] ?? [];
+        $candidates = [];
+        foreach ($tracked as $stock) {
+            $sym = prakashNormalizeSymbol((string)($stock['symbol'] ?? ''));
+            if ($sym === '') continue;
+            if (!in_array(prakashDisplaySymbol($sym), $members, true)) continue;
+            if (isset($excludeSet[$sym])) continue; // already an active mover, not a laggard
+            $candidates[] = $stock;
+        }
+        if (empty($candidates)) return null;
+        usort($candidates, fn($a, $b) => abs((float)($a['change_pct'] ?? 0)) <=> abs((float)($b['change_pct'] ?? 0)));
+        return $candidates[0];
+    };
+
+    $bullLaggard = $findLaggard($bullSector, $gainerSet);
+    $bearLaggard = $findLaggard($bearSector, $loserSet);
+
+    $buy = null;
+    if ($bullLaggard !== null && $bullSector !== null) {
+        $sym = prakashDisplaySymbol((string)($bullLaggard['symbol'] ?? ''));
+        $buy = [
+            'symbol'             => $sym,
+            'price'              => (float)($bullLaggard['price'] ?? 0),
+            'percentage_change'  => (float)($bullLaggard['change_pct'] ?? 0),
+            'sector'             => $bullSector,
+            'sector_mover_count' => $bullCount,
+            'sector_top_n'       => $topN,
+            'reason'             => "Sector Momentum — {$bullSector} moving up ({$bullCount}/{$topN} top gainers), {$sym} is the laggard",
+        ];
+    }
+    $sell = null;
+    if ($bearLaggard !== null && $bearSector !== null) {
+        $sym = prakashDisplaySymbol((string)($bearLaggard['symbol'] ?? ''));
+        $sell = [
+            'symbol'             => $sym,
+            'price'              => (float)($bearLaggard['price'] ?? 0),
+            'percentage_change'  => (float)($bearLaggard['change_pct'] ?? 0),
+            'sector'             => $bearSector,
+            'sector_mover_count' => $bearCount,
+            'sector_top_n'       => $topN,
+            'reason'             => "Sector Momentum — {$bearSector} moving down ({$bearCount}/{$topN} top losers), {$sym} is the laggard",
+        ];
+    }
+
+    return ['buy' => $buy, 'sell' => $sell];
+}
+
+// ── 5-Day Reversal vs Sector Strength signal — the "4th logic" ─────
+// Buy: a stock trading near its own 5-day low (within PRAKASH_5D_NEAR_PCT)
+// while its sector's average %change today is NOT very negative — i.e.
+// the sector as a whole is holding up ("Bank Nifty not going down much")
+// even though this particular stock has drifted down to its 5-day low.
+// That divergence — laggard vs. a resilient sector — is the Buy case.
+//
+// Sell is the mirror: a stock near its 5-day high while its sector's
+// average %change is NOT very positive — the stock has run up to a
+// 5-day high on its own steam without the rest of its sector following,
+// which is read as overextension rather than genuine sector strength.
+//
+// "Near" the 5-day low/high uses fiveDayRange()'s low/high (see
+// app/signals.php) rather than an exact touch. The stock's own 5-day SMA
+// (also from fiveDayRange()) is used as a second, independent
+// confirmation — price below the 5-day average for Buy, above it for
+// Sell — since a stock can be numerically close to its 5-day low/high by
+// coincidence on a single tick; requiring both lowers false positives.
+function prakashFiveDayReversalSignal(array $tracked): array
+{
+    $nearPct   = (float)(defined('PRAKASH_5D_NEAR_PCT') ? PRAKASH_5D_NEAR_PCT : 2.0);
+    $resiliencePct = (float)(defined('PRAKASH_SECTOR_RESILIENCE_PCT') ? PRAKASH_SECTOR_RESILIENCE_PCT : 0.5);
+
+    // Sector average %change across every tracked stock we can classify —
+    // this stands in for "how is Bank Nifty doing" using the sector's own
+    // members on the watchlist, since the app has no separate index feed.
+    $sectorChanges = [];
+    foreach ($tracked as $stock) {
+        $sym = prakashNormalizeSymbol((string)($stock['symbol'] ?? ''));
+        if ($sym === '') continue;
+        $sector = prakashSectorOf($sym);
+        if ($sector === null) continue;
+        $sectorChanges[$sector][] = (float)($stock['change_pct'] ?? 0);
+    }
+    $sectorAvg = [];
+    foreach ($sectorChanges as $sector => $changes) {
+        $sectorAvg[$sector] = array_sum($changes) / max(1, count($changes));
+    }
+
+    $buyCandidates  = [];
+    $sellCandidates = [];
+    foreach ($tracked as $stock) {
+        $sym = prakashNormalizeSymbol((string)($stock['symbol'] ?? ''));
+        if ($sym === '') continue;
+        $sector = prakashSectorOf($sym);
+        if ($sector === null || !isset($sectorAvg[$sector])) continue; // unclassified — no sector context to compare against
+
+        $price = (float)($stock['price'] ?? 0);
+        $low5  = (float)($stock['low_5d']  ?? 0);
+        $high5 = (float)($stock['high_5d'] ?? 0);
+        $sma5  = (float)($stock['sma_5d']  ?? 0);
+        if ($price <= 0 || $low5 <= 0 || $high5 <= 0) continue;
+
+        $secAvg = $sectorAvg[$sector];
+        $displaySym = prakashDisplaySymbol($sym);
+
+        // Buy: near the 5-day low, below the 5-day SMA, sector holding up.
+        $pctAboveLow = ($price - $low5) / $low5 * 100;
+        if ($pctAboveLow <= $nearPct && ($sma5 <= 0 || $price < $sma5) && $secAvg >= -$resiliencePct) {
+            $buyCandidates[] = [
+                'symbol' => $displaySym,
+                'price' => $price,
+                'percentage_change' => (float)($stock['change_pct'] ?? 0),
+                'sector' => $sector,
+                'sector_avg_change' => round($secAvg, 2),
+                'low_5d' => $low5,
+                'sma_5d' => $sma5,
+                'pct_above_5d_low' => round($pctAboveLow, 2),
+                'reason' => "5-Day Reversal — near 5-day low (₹{$low5}), {$sector} sector holding up (avg " . round($secAvg, 2) . "%)",
+                // Rank by strength of divergence: how far the sector is
+                // outperforming this specific laggard.
+                'divergence' => $secAvg - (float)($stock['change_pct'] ?? 0),
+            ];
+        }
+
+        // Sell: near the 5-day high, above the 5-day SMA, sector not running.
+        $pctBelowHigh = ($high5 - $price) / $high5 * 100;
+        if ($pctBelowHigh <= $nearPct && ($sma5 <= 0 || $price > $sma5) && $secAvg <= $resiliencePct) {
+            $sellCandidates[] = [
+                'symbol' => $displaySym,
+                'price' => $price,
+                'percentage_change' => (float)($stock['change_pct'] ?? 0),
+                'sector' => $sector,
+                'sector_avg_change' => round($secAvg, 2),
+                'high_5d' => $high5,
+                'sma_5d' => $sma5,
+                'pct_below_5d_high' => round($pctBelowHigh, 2),
+                'reason' => "5-Day Reversal — near 5-day high (₹{$high5}), {$sector} sector not following (avg " . round($secAvg, 2) . "%)",
+                'divergence' => (float)($stock['change_pct'] ?? 0) - $secAvg,
+            ];
+        }
+    }
+
+    usort($buyCandidates,  fn($a, $b) => $b['divergence'] <=> $a['divergence']);
+    usort($sellCandidates, fn($a, $b) => $b['divergence'] <=> $a['divergence']);
+
+    return [
+        'buy'  => $buyCandidates[0]  ?? null,
+        'sell' => $sellCandidates[0] ?? null,
+    ];
+}
+
 // ── "Seen in Top N today" persistence ──────────────────────────
 // Tracks every symbol that has been in the day's Top N Gainers or
 // Top N Losers at any prior iteration. Used by the new-entry detector
@@ -777,6 +994,10 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
             'top_loser'           => null,
             'rank_movement_buy'   => null,
             'rank_movement_sell'  => null,
+            'sector_buy_recommendation' => null,
+            'sector_sell_recommendation' => null,
+            'reversal_buy_recommendation' => null,
+            'reversal_sell_recommendation' => null,
             'buy_box'             => [],
             'sell_box'            => [],
             'top5_buy'            => [],
@@ -903,6 +1124,15 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
     $topNLists = prakashTopGainersLosers($tracked, $topN);
     $topGainersList = $topNLists['gainers'];
     $topLosersList  = $topNLists['losers'];
+
+    // ── Sector Momentum (laggard) signal — 3rd logic, independent of
+    // momentum/rank above. Runs every iteration off the same Top-N lists. ──
+    $sectorSignal = prakashSectorMomentumSignal($tracked, $topGainersList, $topLosersList);
+
+    // ── 5-Day Reversal vs Sector Strength signal — 4th logic. Independent
+    // of everything above; only needs $tracked (with low_5d/high_5d/sma_5d
+    // populated by analyzeSymbolsBatch() in api/watchlist.php). ──
+    $reversalSignal = prakashFiveDayReversalSignal($tracked);
     $topSeenPath = $topSeenPath ?? prakashTopSeenFile($username);
     $newEntries = $marketHoursNow
         ? prakashDetectNewEntries($topGainersList, $topLosersList, $topSeenPath)
@@ -1720,6 +1950,10 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
             'target_price' => $dailyRecBySymbol[prakashDisplaySymbol($rankSellCandidate['symbol'])]['target_price'] ?? null,
             'current_status' => $dailyRecBySymbol[prakashDisplaySymbol($rankSellCandidate['symbol'])]['status'] ?? 'Active',
         ]) : null,
+        'sector_buy_recommendation' => $sectorSignal['buy'],
+        'sector_sell_recommendation' => $sectorSignal['sell'],
+        'reversal_buy_recommendation' => $reversalSignal['buy'],
+        'reversal_sell_recommendation' => $reversalSignal['sell'],
         'rank_movement_buy' => $rankMovementBuy ? array_merge(
             ['symbol' => $rankMovementBuy['symbol']],
             $rankMovementBuy,

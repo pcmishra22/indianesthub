@@ -63,9 +63,33 @@
                         <input type="text" name="company_name" class="form-control" value="{{ old('company_name', $dealer->company_name) }}" required>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label">Bio</label>
+                        <textarea name="bio" class="form-control" rows="4" maxlength="1000" placeholder="A short description about you or your agency, shown on your public profile.">{{ old('bio', $dealer->bio) }}</textarea>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">Profile Photo</label>
                         <input type="file" name="profile_photo" class="form-control" accept="image/*">
                     </div>
+
+                    <hr class="my-4">
+
+                    <h6 class="mb-3">Change Password</h6>
+                    <p class="text-muted small">Leave these blank to keep your current password.</p>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Current Password</label>
+                            <input type="password" name="current_password" class="form-control" autocomplete="current-password">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">New Password</label>
+                            <input type="password" name="new_password" class="form-control" minlength="8" autocomplete="new-password">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Confirm New Password</label>
+                            <input type="password" name="new_password_confirmation" class="form-control" minlength="8" autocomplete="new-password">
+                        </div>
+                    </div>
+
                     <button type="submit" class="btn btn-primary">Update Profile</button>
                 </form>
             </div>

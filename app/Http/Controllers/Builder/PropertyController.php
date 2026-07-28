@@ -167,10 +167,11 @@ class PropertyController extends Controller
     {
         $this->authorizeProperty($project, $property);
 
-        if ($property->cover_image) {
-            Storage::disk('public')->delete($property->cover_image);
-        }
-
+        // Note: cover image is intentionally NOT deleted from storage here —
+        // $property->delete() is now a soft delete (see the SoftDeletes trait
+        // on the Property model), so the row and its image are retained to
+        // let the public listing URL show a graceful "no longer available"
+        // page instead of a broken image / hard 404.
         $property->delete();
 
         return redirect()->route('builder.projects.show', $project)

@@ -86,6 +86,26 @@
             </div>
         </div>
     </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col mt-0">
+                        <h5 class="card-title">Scheduled Viewings</h5>
+                    </div>
+                    <div class="col-auto">
+                        <div class="stat text-primary">
+                            <i class="align-middle" data-feather="calendar"></i>
+                        </div>
+                    </div>
+                </div>
+                <h1 class="mt-1 mb-3">{{ $totalViewings ?? 0 }}</h1>
+                <div class="mb-0">
+                    <a href="{{ route('dealer.schedule-viewings.index') }}" class="text-muted">View all viewings</a>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="row">
