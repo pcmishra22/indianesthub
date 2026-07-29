@@ -49,6 +49,17 @@
                     </div>
                     <div class="col-12">
                         <div class="form-check">
+                            <input type="hidden" name="is_active" value="0">
+                            <input class="form-check-input" type="checkbox" name="is_active" id="is_active" value="1"
+                                {{ old('is_active', $project->is_active ?? true) ? 'checked' : '' }}>
+                            <label class="form-check-label" for="is_active">
+                                Active (visible on the public website)
+                            </label>
+                            <div class="form-text">Uncheck to temporarily hide this project from the public site without deleting it.</div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="form-check">
                             <input type="hidden" name="is_featured" value="0">
                             <input class="form-check-input" type="checkbox" name="is_featured" id="is_featured" value="1"
                                 {{ old('is_featured', $project->is_featured ?? false) ? 'checked' : '' }}>

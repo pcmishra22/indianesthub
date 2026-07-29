@@ -67,6 +67,7 @@ class ProjectController extends Controller
             'amenity_ids.*'      => ['integer', 'exists:amenities,id'],
             'rera_id'            => ['nullable', 'string', 'max:100'],
             'is_featured'        => ['boolean'],
+            'is_active'          => ['boolean'],
             // Location intelligence
             'latitude'           => ['nullable', 'numeric'],
             'longitude'          => ['nullable', 'numeric'],
@@ -110,6 +111,7 @@ class ProjectController extends Controller
         $validated = $request->validate($this->projectValidationRules());
         $validated['builder_id']  = $this->builder()->id;
         $validated['is_featured'] = $request->boolean('is_featured');
+        $validated['is_active']   = $request->boolean('is_active');
 
         // Remove file/relation fields from mass-assignment
         $amenityIds = $request->input('amenity_ids', []);
@@ -176,6 +178,7 @@ class ProjectController extends Controller
 
         $validated = $request->validate($this->projectValidationRules());
         $validated['is_featured'] = $request->boolean('is_featured');
+        $validated['is_active']   = $request->boolean('is_active');
 
         $amenityIds = $request->input('amenity_ids', []);
         unset($validated['cover_image'], $validated['master_plan'], $validated['brochure'],
