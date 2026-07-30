@@ -186,7 +186,149 @@ function apiWatchlist(): array
 
     if (!is_dir(STORAGE)) mkdir(STORAGE, 0755, true);
     file_put_contents($cacheFile, json_encode($result));
+
+    // Persist a day-wise snapshot of these Buy/Sell counts — the KPI cards
+    // at the top of the Watchlist tab used to be live-only (recalculated
+    // from scratch every 5 minutes, nothing kept from one check to the
+    // next), so there was no way to answer "what did the report say
+    // yesterday?" at all. This writes today's Buy/Sell stocks (with the
+    // price each was first flagged at, and the latest price/signal seen)
+    // into a file namespaced by today's date, so a person can come back
+    // later today, or on any future day, and see exactly what was flagged
+    // and how it played out. New calendar day = new file, so this always
+    // starts fresh at 1 without any special reset logic needed.
+    if (prakashIsMarketHours()) {
+        saveWatchlistDailySnapshot($buyList, $sellList, getCurrentUser());
+    }
+
     return $result;
+}
+
+// ── Watchlist Signal Report: day-wise persistence ──────────────────────
+// One file per user per calendar day (mirrors prakashDailyFile's naming
+// scheme). Records, for every stock currently classified Buy or Sell by
+// the main Watchlist scan: the price it was FIRST flagged at today (so
+// "given at ₹X" never changes once set) and the latest price/signal seen
+// (so you can tell whether it's still active, moved favorably, or has
+// since flipped to Hold/the other side).
+function watchlistDailyFile(?string $username = null, ?string $date = null): string
+{
+    $date = $date ?: date('Y-m-d');
+    if ($username) {
+        $prefix = getUserDataDir() . '/' . preg_replace('/[^a-z0-9._-]/i', '_', trim($username));
+        return $prefix . '_watchlist_daily_' . $date . '.json';
+    }
+    return getStorageBasePath() . '/watchlist_daily_' . $date . '.json';
+}
+
+function loadWatchlistDaily(string $path): array
+{
+    if (!file_exists($path)) return ['date' => date('Y-m-d'), 'buy' => [], 'sell' => []];
+    $decoded = json_decode((string)file_get_contents($path), true);
+    if (!is_array($decoded)) return ['date' => date('Y-m-d'), 'buy' => [], 'sell' => []];
+    return [
+        'date' => $decoded['date'] ?? date('Y-m-d'),
+        'buy'  => is_array($decoded['buy'] ?? null) ? $decoded['buy'] : [],
+        'sell' => is_array($decoded['sell'] ?? null) ? $decoded['sell'] : [],
+    ];
+}
+
+function saveWatchlistDaily(array $daily, string $path): void
+{
+    $base = getStorageBasePath();
+    if (!is_dir($base)) mkdir($base, 0755, true);
+    file_put_contents($path, json_encode($daily, JSON_PRETTY_PRINT));
+}
+
+function saveWatchlistDailySnapshot(array $buyList, array $sellList, ?string $username = null): void
+{
+    $path = watchlistDailyFile($username);
+    $todayStr = date('Y-m-d');
+    $daily = loadWatchlistDaily($path);
+    // New calendar day → start completely fresh (no carryover from
+    // yesterday's Buy/Sell entries).
+    if (($daily['date'] ?? '') !== $todayStr) {
+        $daily = ['date' => $todayStr, 'buy' => [], 'sell' => []];
+    }
+
+    $now = date('Y-m-d H:i:s');
+    $apply = function (array $list, string $bucket) use (&$daily, $now) {
+        $seenSymbols = [];
+        foreach ($list as $s) {
+            $symbol = (string)($s['symbol'] ?? '');
+            if ($symbol === '') continue;
+            $seenSymbols[] = $symbol;
+            $price = (float)($s['price'] ?? 0);
+            if (!isset($daily[$bucket][$symbol])) {
+                // First time this stock was flagged in this bucket today —
+                // lock in its "given at" price permanently.
+                $daily[$bucket][$symbol] = [
+                    'first_price' => $price,
+                    'first_seen'  => $now,
+                    'last_price'  => $price,
+                    'last_seen'   => $now,
+                    'still_active'=> true,
+                ];
+            } else {
+                $daily[$bucket][$symbol]['last_price'] = $price;
+                $daily[$bucket][$symbol]['last_seen'] = $now;
+                $daily[$bucket][$symbol]['still_active'] = true;
+            }
+        }
+        // Anything that WAS in this bucket earlier today but isn't in the
+        // current scan any more has moved to Hold/the other side — keep
+        // its historical row (don't delete it, that's exactly the kind of
+        // silent data loss this whole report is meant to avoid), just mark
+        // it no longer active so the report can show "no longer Buy".
+        foreach ($daily[$bucket] as $symbol => &$row) {
+            if (!in_array($symbol, $seenSymbols, true)) {
+                $row['still_active'] = false;
+            }
+        }
+        unset($row);
+    };
+    $apply($buyList, 'buy');
+    $apply($sellList, 'sell');
+
+    saveWatchlistDaily($daily, $path);
+}
+
+// Builds the report rows + counts for one day, for the API/report view.
+function watchlistDailyReport(?string $username = null, ?string $date = null): array
+{
+    $date = $date ?: date('Y-m-d');
+    $path = watchlistDailyFile($username, $date);
+    $daily = loadWatchlistDaily($path);
+    $rows = [];
+    foreach (['buy' => 'Buy', 'sell' => 'Sell'] as $bucket => $sideLabel) {
+        foreach (($daily[$bucket] ?? []) as $symbol => $row) {
+            $first = (float)($row['first_price'] ?? 0);
+            $last = (float)($row['last_price'] ?? $first);
+            $rows[] = [
+                'symbol' => $symbol,
+                'side' => $sideLabel,
+                'given_price' => $first,
+                'last_price' => $last,
+                'gap_pct' => $first > 0 ? round((($last - $first) / $first) * 100, 2) : null,
+                'first_seen' => $row['first_seen'] ?? null,
+                'last_seen' => $row['last_seen'] ?? null,
+                'still_active' => (bool)($row['still_active'] ?? false),
+            ];
+        }
+    }
+    usort($rows, fn($a, $b) => [$a['side'], $a['symbol']] <=> [$b['side'], $b['symbol']]);
+    $buyRows = array_values(array_filter($rows, fn($r) => $r['side'] === 'Buy'));
+    $sellRows = array_values(array_filter($rows, fn($r) => $r['side'] === 'Sell'));
+    return [
+        'date' => $daily['date'] ?? $date,
+        'rows' => $rows,
+        'summary' => [
+            'buy_stocks' => count($buyRows),
+            'sell_stocks' => count($sellRows),
+            'buy_active' => count(array_filter($buyRows, fn($r) => $r['still_active'])),
+            'sell_active' => count(array_filter($sellRows, fn($r) => $r['still_active'])),
+        ],
+    ];
 }
 
 function apiAnalyze(string $symbol): array

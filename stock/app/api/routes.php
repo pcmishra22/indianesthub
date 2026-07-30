@@ -23,6 +23,34 @@ if ($uri === '/api/watchlist') {
     exit;
 }
 
+// ── Watchlist Signal Report: day-wise Buy/Sell counts with "given at"
+// price and current status — see saveWatchlistDailySnapshot() in
+// watchlist.php. Defaults to today; ?date=YYYY-MM-DD reviews any past day.
+if ($uri === '/api/watchlist/daily') {
+    header('Content-Type: application/json');
+    $date = $_GET['date'] ?? date('Y-m-d');
+    try { echo json_encode(watchlistDailyReport(getCurrentUser(), $date)); }
+    catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
+    exit;
+}
+
+// ── List every date that has a saved Watchlist Signal Report ──────────
+if ($uri === '/api/watchlist/daily/dates') {
+    header('Content-Type: application/json');
+    $username = getCurrentUser();
+    $prefix = $username ? preg_replace('/[^a-z0-9._-]/i', '_', trim($username)) . '_' : '';
+    $dir = $username ? (getStorageBasePath() . '/users_data') : getStorageBasePath();
+    $files = glob($dir . '/' . $prefix . 'watchlist_daily_*.json') ?: [];
+    $dates = [];
+    foreach ($files as $f) {
+        preg_match('/watchlist_daily_(\d{4}-\d{2}-\d{2})\.json$/', $f, $m);
+        if ($m[1] ?? null) $dates[] = $m[1];
+    }
+    rsort($dates);
+    echo json_encode(['dates' => $dates]);
+    exit;
+}
+
 if ($uri === '/api/analyze' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json');
     $sym = strtoupper(trim($_POST['symbol'] ?? ''));

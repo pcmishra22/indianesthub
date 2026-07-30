@@ -639,6 +639,23 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div id="combinedEodTable" style="font-size:14px"><div style="color:var(--muted)">Loading…</div></div>
   </div>
 
+  <!-- Watchlist Signal Report: day-wise Buy/Sell counts from the main
+       Watchlist tab's KPI cards (Watchlist/Buy Signals/Sell Signals) — this
+       used to be a live-only snapshot with no history at all, so "what did
+       it say yesterday" had no answer. Uses the SAME date picker above the
+       Momentum+AI log so both sections always show the same selected day. -->
+  <div class="panel" id="watchlistSignalPanel" style="margin-bottom:16px;padding:14px 16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+      <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0">📋 Watchlist Signal Report</h3>
+      <div id="wlDailySummary" style="font-size:14px;color:var(--muted)"></div>
+    </div>
+    <div class="kpi-row" id="wlDailyKpis" style="display:none;margin-bottom:12px">
+      <div class="kpi green"><div class="kpi-label">Buy Signals</div><div class="kpi-val" id="wlDailyBuy">—</div><div class="kpi-sub" id="wlDailyBuySub">given today</div></div>
+      <div class="kpi red"><div class="kpi-label">Sell Signals</div><div class="kpi-val" id="wlDailySell">—</div><div class="kpi-sub" id="wlDailySellSub">given today</div></div>
+    </div>
+    <div id="wlDailyTable" style="font-size:14px"><div style="color:var(--muted)">Loading…</div></div>
+  </div>
+
   <!-- Summary KPI row -->
   <div id="eodSummary" style="display:none;margin-bottom:16px">
     <div class="kpi-row">
@@ -2868,9 +2885,81 @@ function downloadCombinedEodReport(){
   URL.revokeObjectURL(url);
 }
 
+// ── Watchlist Signal Report: day-wise view of the Watchlist tab's own
+// Buy/Sell KPI cards. Backed by /api/watchlist/daily (see
+// saveWatchlistDailySnapshot() in app/api/watchlist.php). Independent of
+// the Momentum+AI log above — this reflects the broader signals.php
+// classification across the whole tracked watchlist, not just the
+// headline momentum picks.
+function wlDailyRowHtml(r){
+  const isBuy=r.side==='Buy';
+  const sideColor=isBuy?'var(--green)':'var(--red)';
+  const gap=r.gap_pct;
+  const favorable = gap===null||gap===undefined ? true : (isBuy?gap>=0:gap<=0);
+  const gapColor=favorable?'var(--green)':'var(--red)';
+  const gapStr = (gap===null||gap===undefined) ? '—' : `${gap>=0?'+':''}${fmtNum(gap)}%`;
+  const statusText = r.still_active ? `Still ${r.side}` : 'No longer active';
+  const statusColor = r.still_active ? sideColor : 'var(--muted)';
+  return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-weight:700;color:#fff">${escHtml(r.symbol)}</span>
+      <span style="font-size:12px;font-weight:700;color:${sideColor};text-transform:uppercase">${r.side}</span>
+    </div>
+    <div style="font-size:13px;color:var(--muted2)">Given @ ₹${fmtNum(r.given_price)}${r.first_seen?' <span style="color:var(--muted)">'+escHtml(r.first_seen.split(' ')[1]||'')+'</span>':''}</div>
+    <div style="font-size:13px;color:${gapColor};font-weight:700">Now ₹${fmtNum(r.last_price)} (${gapStr})</div>
+    <div style="font-size:12px;color:${statusColor};font-weight:600">${statusText}</div>
+  </div>`;
+}
+
+let _lastWlDaily = null;
+async function loadWatchlistDailyReport(date){
+  const tableEl=document.getElementById('wlDailyTable');
+  const summaryEl=document.getElementById('wlDailySummary');
+  const kpiEl=document.getElementById('wlDailyKpis');
+  if(!tableEl) return;
+  tableEl.innerHTML='<div style="color:var(--muted)">Loading…</div>';
+  try{
+    const url=apiUrl('api/watchlist/daily')+(date?'?date='+encodeURIComponent(date):'');
+    const r=await fetch(url);
+    const d=await r.json();
+    _lastWlDaily=d;
+    if(d.error){ tableEl.innerHTML=`<div class="err-box">${escHtml(d.error)}</div>`; return; }
+    const rows=d.rows||[];
+    const s=d.summary||{};
+    if(summaryEl){
+      summaryEl.innerHTML = rows.length
+        ? `<strong style="color:#fff">${s.buy_stocks||0} buy</strong> / <strong style="color:#fff">${s.sell_stocks||0} sell</strong> signals on ${escHtml(d.date||date||'this date')}`
+        : '';
+    }
+    if(kpiEl){
+      if(rows.length){
+        kpiEl.style.display='';
+        document.getElementById('wlDailyBuy').textContent=s.buy_stocks||0;
+        document.getElementById('wlDailyBuySub').textContent=`${s.buy_active||0} still active`;
+        document.getElementById('wlDailySell').textContent=s.sell_stocks||0;
+        document.getElementById('wlDailySellSub').textContent=`${s.sell_active||0} still active`;
+      } else {
+        kpiEl.style.display='none';
+      }
+    }
+    if(rows.length===0){
+      tableEl.innerHTML='<div style="color:var(--muted);padding:16px;text-align:center">No Watchlist Buy/Sell signals logged for this date yet.</div>';
+      return;
+    }
+    const buyRows=rows.filter(r=>r.side==='Buy');
+    const sellRows=rows.filter(r=>r.side==='Sell');
+    tableEl.innerHTML =
+      (buyRows.length? `<div style="font-size:13px;color:var(--muted);margin:8px 0 4px">📈 Buy (${buyRows.length})</div>${buyRows.map(wlDailyRowHtml).join('')}` : '') +
+      (sellRows.length? `<div style="font-size:13px;color:var(--muted);margin:8px 0 4px">📉 Sell (${sellRows.length})</div>${sellRows.map(wlDailyRowHtml).join('')}` : '');
+  }catch(e){
+    tableEl.innerHTML=`<div class="err-box">Error: ${escHtml(e.message)}</div>`;
+  }
+}
+
 async function loadEodReport(date){
   eodLoaded=true;
   loadCombinedEodReport(date||''); // Prakash + AI recommendation log, independent of the signal-tracker table below
+  loadWatchlistDailyReport(date||''); // Watchlist tab's own Buy/Sell signal report, same selected date
   // Load available dates into picker
   try{
     const dr=await fetch(apiUrl('api/eod/dates'));

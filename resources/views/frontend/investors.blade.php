@@ -273,40 +273,109 @@
   {{-- ══════════════════════════════════════
        FOUNDER
   ══════════════════════════════════════ --}}
-  <section style="padding:60px 0;">
-    <div class="container">
-      <div class="text-center mb-4">
+  <section style="padding:70px 0; background:#f8fafc;">
+    <div class="container-xl">
+      <div class="text-center mb-5">
         <span style="color:#0078d4; font-weight:700; font-size:.8rem; letter-spacing:1px; text-transform:uppercase;">Leadership</span>
         <h2 style="font-weight:800; color:#0a2d5e; margin:8px 0;">Meet the Founder</h2>
       </div>
-      <div class="row justify-content-center">
-        <div class="col-lg-6">
-          <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; padding:32px; display:flex; gap:20px; align-items:flex-start;">
-            <div style="width:72px; height:72px; border-radius:50%; background:#0a2d5e; color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.6rem; flex-shrink:0;">
-              <i class="bi bi-person-fill"></i>
+
+      <div style="background:#fff; border-radius:20px; padding:44px; box-shadow:0 10px 40px rgba(10,45,94,.10);">
+        <div class="row g-5">
+
+          {{-- LEFT: identity + bio + companies --}}
+          <div class="col-lg-7">
+            <div class="d-flex flex-column flex-md-row gap-4 align-items-start mb-3">
+              <div style="width:90px; height:90px; min-width:90px; border-radius:50%; background:linear-gradient(135deg,#0a2d5e 0%,#0078d4 100%); color:#fff; display:flex; align-items:center; justify-content:center; font-size:1.8rem; font-weight:800; box-shadow:0 6px 16px rgba(10,45,94,.25);">
+                PM
+              </div>
+              <div>
+                <h4 style="font-weight:700; color:#0a2d5e; margin-bottom:2px; font-size:1.3rem;">Prakash Chandra Mishra</h4>
+                <p style="color:#0078d4; font-size:.9rem; font-weight:600; margin-bottom:14px;">Founder &amp; CEO, {{ config('app.name') }}</p>
+
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                  <span style="background:#eef4fb; color:#0a2d5e; padding:6px 14px; border-radius:20px; font-size:.78rem; font-weight:700;">
+                    <i class="bi bi-briefcase me-1"></i> 18+ Years Experience
+                  </span>
+                  <span style="background:#eef4fb; color:#0a2d5e; padding:6px 14px; border-radius:20px; font-size:.78rem; font-weight:700;">
+                    <i class="bi bi-people me-1"></i> Engineering Team Leadership
+                  </span>
+                  <span style="background:#eef4fb; color:#0a2d5e; padding:6px 14px; border-radius:20px; font-size:.78rem; font-weight:700;">
+                    <i class="bi bi-diagram-3 me-1"></i> Microservices &amp; Cloud Architecture
+                  </span>
+                </div>
+              </div>
             </div>
-            <div>
-              <h4 style="font-weight:700; color:#0a2d5e; margin-bottom:2px;">Prakash Chandra Mishra</h4>
-              <p style="color:#0078d4; font-size:.85rem; font-weight:600; margin-bottom:10px;">Founder &amp; CEO, {{ config('app.name') }}</p>
-              <p style="color:#64748b; font-size:.9rem; line-height:1.7;">
-                Prakash is a full-stack technologist and engineering leader with 18+ years architecting and
-                scaling web platforms for global companies including GoDaddy, Carsome, Motorola Mobility,
-                360Alumni and Lavu (MenuDrive). He has led cross-functional engineering teams, designed
-                microservices architectures, and shipped production systems spanning PHP/Laravel, Node.js,
-                Go and modern cloud infrastructure — the same technical foundation {{ config('app.name') }}
-                is built on. From real-time POS systems to enterprise CRM platforms for U.S. institutions,
-                his focus has stayed constant: software that's fast, reliable, and built to scale.
-                <!-- TODO(Prakash): replace this bridging line with your own specific reason for starting
-                     {{ config('app.name') }} — investors respond strongly to an authentic personal "why". -->
-                After years building mission-critical systems for other companies, he set out to bring that
-                same engineering discipline to India's real estate market — building {{ config('app.name') }}
-                as the platform he wished existed for dealers, builders and buyers alike.
-              </p>
-              <a href="https://www.linkedin.com/in/pcmishra22/" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:6px; margin-top:12px; color:#0078d4; font-size:.85rem; font-weight:600; text-decoration:none;">
-                <i class="bi bi-linkedin"></i> Connect on LinkedIn
-              </a>
+
+            <p style="color:#64748b; font-size:.92rem; line-height:1.75; margin-bottom:20px;">
+              Prakash is a full-stack technologist and engineering leader who has architected and scaled
+              web platforms for global companies across two decades. He has led cross-functional engineering
+              teams, designed microservices architectures, and shipped production systems spanning
+              PHP/Laravel, Node.js, Go and modern cloud infrastructure — the same technical foundation
+              {{ config('app.name') }} is built on. From real-time POS systems to enterprise CRM platforms
+              for U.S. institutions, his focus has stayed constant: software that's fast, reliable, and
+              built to scale.
+              <!-- TODO(Prakash): replace this bridging line with your own specific reason for starting
+                   {{ config('app.name') }} — investors respond strongly to an authentic personal "why". -->
+              After years building mission-critical systems for other companies, he set out to bring that
+              same engineering discipline to India's real estate market — building {{ config('app.name') }}
+              as the platform he wished existed for dealers, builders and buyers alike.
+            </p>
+
+            <p style="color:#94a3b8; font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px;">
+              Previously Built Platforms For
+            </p>
+            <div class="d-flex flex-wrap gap-2 mb-4">
+              @foreach(['GoDaddy', 'Carsome', 'Motorola Mobility', '360Alumni', 'Lavu (MenuDrive)'] as $company)
+                <span style="background:#fff; border:1px solid #e2e8f0; color:#334155; padding:7px 16px; border-radius:8px; font-size:.82rem; font-weight:600;">
+                  <i class="bi bi-building me-1" style="color:#0078d4;"></i>{{ $company }}
+                </span>
+              @endforeach
+            </div>
+
+            <a href="https://www.linkedin.com/in/pcmishra22/" target="_blank" rel="noopener"
+               style="display:inline-flex; align-items:center; gap:6px; background:#0a2d5e; color:#fff; padding:9px 18px; border-radius:8px; font-size:.85rem; font-weight:700; text-decoration:none;">
+              <i class="bi bi-linkedin"></i> Connect on LinkedIn
+            </a>
+          </div>
+
+          {{-- RIGHT: technologies & skills panel --}}
+          <div class="col-lg-5">
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; padding:28px; height:100%;">
+              <h6 style="font-weight:800; color:#0a2d5e; margin-bottom:16px; font-size:.95rem;">
+                <i class="bi bi-code-slash me-1"></i> Technologies &amp; Skills
+              </h6>
+
+              <p style="color:#94a3b8; font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px;">Backend</p>
+              <div class="d-flex flex-wrap gap-2 mb-3">
+                @foreach(['PHP', 'Laravel', 'Node.js', 'Go', 'Ruby on Rails', 'Python'] as $tech)
+                  <span style="background:#0a2d5e; color:#fff; padding:5px 13px; border-radius:6px; font-size:.76rem; font-weight:600;">{{ $tech }}</span>
+                @endforeach
+              </div>
+
+              <p style="color:#94a3b8; font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px;">Frontend</p>
+              <div class="d-flex flex-wrap gap-2 mb-3">
+                @foreach(['React.js', 'Vue.js', 'TypeScript', 'Angular.js'] as $tech)
+                  <span style="background:#0078d4; color:#fff; padding:5px 13px; border-radius:6px; font-size:.76rem; font-weight:600;">{{ $tech }}</span>
+                @endforeach
+              </div>
+
+              <p style="color:#94a3b8; font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px;">Infrastructure &amp; Data</p>
+              <div class="d-flex flex-wrap gap-2 mb-3">
+                @foreach(['Docker', 'Kubernetes', 'AWS', 'MySQL', 'MongoDB', 'Redis'] as $tech)
+                  <span style="background:#334155; color:#fff; padding:5px 13px; border-radius:6px; font-size:.76rem; font-weight:600;">{{ $tech }}</span>
+                @endforeach
+              </div>
+
+              <p style="color:#94a3b8; font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px;">Messaging &amp; APIs</p>
+              <div class="d-flex flex-wrap gap-2">
+                @foreach(['RabbitMQ', 'Kafka', 'REST/GraphQL', '50+ API Integrations'] as $tech)
+                  <span style="background:#fff; border:1px solid #cbd5e1; color:#334155; padding:5px 13px; border-radius:6px; font-size:.76rem; font-weight:600;">{{ $tech }}</span>
+                @endforeach
+              </div>
             </div>
           </div>
+
         </div>
       </div>
     </div>
