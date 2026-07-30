@@ -92,4 +92,39 @@ class ServiceProvider extends Authenticatable
     {
         return $this->business_name ?: $this->full_name;
     }
+
+    /**
+     * All reviews for this provider (any status). Use approvedReviews() for
+     * public-facing display — reviews default to 'pending' until an admin
+     * approves them, same moderation pattern used for property/agent reviews.
+     */
+    public function reviews()
+    {
+        return $this->hasMany(Review::class);
+    }
+
+    public function approvedReviews()
+    {
+        return $this->reviews()->where('status', 'approved');
+    }
+
+    public function getAverageRatingAttribute(): float
+    {
+        return round((float) $this->approvedReviews()->avg('rating'), 1);
+    }
+
+    public function getReviewsCountAttribute(): int
+    {
+        return $this->approvedReviews()->count();
+    }
+
+    public function portfolios()
+    {
+        return $this->hasMany(ServiceProviderPortfolio::class)->orderBy('sort_order');
+    }
+
+    public function leads()
+    {
+        return $this->hasMany(ServiceProviderLead::class);
+    }
 }

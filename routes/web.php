@@ -245,6 +245,9 @@ Route::get('/services/{category:slug}',
 Route::get('/professionals/{provider:slug}',
     [\App\Http\Controllers\Frontend\ServicePublicController::class, 'profile'])
     ->name('services.profile');
+Route::post('/professionals/{provider:slug}/contact-click',
+    [\App\Http\Controllers\Frontend\ServicePublicController::class, 'recordContactClick'])
+    ->name('services.contact-click');
 
 Route::get('/real-estate-agents-in-{city}',
     [\App\Http\Controllers\Frontend\SeoLandingController::class, 'agentsInCity'])
@@ -588,6 +591,10 @@ Route::prefix('service-provider')->middleware('auth:service_provider')->name('se
     Route::get('/dashboard', [\App\Http\Controllers\ServiceProvider\ServiceProviderDashboardController::class, 'index'])->name('dashboard');
     Route::get('/profile', [\App\Http\Controllers\ServiceProvider\ServiceProviderDashboardController::class, 'editProfile'])->name('profile');
     Route::put('/profile', [\App\Http\Controllers\ServiceProvider\ServiceProviderDashboardController::class, 'updateProfile'])->name('profile.update');
+
+    Route::get('/portfolio', [\App\Http\Controllers\ServiceProvider\PortfolioController::class, 'index'])->name('portfolio.index');
+    Route::post('/portfolio', [\App\Http\Controllers\ServiceProvider\PortfolioController::class, 'store'])->name('portfolio.store');
+    Route::delete('/portfolio/{portfolio}', [\App\Http\Controllers\ServiceProvider\PortfolioController::class, 'destroy'])->name('portfolio.destroy');
 });
 
 /*

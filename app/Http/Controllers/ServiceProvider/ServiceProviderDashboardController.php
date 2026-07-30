@@ -13,7 +13,16 @@ class ServiceProviderDashboardController extends Controller
     public function index()
     {
         $provider = Auth::guard('service_provider')->user()->load('categories');
-        return view('service-provider.dashboard', compact('provider'));
+
+        $leadsReceived = $provider->leads()->count();
+        $reviewsCount = $provider->reviews_count;
+        $averageRating = $provider->average_rating;
+        $recentReviews = $provider->approvedReviews()->with('user')->latest()->take(5)->get();
+        $portfolioCount = $provider->portfolios()->count();
+
+        return view('service-provider.dashboard', compact(
+            'provider', 'leadsReceived', 'reviewsCount', 'averageRating', 'recentReviews', 'portfolioCount'
+        ));
     }
 
     public function editProfile()

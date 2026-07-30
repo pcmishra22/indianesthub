@@ -51,6 +51,12 @@
 						</a>
 					</li>
 
+					<li class="sidebar-item {{ request()->routeIs('service-provider.portfolio.*') ? 'active' : '' }}">
+						<a class="sidebar-link" href="{{ route('service-provider.portfolio.index') }}">
+							<i class="align-middle" data-feather="image"></i> <span class="align-middle">Portfolio</span>
+						</a>
+					</li>
+
 					<li class="sidebar-item">
 						<a class="sidebar-link" href="{{ route('home') }}" target="_blank">
 							<i class="align-middle" data-feather="globe"></i> <span class="align-middle">Visit Website</span>

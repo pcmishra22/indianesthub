@@ -87,30 +87,57 @@
                 <div class="col-6 col-md-3">
                     <div class="card border-0 shadow-sm text-center p-3 h-100">
                         <i class="bi bi-people fs-4 text-primary mb-1"></i>
-                        <div class="fs-4 fw-bold">0</div>
+                        <div class="fs-4 fw-bold">{{ $leadsReceived }}</div>
                         <div class="small text-muted">Leads Received</div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="card border-0 shadow-sm text-center p-3 h-100">
                         <i class="bi bi-eye fs-4 text-primary mb-1"></i>
-                        <div class="fs-4 fw-bold">0</div>
+                        <div class="fs-4 fw-bold">{{ $provider->views_count }}</div>
                         <div class="small text-muted">Profile Views</div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="card border-0 shadow-sm text-center p-3 h-100">
-                        <i class="bi bi-tools fs-4 text-primary mb-1"></i>
-                        <div class="fs-4 fw-bold">{{ $provider->categories->count() }}</div>
-                        <div class="small text-muted">Services Listed</div>
+                        <i class="bi bi-star-fill fs-4 text-warning mb-1"></i>
+                        <div class="fs-4 fw-bold">{{ $averageRating > 0 ? $averageRating : '—' }}</div>
+                        <div class="small text-muted">{{ $reviewsCount }} {{ \Illuminate\Support\Str::plural('Review', $reviewsCount) }}</div>
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="card border-0 shadow-sm text-center p-3 h-100">
-                        <i class="bi bi-patch-check fs-4 {{ $provider->is_verified ? 'text-success' : 'text-muted' }} mb-1"></i>
-                        <div class="fs-4 fw-bold">{{ $provider->is_verified ? 'Yes' : 'No' }}</div>
-                        <div class="small text-muted">Verified Badge</div>
+                        <i class="bi bi-images fs-4 text-primary mb-1"></i>
+                        <div class="fs-4 fw-bold">{{ $portfolioCount }}</div>
+                        <div class="small text-muted">Portfolio Items</div>
                     </div>
+                </div>
+            </div>
+
+            {{-- Recent Reviews --}}
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold mb-0">Recent Reviews</h6>
+                        <a href="{{ route('service-provider.portfolio.index') }}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-images me-1"></i> Manage Portfolio
+                        </a>
+                    </div>
+                    @forelse($recentReviews as $review)
+                        <div class="d-flex justify-content-between border-bottom py-2">
+                            <div>
+                                <div class="mb-1">
+                                    @for($i = 1; $i <= 5; $i++)
+                                        <i class="bi bi-star{{ $i <= $review->rating ? '-fill text-warning' : ' text-muted' }}"></i>
+                                    @endfor
+                                </div>
+                                <p class="small mb-0">{{ \Illuminate\Support\Str::limit($review->review_text, 120) }}</p>
+                                <p class="small text-muted mb-0">— {{ $review->user->name ?? 'Anonymous' }}</p>
+                            </div>
+                        </div>
+                    @empty
+                        <p class="text-muted small mb-0">No approved reviews yet. Reviews from customers will show here once approved.</p>
+                    @endforelse
                 </div>
             </div>
 

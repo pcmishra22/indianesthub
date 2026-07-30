@@ -22,6 +22,9 @@
     .chart-wrap { position: relative; height: 220px; }
     .tab-pane .table th { font-size: 0.78rem; text-transform: uppercase; color: #6b7280; }
     .tab-pane .table td { font-size: 0.83rem; vertical-align: middle; }
+    .jump-to-tab { display: block; cursor: pointer; }
+    .jump-to-tab .card { transition: transform .12s ease, box-shadow .12s ease; }
+    .jump-to-tab:hover .card { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.08) !important; }
 </style>
 @endsection
 
@@ -78,22 +81,26 @@
         </div>
     </div>
     <div class="col-6 col-lg-3">
-        <div class="card kpi-card purple h-100 shadow-sm">
-            <div class="card-body py-3">
-                <div class="kpi-sub">Property Views</div>
-                <div class="kpi-val" style="color:#8b5cf6;">{{ number_format($kpi['property_views']) }}</div>
-                <small class="text-muted">Today: <strong>{{ $kpi['property_views_today'] }}</strong></small>
+        <a href="#tab-visitor-log" class="text-decoration-none jump-to-tab" data-tab="#tab-visitor-log">
+            <div class="card kpi-card purple h-100 shadow-sm">
+                <div class="card-body py-3">
+                    <div class="kpi-sub">Property Views <i data-feather="arrow-down-circle" style="width:12px;height:12px;" class="text-muted"></i></div>
+                    <div class="kpi-val" style="color:#8b5cf6;">{{ number_format($kpi['property_views']) }}</div>
+                    <small class="text-muted">Today: <strong>{{ $kpi['property_views_today'] }}</strong> &middot; click to see the pages</small>
+                </div>
             </div>
-        </div>
+        </a>
     </div>
     <div class="col-6 col-lg-3">
-        <div class="card kpi-card orange h-100 shadow-sm">
-            <div class="card-body py-3">
-                <div class="kpi-sub">Unique Visitors</div>
-                <div class="kpi-val text-warning">{{ number_format($kpi['unique_visitors']) }}</div>
-                <small class="text-muted">By session</small>
+        <a href="#tab-visitor-log" class="text-decoration-none jump-to-tab" data-tab="#tab-visitor-log">
+            <div class="card kpi-card orange h-100 shadow-sm">
+                <div class="card-body py-3">
+                    <div class="kpi-sub">Unique Visitors <i data-feather="arrow-down-circle" style="width:12px;height:12px;" class="text-muted"></i></div>
+                    <div class="kpi-val text-warning">{{ number_format($kpi['unique_visitors']) }}</div>
+                    <small class="text-muted">By session &middot; click to see the list</small>
+                </div>
             </div>
-        </div>
+        </a>
     </div>
 </div>
 
@@ -459,6 +466,26 @@
 @section('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
+// ── Jump-to-tab stat cards: activate the right tab and scroll it into view ──
+function activateReportTab(targetSelector) {
+    const btn = document.querySelector(`#leadTabs button[data-bs-target="${targetSelector}"]`);
+    if (!btn) return;
+    bootstrap.Tab.getOrCreateInstance(btn).show();
+    document.querySelector('#leadTabs').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+document.querySelectorAll('.jump-to-tab').forEach(function (el) {
+    el.addEventListener('click', function (e) {
+        e.preventDefault();
+        activateReportTab(this.dataset.tab);
+    });
+});
+
+// Support deep-linking / bookmarking a direct link to a tab, e.g. ...#tab-visitor-log
+if (window.location.hash) {
+    activateReportTab(window.location.hash);
+}
+
 // ── Activity Line Chart ────────────────────────────────────────────────────
 const ctx1 = document.getElementById('activityChart').getContext('2d');
 new Chart(ctx1, {

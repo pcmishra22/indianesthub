@@ -98,10 +98,47 @@ class ServicePublicController extends Controller
     }
 
     /** /professionals/{provider} — public profile with login-gate contact */
-    public function profile(ServiceProvider $provider)
+    public function profile(ServiceProvider $provider, Request $request)
     {
         if ($provider->status !== 'approved') abort(404);
-        $provider->load('categories');
-        return view('frontend.services.profile', compact('provider'));
+        $provider->load('categories', 'portfolios');
+
+        // Basic session-deduped view counting — one increment per visitor per
+        // provider per session, so refreshes/back-and-forth browsing don't
+        // inflate the count. (A simpler approach than the bot-aware
+        // PropertyView system used for property listings — good enough for
+        // a first version here.)
+        $seenKey = 'viewed_service_providers';
+        $seen = $request->session()->get($seenKey, []);
+        if (!in_array($provider->id, $seen)) {
+            $provider->increment('views_count');
+            $seen[] = $provider->id;
+            $request->session()->put($seenKey, $seen);
+        }
+
+        $reviews = $provider->approvedReviews()->with('user')->latest()->paginate(10);
+
+        return view('frontend.services.profile', compact('provider', 'reviews'));
+    }
+
+    /**
+     * Record a lead when a logged-in visitor reveals/clicks Call or WhatsApp
+     * contact on a provider's profile — this is what the provider's dashboard
+     * "Leads Received" stat counts. AJAX-friendly: returns 204 either way so
+     * it never blocks the actual tel:/wa.me navigation.
+     */
+    public function recordContactClick(ServiceProvider $provider, Request $request)
+    {
+        $request->validate(['contact_method' => 'required|in:call,whatsapp']);
+
+        if (\Illuminate\Support\Facades\Auth::check()) {
+            \App\Models\ServiceProviderLead::create([
+                'service_provider_id' => $provider->id,
+                'user_id'             => \Illuminate\Support\Facades\Auth::id(),
+                'contact_method'      => $request->contact_method,
+            ]);
+        }
+
+        return response()->noContent();
     }
 }
