@@ -1485,10 +1485,22 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
     $dailyPath = prakashDailyFile($username);
     $daily = loadPrakashDaily($dailyPath);
     $todayStr = date('Y-m-d');
-    if (($daily['date'] ?? '') !== $todayStr || $isInitial) {
-        // Start a fresh daily log for a new day or a fresh initial iteration.
-        // This keeps the first 9:10 AM recommendations from being mixed with
-        // any previous same-day run that was restarted or replayed.
+    if (($daily['date'] ?? '') !== $todayStr) {
+        // Start a fresh daily log ONLY on a genuine new calendar day.
+        //
+        // IMPORTANT: this used to also reset whenever $isInitial was true
+        // (i.e. whenever the rank-history window looked like "iteration 1").
+        // That was a serious bug: $isInitial goes true not just on the
+        // day's real first refresh, but ANY time the rank-history file
+        // comes back empty/stale/unreadable — which can happen mid-day
+        // from a deploy, a cache clear, a corrupted write, or any other
+        // hiccup unrelated to today's tracked recommendations. Every time
+        // that happened, this branch silently threw away the entire day's
+        // locked-in entry prices and already-achieved targets and started
+        // over from scratch — which is exactly why entries looked like
+        // their "buy at" price kept getting replaced and why achieved
+        // targets never showed up in the report. The date check alone is
+        // both necessary and sufficient for "is this a new day".
         $daily = ['date' => $todayStr, 'recommendations' => [], 'closed' => false];
     }
 

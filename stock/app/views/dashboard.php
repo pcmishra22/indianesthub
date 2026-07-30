@@ -613,6 +613,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <!-- At-a-glance KPIs: what a trader checks first — how many are still
          live, how many won, how many missed, overall hit rate. -->
     <div class="kpi-row" id="combinedEodKpis" style="display:none;margin-bottom:12px">
+      <div class="kpi"><div class="kpi-label">Stocks Recommended</div><div class="kpi-val" id="ceodStocks" style="font-size:1.3rem">—</div><div class="kpi-sub" id="ceodStocksSub">distinct Buy / Sell</div></div>
       <div class="kpi orange"><div class="kpi-label">Open ⏳</div><div class="kpi-val" id="ceodOpen">—</div><div class="kpi-sub">still in play</div></div>
       <div class="kpi green"><div class="kpi-label">Achieved ✅</div><div class="kpi-val" id="ceodAchieved">—</div><div class="kpi-sub">target hit</div></div>
       <div class="kpi red"><div class="kpi-label">Not Achieved ❌</div><div class="kpi-val" id="ceodNotAchieved">—</div><div class="kpi-sub">day closed, missed</div></div>
@@ -2782,11 +2783,24 @@ async function loadCombinedEodReport(date){
       return;
     }
     const rows=d.rows||[];
+    // Distinct stocks per side vs. total rows/entries — computed straight
+    // from the rows we have (not just trusting summary fields) so this
+    // stays correct even against an older cached response. A stock whose
+    // tight intraday target gets hit can re-enter later the same day and
+    // add another row — that's useful row-level detail, but it means
+    // "row count" != "how many distinct stocks were recommended today".
+    const buyStockSet = new Set(rows.filter(r=>r.side==='Buy').map(r=>r.symbol));
+    const sellStockSet = new Set(rows.filter(r=>r.side==='Sell').map(r=>r.symbol));
+    const buyEntries = rows.filter(r=>r.side==='Buy').length;
+    const sellEntries = rows.filter(r=>r.side==='Sell').length;
     if(summaryEl){
       const s=d.summary||{};
       const rate=s.success_rate!==null&&s.success_rate!==undefined?s.success_rate+'%':'—';
       const rc=(s.success_rate||0)>=50?'var(--green)':'var(--red)';
-      summaryEl.innerHTML=rows.length?`<strong style="color:#fff">${s.achieved}/${s.total}</strong> hit · <strong style="color:${rc}">${rate}</strong> · Momentum: ${s.prakash_total} · AI: ${s.ai_total}`:'';
+      const reentryNote = (buyEntries>buyStockSet.size || sellEntries>sellStockSet.size)
+        ? ` <span title="Some stocks hit their target and got a fresh entry later the same day — that's why entry counts can be higher than distinct stocks.">(${buyEntries} buy / ${sellEntries} sell entries incl. re-picks)</span>`
+        : '';
+      summaryEl.innerHTML=rows.length?`<strong style="color:#fff">${buyStockSet.size} buy</strong> / <strong style="color:#fff">${sellStockSet.size} sell</strong> stocks today${reentryNote} · <strong style="color:#fff">${s.achieved}/${s.total}</strong> hit · <strong style="color:${rc}">${rate}</strong> · Momentum: ${s.prakash_total} · AI: ${s.ai_total}`:'';
     }
     if(rows.length===0){
       if(kpiEl) kpiEl.style.display='none';
@@ -2802,6 +2816,12 @@ async function loadCombinedEodReport(date){
     const rate = resolved>0 ? Math.round(achievedCount/resolved*100) : null;
     if(kpiEl){
       kpiEl.style.display='';
+      const stocksEl=document.getElementById('ceodStocks');
+      const stocksSubEl=document.getElementById('ceodStocksSub');
+      if(stocksEl) stocksEl.innerHTML=`<span style="color:var(--green)">${buyStockSet.size}</span> / <span style="color:var(--red)">${sellStockSet.size}</span>`;
+      if(stocksSubEl) stocksSubEl.textContent = (buyEntries+sellEntries) > (buyStockSet.size+sellStockSet.size)
+        ? `distinct Buy / Sell (${buyEntries+sellEntries} entries total)`
+        : 'distinct Buy / Sell';
       document.getElementById('ceodOpen').textContent=openCount;
       document.getElementById('ceodAchieved').textContent=achievedCount;
       document.getElementById('ceodNotAchieved').textContent=notAchievedCount;
@@ -2821,8 +2841,16 @@ async function loadCombinedEodReport(date){
 function downloadCombinedEodReport(){
   const d=_lastCombinedEod;
   if(!d || !d.rows || d.rows.length===0){ alert('No Momentum/AI recommendations for this date yet.'); return; }
+  const buyStockSet=new Set(d.rows.filter(r=>r.side==='Buy').map(r=>r.symbol));
+  const sellStockSet=new Set(d.rows.filter(r=>r.side==='Sell').map(r=>r.symbol));
+  const buyEntries=d.rows.filter(r=>r.side==='Buy').length;
+  const sellEntries=d.rows.filter(r=>r.side==='Sell').length;
+  // Summary line first — "Pick #" in the row data below can make a single
+  // stock that re-hit its target the same day look like several separate
+  // picks, so state the distinct-stock counts up front to avoid confusion.
+  const lines=[`# ${d.date} — ${buyStockSet.size} distinct Buy stocks (${buyEntries} entries), ${sellStockSet.size} distinct Sell stocks (${sellEntries} entries)`];
   const headers=['Date','Engine','Symbol','Pick #','Side','Given By','Entry Price','Current Price','Target Price','Gap %','Status','Achieved Price','Entry Time','Achieved Time'];
-  const lines=[headers.join(',')];
+  lines.push(headers.join(','));
   d.rows.forEach(r=>{
     const label=r.status_label || (r.achieved?'ACHIEVED':(r.final_status==='Not Achieved'?'NOT ACHIEVED':'OPEN'));
     const cur=(r.current_price ?? r.last_checked_price ?? r.entry_price ?? '');

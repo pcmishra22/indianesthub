@@ -289,12 +289,18 @@
               <h4 style="font-weight:700; color:#0a2d5e; margin-bottom:2px;">Prakash Chandra Mishra</h4>
               <p style="color:#0078d4; font-size:.85rem; font-weight:600; margin-bottom:10px;">Founder &amp; CEO, {{ config('app.name') }}</p>
               <p style="color:#64748b; font-size:.9rem; line-height:1.7;">
-                Prakash is a full-stack technologist with 18+ years of experience architecting and leading
-                development for global companies including GoDaddy, Carsome, Motorola Mobility, 360Alumni
-                and Lavu (MenuDrive). He has led engineering teams building scalable, high-performance
-                platforms across PHP/Laravel, Node.js, GOLANG and modern cloud infrastructure — the same
-                technical foundation {{ config('app.name') }} is built on. [Add a line here on what drew you
-                personally to real estate and why you started {{ config('app.name') }}.]
+                Prakash is a full-stack technologist and engineering leader with 18+ years architecting and
+                scaling web platforms for global companies including GoDaddy, Carsome, Motorola Mobility,
+                360Alumni and Lavu (MenuDrive). He has led cross-functional engineering teams, designed
+                microservices architectures, and shipped production systems spanning PHP/Laravel, Node.js,
+                Go and modern cloud infrastructure — the same technical foundation {{ config('app.name') }}
+                is built on. From real-time POS systems to enterprise CRM platforms for U.S. institutions,
+                his focus has stayed constant: software that's fast, reliable, and built to scale.
+                <!-- TODO(Prakash): replace this bridging line with your own specific reason for starting
+                     {{ config('app.name') }} — investors respond strongly to an authentic personal "why". -->
+                After years building mission-critical systems for other companies, he set out to bring that
+                same engineering discipline to India's real estate market — building {{ config('app.name') }}
+                as the platform he wished existed for dealers, builders and buyers alike.
               </p>
               <a href="https://www.linkedin.com/in/pcmishra22/" target="_blank" rel="noopener" style="display:inline-flex; align-items:center; gap:6px; margin-top:12px; color:#0078d4; font-size:.85rem; font-weight:600; text-decoration:none;">
                 <i class="bi bi-linkedin"></i> Connect on LinkedIn

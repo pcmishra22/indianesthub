@@ -356,6 +356,22 @@ if ($uri === '/api/eod/combined') {
 
         $achieved = count(array_filter($rows, fn($r) => !empty($r['achieved'])));
         $total = count($rows);
+
+        // A symbol can legitimately get MORE THAN ONE row the same day —
+        // if its (tight, ~1%) intraday target is hit, a fresh signal on it
+        // later that day opens a brand-new entry ("2nd pick" etc.) rather
+        // than being silently swallowed. That's useful detail in the row
+        // list, but it means "$total" (row count) is NOT the same thing as
+        // "how many stocks were recommended today" — a single hot stock
+        // that re-triggers 4-5 times in one session can make the headline
+        // number look inflated/wrong (e.g. "24 buy" when only ~8 distinct
+        // stocks were actually picked). Report both explicitly so the
+        // numbers are unambiguous instead of conflating the two.
+        $buyRows = array_filter($rows, fn($r) => ($r['side'] ?? '') === 'Buy');
+        $sellRows = array_filter($rows, fn($r) => ($r['side'] ?? '') === 'Sell');
+        $buyStocks = count(array_unique(array_column($buyRows, 'symbol')));
+        $sellStocks = count(array_unique(array_column($sellRows, 'symbol')));
+
         echo json_encode([
             'date' => $date,
             'is_today' => $isToday,
@@ -368,6 +384,13 @@ if ($uri === '/api/eod/combined') {
                 'success_rate' => $total > 0 ? round($achieved / $total * 100, 1) : null,
                 'prakash_total' => count($prakashDaily['recommendations'] ?? []),
                 'ai_total' => count($aiDaily['recommendations'] ?? []),
+                // Distinct-stock counts (what most people mean by "10 buy
+                // and 10 sell today") vs. total rows/entries (which
+                // include re-entries after an earlier target was hit).
+                'buy_entries' => count($buyRows),
+                'sell_entries' => count($sellRows),
+                'buy_stocks' => $buyStocks,
+                'sell_stocks' => $sellStocks,
             ],
         ]);
     } catch (\Throwable $e) { echo json_encode(['error' => $e->getMessage(), 'line' => $e->getLine()]); }
