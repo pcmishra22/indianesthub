@@ -129,7 +129,7 @@ if ($uri === '/api/watchlist/list') {
 
     echo json_encode([
         'watchlist' => $wl,
-        'analysis_watchlist' => $fallbackApplied ? RELIABLE_FALLBACK_SYMBOLS : $wl,
+        'analysis_watchlist' => resolveWatchlistFetchSymbols($wl),
         'meta' => $meta,
     ]);
     exit;

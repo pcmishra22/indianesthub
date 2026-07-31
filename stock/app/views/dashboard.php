@@ -1524,8 +1524,15 @@ function renderWatchlist(d, preserveWlPage){
   document.getElementById('kpiMood').textContent=mood+(d.mood_score?' ('+d.mood_score+')':'');
   document.getElementById('kpiMood').style.color=mc;
   document.getElementById('kpiNifty').textContent=d.nifty_view||'';
-  document.getElementById('kpiTime').textContent=new Date().toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata'});
-  document.getElementById('kpiCached').textContent=d.cached?'cached (< 5 min)':'fresh data';
+  // Show the actual timestamp THIS data was generated at (d.ts, from the
+  // server), not just "whatever time it is right now in the browser" —
+  // that used to make even hours-old, market-closed data look like it had
+  // just been refreshed a second ago, which was hiding real staleness.
+  const dataTime = d.ts ? new Date(d.ts * 1000) : new Date();
+  document.getElementById('kpiTime').textContent=dataTime.toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata'});
+  document.getElementById('kpiCached').textContent = d.market_open===false
+    ? 'market closed — last available data'
+    : (d.cached?'cached (< 5 min)':'fresh data');
   document.getElementById('cacheNote').textContent=d.fallback_applied
     ? `⚠️ ${d.fallback_reason||('Showing top '+total+' reliable stocks instead of '+(d.fallback_watchlist_size||'')+' — see notes')}`
     : (d.cached?'⚡ Cached':'🔴 Live');
@@ -2598,18 +2605,6 @@ function renderPivots(pivots){
   </div>`;
 }
 
-// Reset watchlist to default
-async function resetWatchlist(){
-  if(!confirm('Reset to default 5 stocks? Custom stocks will be removed.')) return;
-  await fetch(apiUrl('api/watchlist/list')).then(r=>r.json()).then(async d=>{
-    for(const s of (d.watchlist||[])){
-      const fd=new FormData(); fd.append('symbol',s);
-      await fetch(apiUrl('api/watchlist/remove'),{method:'POST',body:fd});
-    }
-  });
-  renderWatchlistManager([]);
-  loadWatchlist(true);
-}
 
 // ══ EOD REPORT ═══════════════════════════════════════════════
 let eodLoaded=false;

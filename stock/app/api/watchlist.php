@@ -21,6 +21,69 @@ function getActiveWatchlist(): array
     return WATCHLIST_SYMBOLS;
 }
 
+// ── Large-watchlist fallback, done right ────────────────────────────
+// A >50-symbol watchlist can't be fetched reliably from the legacy
+// server-side scrape sources (BSE/Stooq/NSE/Groww), so a fixed set of 24
+// large-cap symbols (RELIABLE_FALLBACK_SYMBOLS) is used instead of the
+// user's real list for that case.
+//
+// BUG this used to cause: that swap was total and unconditional — it
+// silently replaced the user's ENTIRE custom watchlist for every live
+// view (Buy/Sell counts, sector filter, search, the whole table) with
+// just those same fixed 24 names, no matter what the user had actually
+// saved. Concretely: 3 of the 14 sector filters (Cement, RealEstate,
+// Chemicals) have zero overlap with those 24 names, so picking them
+// returned nothing at all — and a stock added via the "+Add" box got
+// saved to the watchlist file correctly, but the live table kept
+// showing only the same fixed 24 forever, since it never once used to
+// look at what the user had just added.
+//
+// Fix: still use the reliable-24 as the baseline (for speed/reliability
+// on the plain unfiltered view), but always fold in whatever the *user's
+// real list* actually contributes for the specific thing being asked
+// for — their sector's own stocks, their search match, or symbols they
+// recently added — capped at a small, safe size so this never
+// reintroduces the original "too many symbols, unreliable fetch" problem.
+function resolveWatchlistFetchSymbols(array $rawSyms, string $sector = '', string $search = ''): array
+{
+    if (count($rawSyms) <= WATCHLIST_LARGE_THRESHOLD) {
+        return $rawSyms;
+    }
+
+    $syms = RELIABLE_FALLBACK_SYMBOLS;
+
+    // Sector filter: use the user's OWN stocks in that sector (there are
+    // at most ~16 per sector in SECTOR_MAP, so this stays small) instead
+    // of whichever of the fixed 24 happen to fall in it.
+    if ($sector && isset(SECTOR_MAP[$sector])) {
+        $sectorSyms = array_map(fn($s) => $s . '.NS', SECTOR_MAP[$sector]);
+        $userSectorSyms = array_values(array_intersect($rawSyms, $sectorSyms));
+        if (!empty($userSectorSyms)) {
+            $syms = $userSectorSyms;
+        }
+    }
+
+    // Search: if what they typed matches something in their real
+    // watchlist that isn't one of the fixed 24, include it (bounded, so a
+    // very broad search string can't balloon this back to 214 symbols).
+    if ($search) {
+        $searchMatches = array_values(array_filter($rawSyms, fn($s) => str_contains(strtoupper($s), strtoupper($search))));
+        if (!empty($searchMatches)) {
+            $syms = array_slice(array_unique(array_merge($syms, $searchMatches)), 0, 40);
+        }
+    }
+
+    // Recently added: getUserWatchlist() returns symbols in the order
+    // they were saved, and addToWatchlist() appends — so the last ~20
+    // entries are exactly whatever the user has been adding via "+Add".
+    // Always include them so a manual add is visible in the live table
+    // right away instead of being silently dropped.
+    $recentlyAdded = array_slice($rawSyms, -20);
+    $syms = array_values(array_unique(array_merge($syms, $recentlyAdded)));
+
+    return $syms;
+}
+
 function apiWatchlist(): array
 {
     $cacheFile = getUserWatchlistCachePath(getCurrentUser());
@@ -34,9 +97,7 @@ function apiWatchlist(): array
 
     $username = getCurrentUser();
     $rawSyms  = $username ? getUserWatchlist($username) : getActiveWatchlist();
-    // Same large-watchlist fallback as apiWatchlistPage() — see config.php
-    // RELIABLE_FALLBACK_SYMBOLS for why.
-    $symbols = count($rawSyms) > WATCHLIST_LARGE_THRESHOLD ? RELIABLE_FALLBACK_SYMBOLS : $rawSyms;
+    $symbols  = resolveWatchlistFetchSymbols($rawSyms);
     $stocks  = [];
 
     foreach ($symbols as $sym) {
@@ -1146,11 +1207,13 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
     // ── Step 0: large watchlists (> WATCHLIST_LARGE_THRESHOLD, default 50)
     // don't fetch reliably from the free scrape sources (BSE scrip map,
     // Stooq, NSE, Groww each only cover a subset) — the result used to
-    // vary run to run with most symbols silently dropped. Instead, fall
-    // back deterministically to a fixed set of 24 large-cap symbols that
-    // are guaranteed coverage (see RELIABLE_FALLBACK_SYMBOLS in config.php).
+    // vary run to run with most symbols silently dropped. Falls back to a
+    // reliable baseline for the plain/unfiltered view, but folds in the
+    // user's own stocks for the sector/search/add cases — see
+    // resolveWatchlistFetchSymbols() for why (that used to be the bug
+    // behind "sector filter empty" / "+Add does nothing").
     $fallbackApplied = count($rawSyms) > WATCHLIST_LARGE_THRESHOLD;
-    $fullSyms = $fallbackApplied ? RELIABLE_FALLBACK_SYMBOLS : $rawSyms;
+    $fullSyms = resolveWatchlistFetchSymbols($rawSyms, $sector, $search);
 
     // ── Step 1: check if browser already pushed quotes via /api/proxy/quotes ──
     // This is the primary path when server-side sources (Stooq/Yahoo/NSE) are IP-blocked.
@@ -1238,6 +1301,7 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
         'fallback_reason'       => $fallbackApplied
             ? ('Watchlist has ' . count($rawSyms) . ' symbols — showing the ' . count(RELIABLE_FALLBACK_SYMBOLS) . ' most reliably-covered large-caps instead of an inconsistent partial scrape.')
             : null,
+        'market_open' => prakashIsMarketHours(),
     ];
 }
 
