@@ -61,6 +61,17 @@
 </div>
 
 {{-- ── KPI Cards ────────────────────────────────────────────────────────────── --}}
+<div class="alert alert-light border d-flex align-items-start gap-2 mb-3" style="font-size:.82rem;">
+    <i data-feather="info" style="width:16px;height:16px;flex-shrink:0;margin-top:2px;" class="text-muted"></i>
+    <div class="text-muted">
+        <strong>What "Property Views" counts:</strong> only visits to individual property listing pages
+        (not the homepage, search, blog, etc.), counted once per visitor per property per 30-minute window,
+        with known bots/link-preview crawlers excluded. This is why it will always read <strong>lower</strong>
+        than Google Analytics' site-wide "Views" for the same period — GA counts every page and every hit,
+        unfiltered. Compare like-for-like by checking GA is filtered to <code>/properties/</code> pages only,
+        for the exact same date range shown above.
+    </div>
+</div>
 <div class="row g-3 mb-4">
     <div class="col-6 col-lg-3">
         <div class="card kpi-card blue h-100 shadow-sm">
@@ -206,6 +217,37 @@
                 @empty
                 <p class="text-muted small">No data yet.</p>
                 @endforelse
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- ── Top Countries ────────────────────────────────────────────────────────── --}}
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="section-title mb-0">🌍 Top Countries (by property views)</div>
+                    <span class="text-muted small">Auto-detected from visitor IP — best effort, may show "Unknown" for some visits</span>
+                </div>
+                <div class="row mt-2">
+                    @forelse($countryBreakdown as $country => $count)
+                    <div class="col-md-6 col-lg-4 mb-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="small fw-medium">{{ $country }}</span>
+                            <div class="flex-grow-1 mx-2">
+                                <div class="progress" style="height:6px;border-radius:3px;">
+                                    <div class="progress-bar bg-success" style="width:{{ $kpi['property_views'] > 0 ? round($count/$kpi['property_views']*100) : 0 }}%"></div>
+                                </div>
+                            </div>
+                            <span class="badge bg-light text-dark">{{ $count }}</span>
+                        </div>
+                    </div>
+                    @empty
+                    <div class="col-12"><p class="text-muted small mb-0">No data yet.</p></div>
+                    @endforelse
+                </div>
             </div>
         </div>
     </div>
@@ -407,6 +449,7 @@
                                 <th>Time</th>
                                 <th>Property</th>
                                 <th>IP Address</th>
+                                <th>Country</th>
                                 <th>Device</th>
                                 <th>Browser</th>
                                 <th>Referrer</th>
@@ -428,6 +471,22 @@
                                     @endif
                                 </td>
                                 <td><code>{{ $visit->ip_address ?: '–' }}</code></td>
+                                <td>
+                                    @if($visit->country)
+                                        @if($visit->country_code)
+                                            @php
+                                                $flag = collect(str_split(strtoupper($visit->country_code)))
+                                                    ->map(fn($c) => mb_chr(ord($c) - 65 + 0x1F1E6, 'UTF-8'))
+                                                    ->implode('');
+                                            @endphp
+                                            <span title="{{ $visit->country }}">{{ $flag }} {{ $visit->country }}</span>
+                                        @else
+                                            {{ $visit->country }}
+                                        @endif
+                                    @else
+                                        <span class="text-muted small">Unknown</span>
+                                    @endif
+                                </td>
                                 <td>
                                     @php $d = strtolower($visit->device ?: 'other'); @endphp
                                     <span class="badge-device badge-{{ $d }}">{{ ucfirst($visit->device ?: 'Unknown') }}</span>

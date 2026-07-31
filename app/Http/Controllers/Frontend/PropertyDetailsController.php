@@ -116,7 +116,7 @@ class PropertyDetailsController extends Controller
             if (!$recentDuplicate) {
                 $property->increment('views_count');
 
-                PropertyView::create([
+                $propertyView = PropertyView::create([
                     'property_id'     => $property->id,
                     'event_type'      => 'page_view',
                     'user_id'         => Auth::id(),
@@ -129,6 +129,21 @@ class PropertyDetailsController extends Controller
                     'page_url'        => request()->fullUrl(),
                     'viewed_at'       => now(),
                 ]);
+
+                // Best-effort, non-blocking: resolve the visitor's country
+                // and fill it in after this page has already been sent to
+                // them. See IpGeolocationService for why this is designed to
+                // never fail loudly or slow down the page.
+                $ip = request()->ip();
+                dispatch(function () use ($propertyView, $ip) {
+                    $geo = app(\App\Services\IpGeolocationService::class)->lookup($ip);
+                    if ($geo) {
+                        $propertyView->update([
+                            'country'      => $geo['country'],
+                            'country_code' => $geo['country_code'],
+                        ]);
+                    }
+                })->afterResponse();
             }
         }
 

@@ -98,6 +98,19 @@ class LeadReportController extends Controller
             ->orderByDesc('total')
             ->pluck('total', 'browser');
 
+        // ── Country Breakdown ─────────────────────────────────────────────────
+        // Country is filled in asynchronously (after each page view, so it never
+        // delays the page for the visitor) — rows may briefly show "Unknown"
+        // until that background lookup completes, and any visit where the
+        // lookup failed/skipped will permanently show "Unknown" too.
+        $countryBreakdown = PropertyView::where('event_type', 'page_view')
+            ->whereBetween('viewed_at', [$from, $to])
+            ->selectRaw("COALESCE(NULLIF(country, ''), 'Unknown') as country, COUNT(*) as total")
+            ->groupBy('country')
+            ->orderByDesc('total')
+            ->limit(10)
+            ->pluck('total', 'country');
+
         // ── Daily Views (last 14 days) for sparkline chart ───────────────────
         $dailyViews = PropertyView::where('event_type', 'page_view')
             ->selectRaw('DATE(viewed_at) as date, COUNT(*) as total')
@@ -144,7 +157,7 @@ class LeadReportController extends Controller
             'kpi', 'from', 'to',
             'inquiries', 'builderLeads',
             'topProperties', 'recentVisits',
-            'deviceBreakdown', 'browserBreakdown',
+            'deviceBreakdown', 'browserBreakdown', 'countryBreakdown',
             'chartLabels', 'chartViews', 'chartInqs',
             'leadTypeBreakdown', 'topCities'
         ));

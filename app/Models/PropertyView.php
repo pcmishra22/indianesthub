@@ -7,7 +7,7 @@ class PropertyView extends Model
 {
     protected $fillable = [
         'property_id', 'event_type', 'user_id', 'session_id', 'visitor_token',
-        'ip_address', 'device', 'browser',
+        'ip_address', 'country', 'country_code', 'device', 'browser',
         'referrer', 'page_url', 'viewed_at',
     ];
 
