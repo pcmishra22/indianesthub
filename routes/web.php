@@ -814,7 +814,13 @@ Route::get('/recommendations', [\App\Http\Controllers\Frontend\RecommendationCon
 // Chatbot for Leads (public)
 Route::get('/chatbot', [\App\Http\Controllers\Frontend\AiChatController::class, 'index'])->name('chatbot.index');
 // AI Chat Assistant — widget send endpoint (public AJAX)
-Route::post('/ai-chat/send', [\App\Http\Controllers\Frontend\AiChatController::class, 'send'])->name('ai-chat.send');
+Route::post('/ai-chat/send', [\App\Http\Controllers\Frontend\AiChatController::class, 'send'])
+    ->middleware('throttle:20,1')
+    ->name('ai-chat.send');
+// AI Legal Checklist — public tool (rate-limited since unauthenticated)
+Route::post('/ai/legal-checklist', [\App\Http\Controllers\Frontend\LegalAiController::class, 'generateChecklist'])
+    ->middleware('throttle:10,1')
+    ->name('ai.legal-checklist');
 
 // Property Market Insights (public)
 Route::get('/market-insights', [\App\Http\Controllers\Frontend\MarketInsightsController::class, 'index'])->name('market-insights.index');

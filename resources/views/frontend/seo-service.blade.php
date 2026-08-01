@@ -350,6 +350,11 @@
           @endforeach
         </div>
 
+        {{-- AI Legal Checklist (legal pages only) --}}
+        @if($serviceType === 'legal')
+        @include('frontend.partials.legal-checklist', ['cityLabel' => $cityLabel ?? null])
+        @endif
+
         {{-- FAQs --}}
         @if(count($faqs))
         <h2 class="fw-bold mb-3" style="font-size:1.35rem;">
