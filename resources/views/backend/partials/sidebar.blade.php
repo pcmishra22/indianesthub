@@ -17,7 +17,7 @@
             </li>
             <li class="sidebar-item {{ request()->routeIs('admin.users.bulk-email.*') ? 'active' : '' }}">
                 <a class="sidebar-link" href="{{ route('admin.users.bulk-email.index') }}">
-                    <i class="align-middle" data-feather="mail"></i> <span class="align-middle">User Bulk Email</span>
+                    <i class="align-middle" data-feather="mail"></i> <span class="align-middle">Bulk Email</span>
                 </a>
             </li>
             <li class="sidebar-item {{ request()->routeIs('admin.dealers.*') ? 'active' : '' }}">
@@ -92,11 +92,6 @@
             </li>
             {{-- Dealer Management --}}
             <li class="sidebar-header">Dealer Management</li>
-            <li class="sidebar-item {{ request()->routeIs('admin.dealers.bulk-email.*') ? 'active' : '' }}">
-                <a class="sidebar-link" href="{{ route('admin.dealers.bulk-email.index') }}">
-                    <i class="align-middle" data-feather="mail"></i> <span class="align-middle">Dealer Bulk Email</span>
-                </a>
-            </li>
             <li class="sidebar-item {{ request()->routeIs('admin.subscriptions.*') ? 'active' : '' }}">
 
                 <a class="sidebar-link" href="{{ route('admin.subscriptions.index') }}">

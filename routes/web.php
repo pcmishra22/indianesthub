@@ -630,13 +630,13 @@ Route::prefix('admin')->middleware('auth:admin')->name('admin.')->group(function
     Route::post('/users/bulk-email/{id}/queue', [\App\Http\Controllers\Admin\UserBulkEmailController::class, 'queue'])->name('users.bulk-email.queue');
 
     // Dealer Bulk Email
+    // Dealer Bulk Email now redirects into the unified Users Bulk Email
+    // screen (which supports an audience selector including Dealers) —
+    // see DealerBulkEmailController's docblock for why the old separate
+    // flow was removed.
     Route::get('/dealers/bulk-email', [\App\Http\Controllers\Admin\DealerBulkEmailController::class, 'index'])->name('dealers.bulk-email.index');
     Route::get('/dealers/bulk-email/create', [\App\Http\Controllers\Admin\DealerBulkEmailController::class, 'create'])->name('dealers.bulk-email.create');
-    Route::post('/dealers/bulk-email', [\App\Http\Controllers\Admin\DealerBulkEmailController::class, 'store'])->name('dealers.bulk-email.store');
     Route::get('/dealers/bulk-email/{id}/edit', [\App\Http\Controllers\Admin\DealerBulkEmailController::class, 'edit'])->name('dealers.bulk-email.edit');
-    Route::put('/dealers/bulk-email/{id}', [\App\Http\Controllers\Admin\DealerBulkEmailController::class, 'update'])->name('dealers.bulk-email.update');
-    Route::delete('/dealers/bulk-email/{id}', [\App\Http\Controllers\Admin\DealerBulkEmailController::class, 'destroy'])->name('dealers.bulk-email.destroy');
-    Route::post('/dealers/bulk-email/{id}/queue', [\App\Http\Controllers\Admin\DealerBulkEmailController::class, 'queue'])->name('dealers.bulk-email.queue');
 
     // Manage Dealers
     Route::resource('dealers', AdminDealerController::class);

@@ -258,23 +258,40 @@ if ($uri === '/api/signal/save' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $file  = STORAGE . '/eod_signals_' . $today . '.json';
     $saved = file_exists($file) ? json_decode(file_get_contents($file), true) : [];
     $sym   = strtoupper(trim($_POST['symbol'] ?? ''));
+    $signalSide = trim($_POST['signal'] ?? '');
     $entry = [
         'symbol'       => $sym,
         'name'         => trim($_POST['name'] ?? $sym),
-        'signal'       => trim($_POST['signal'] ?? ''),
+        'signal'       => $signalSide,
         'entry_price'  => (float)($_POST['entry_price'] ?? 0),
         'target_price' => (float)($_POST['target_price'] ?? 0),
         'stoploss'     => (float)($_POST['stoploss'] ?? 0),
         'target2'      => (float)($_POST['target2'] ?? 0),
-        'saved_at'     => date('H:i:s'),
+        // Full date+time it was given — a bare "08:33:09" with no date
+        // attached was exactly why "when was this given" was unclear once
+        // you looked at more than one day's worth of signals.
+        'saved_at'     => date('Y-m-d H:i:s'),
+        'saved_date'   => $today,
         'ts'           => time(),
         'hit'          => null,   // filled at EOD check
         'close_price'  => null,
     ];
-    // Overwrite if same symbol already saved today
     $idx = array_search($sym, array_column($saved, 'symbol'));
-    if ($idx !== false) $saved[$idx] = $entry;
-    else $saved[] = $entry;
+    if ($idx !== false && ($saved[$idx]['signal'] ?? '') === $signalSide) {
+        // Already tracked with the SAME side (Buy/Sell) today — keep the
+        // original entry price/time exactly as first given. Silently
+        // overwriting it here (as this used to do) is the same "given
+        // price keeps changing" bug already fixed in the Momentum engine.
+        echo json_encode(['ok' => true, 'entry' => $saved[$idx], 'already_tracked' => true]);
+        exit;
+    }
+    if ($idx !== false) {
+        // Signal genuinely flipped side (Buy -> Sell or vice versa) —
+        // that IS a new call, so replace it.
+        $saved[$idx] = $entry;
+    } else {
+        $saved[] = $entry;
+    }
     if (!is_dir(STORAGE)) mkdir(STORAGE, 0755, true);
     file_put_contents($file, json_encode($saved));
     echo json_encode(['ok' => true, 'entry' => $entry]);

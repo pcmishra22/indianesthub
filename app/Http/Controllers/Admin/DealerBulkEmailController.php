@@ -3,89 +3,32 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Mail\DealerBulkEmail;
-use App\Models\BulkEmail;
-use App\Models\Dealer;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Mail;
 
+/**
+ * This screen used to operate on the exact same `bulk_emails` table as
+ * Admin\UserBulkEmailController with no way to record which audience a
+ * given draft was actually meant for — meaning a "dealer" draft could be
+ * opened from the Users screen and accidentally sent to every customer
+ * instead, or vice versa. Now that bulk_emails has an explicit `audience`
+ * column and the Users screen supports selecting Dealers/Builders/Service
+ * Providers/Everyone, this controller just redirects there instead of
+ * running a second, ambiguity-prone copy of the same feature.
+ */
 class DealerBulkEmailController extends Controller
 {
     public function index()
     {
-        $emails = BulkEmail::latest()->paginate(10);
-        return view('backend.dealers.bulk-email.index', compact('emails'));
+        return redirect()->route('admin.users.bulk-email.index')
+            ->with('success', 'Dealer bulk email has moved — use the audience selector below to target dealers specifically.');
     }
 
     public function create()
     {
-        return view('backend.dealers.bulk-email.create');
-    }
-
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'subject' => ['required', 'string', 'max:150'],
-            'body'    => ['required', 'string', 'max:5000'],
-        ]);
-
-        BulkEmail::create($validated);
-
-        return redirect()
-            ->route('admin.dealers.bulk-email.index')
-            ->with('success', 'Bulk email draft saved successfully.');
+        return redirect()->route('admin.users.bulk-email.create');
     }
 
     public function edit($id)
     {
-        $email = BulkEmail::findOrFail($id);
-        return view('backend.dealers.bulk-email.edit', compact('email'));
-    }
-
-    public function update(Request $request, $id)
-    {
-        $email = BulkEmail::findOrFail($id);
-
-        $validated = $request->validate([
-            'subject' => ['required', 'string', 'max:150'],
-            'body'    => ['required', 'string', 'max:5000'],
-        ]);
-
-        $email->update($validated);
-
-        return redirect()
-            ->route('admin.dealers.bulk-email.index')
-            ->with('success', 'Bulk email updated successfully.');
-    }
-
-    public function destroy($id)
-    {
-        BulkEmail::findOrFail($id)->delete();
-        return back()->with('success', 'Email draft deleted.');
-    }
-
-    public function queue($id)
-    {
-        $email = BulkEmail::findOrFail($id);
-        $email->update(['status' => 'queued']);
-
-        $subject = $email->subject;
-        $body = $email->body;
-
-        Dealer::query()
-            ->where('status', 'active')
-            ->whereNotNull('email')
-            ->where('email', '!=', '')
-            ->chunk(200, function ($dealers) use ($subject, $body) {
-                foreach ($dealers as $dealer) {
-                    Mail::to($dealer->email)->queue(
-                        new DealerBulkEmail($dealer, $subject, $body)
-                    );
-                }
-            });
-
-        return redirect()
-            ->route('admin.dealers.bulk-email.index')
-            ->with('success', 'Emails queued successfully for all active dealers.');
+        return redirect()->route('admin.users.bulk-email.edit', $id);
     }
 }

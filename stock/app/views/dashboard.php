@@ -29,7 +29,7 @@ function dashboardPage(string $appName, string $username): void {
   --green:#10b981;--green2:#34d399;
   --red:#ef4444;--red2:#f87171;
   --orange:#fbbf24;--yellow:#fbbf24;
-  --text:#e2e8f0;--muted:#6b7280;--muted2:#9ca3af;
+  --text:#e2e8f0;--muted:#6b7280;--muted2:#9ca3af;--news-text:#c7d2e4;
   --r:12px;
 }
 body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:16px;min-height:100vh}
@@ -137,15 +137,25 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .pat-bear{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.25)}
 .pat-neu{background:rgba(255,255,255,.05);color:var(--muted2);border:1px solid var(--border)}
 .risk-box{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:12px;font-size:14px;color:var(--orange);line-height:1.6}
-.news-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
-.news-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:16px;cursor:pointer;transition:border-color .2s}
-.news-card:hover{border-color:rgba(34,211,238,.4)}
-.news-impact{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
 .imp-bull{color:var(--green)}.imp-bear{color:var(--red)}.imp-neu{color:var(--orange)}
-.news-head{font-size:15px;font-weight:600;color:#fff;line-height:1.5;margin-bottom:8px}
-.news-sum{font-size:14px;color:var(--muted);line-height:1.6}
-.news-stocks{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
-.ns-tag{font-size:12px;background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.2);color:var(--accent2);padding:2px 7px;border-radius:4px}
+.news-layout{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:18px;align-items:start}
+.news-featured{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:26px 28px}
+.news-featured-impact{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.news-featured-headline{font-size:1.65rem;font-weight:700;color:#fff;line-height:1.35;margin-bottom:14px}
+.news-featured-summary{font-size:1.08rem;color:var(--news-text);line-height:1.75;margin-bottom:18px}
+.news-featured-link{display:inline-flex;align-items:center;gap:6px;font-size:15px;font-weight:600;color:var(--accent2);text-decoration:none}
+.news-featured-link:hover{text-decoration:underline}
+.news-sidebar-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--news-text);margin-bottom:10px;padding:0 2px}
+.news-list{display:flex;flex-direction:column;gap:10px;max-height:860px;overflow-y:auto;padding-right:4px}
+.news-list-item{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .15s,background .15s}
+.news-list-item:hover{border-color:rgba(34,211,238,.4);background:var(--panel2)}
+.news-list-item.active{border-color:var(--accent);background:var(--panel2)}
+.news-list-meta{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.news-list-time{color:var(--news-text);font-weight:500;text-transform:none;letter-spacing:0}
+.news-list-headline{font-size:15px;font-weight:600;color:#fff;line-height:1.45}
+.news-stocks{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
+.ns-tag{font-size:13px;background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.25);color:var(--accent2);padding:3px 9px;border-radius:5px;font-weight:600}
+@media(max-width:900px){.news-layout{grid-template-columns:1fr}.news-list{max-height:520px}}
 .leader-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
 @media(max-width:800px){.leader-grid{grid-template-columns:1fr}}
 .leader-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
@@ -657,6 +667,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
   </div>
 
   <!-- Summary KPI row -->
+  <div id="eodFallbackNote" style="display:none;margin-bottom:12px;padding:10px 14px;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.25);border-radius:8px;font-size:14px;color:var(--news-text)"></div>
   <div id="eodSummary" style="display:none;margin-bottom:16px">
     <div class="kpi-row">
       <div class="kpi blue"><div class="kpi-label">Total Signals</div><div class="kpi-val" id="eodTotal">—</div><div class="kpi-sub">tracked today</div></div>
@@ -1566,8 +1577,11 @@ function renderWatchlist(d, preserveWlPage){
     const tgtGapStr=tgtGap!==0?`(${tgtGap>0?'+':''}${tgtGap.toFixed(1)}%)`:'';
     const sl=parseFloat(s.stoploss)||0;
     const slGap=curP>0&&sl>0?(((sl-curP)/curP)*100):0;
-    // Auto-save signal to EOD tracker (fire-and-forget)
-    if(sig==='Buy'||sig==='Sell'){saveSignalEod(s);}
+    // NOTE: this used to auto-save every Buy/Sell row to the EOD Signal
+    // Tracker on every single table render, with no user action at all —
+    // that's why signals kept showing up in the report unprompted. Tracking
+    // a signal is now only ever explicit, via the "Track in EOD Report"
+    // button (saveSignalManual) elsewhere on this page.
     return `<tr>
       <td style="font-size:13px;color:var(--muted);text-align:center">#${rank}</td>
       <td><div class="sym">${escHtml(s.symbol||'')}</div><div class="co-name">${escHtml(s.name||'')}</div></td>
@@ -2121,6 +2135,60 @@ function addHistory(sym){
 
 // ══ NEWS ═════════════════════════════════════════════════════
 let newsLoaded=false;
+let _newsItems=[];
+let _newsActiveIdx=0;
+
+function newsRelTime(ts){
+  if(!ts) return '';
+  const diffSec = Math.max(0, Math.floor(Date.now()/1000) - ts);
+  if(diffSec < 60) return 'just now';
+  const mins = Math.floor(diffSec/60);
+  if(mins < 60) return mins+'m ago';
+  const hrs = Math.floor(mins/60);
+  if(hrs < 24) return hrs+'h ago';
+  const days = Math.floor(hrs/24);
+  return days+'d ago';
+}
+
+function renderNewsLayout(){
+  const el=document.getElementById('newsContainer');
+  if(!_newsItems.length){ el.innerHTML='<div class="err-box">No news available right now. Check back later.</div>'; return; }
+  const featured = _newsItems[_newsActiveIdx] || _newsItems[0];
+  const fic = featured.impact==='Bullish'?'imp-bull':featured.impact==='Bearish'?'imp-bear':'imp-neu';
+  const fSt = (featured.stocks_affected||[]).map(s=>`<span class="ns-tag">${escHtml(s)}</span>`).join('');
+  const featuredHtml = `<div class="news-featured">
+      <div class="news-featured-impact ${fic}">${escHtml(featured.impact||'Neutral')} · ${escHtml(featured.source||'Market')} · <span class="news-list-time">${newsRelTime(featured.pub_ts)}</span></div>
+      <div class="news-featured-headline">${escHtml(featured.headline||'')}</div>
+      <div class="news-featured-summary">${escHtml(featured.summary||'')}</div>
+      ${featured.link?`<a class="news-featured-link" href="${escHtml(featured.link)}" target="_blank" rel="noopener noreferrer">Read full article on ${escHtml(featured.source||'source')} →</a>`:''}
+      ${fSt?`<div class="news-stocks">${fSt}</div>`:''}
+    </div>`;
+
+  const listHtml = _newsItems.map((n,i)=>{
+    const ic=n.impact==='Bullish'?'imp-bull':n.impact==='Bearish'?'imp-bear':'imp-neu';
+    const active = i===_newsActiveIdx ? ' active' : '';
+    return `<div class="news-list-item${active}" onclick="selectNewsItem(${i})">
+        <div class="news-list-meta ${ic}">${escHtml(n.impact||'Neutral')} <span class="news-list-time">· ${newsRelTime(n.pub_ts)} · ${escHtml(n.source||'')}</span></div>
+        <div class="news-list-headline">${escHtml(n.headline||'')}</div>
+      </div>`;
+  }).join('');
+
+  el.innerHTML = `<div class="news-layout">
+      ${featuredHtml}
+      <div>
+        <div class="news-sidebar-title">🕒 Latest News</div>
+        <div class="news-list">${listHtml}</div>
+      </div>
+    </div>`;
+}
+
+function selectNewsItem(i){
+  _newsActiveIdx=i;
+  renderNewsLayout();
+  const container=document.getElementById('newsContainer');
+  if(container) container.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
 async function loadNews(force=false){
   const el=document.getElementById('newsContainer');
   if(!force&&newsLoaded) return;
@@ -2128,21 +2196,13 @@ async function loadNews(force=false){
   try{
     const r=await fetch(apiUrl('api/news')+(force?'?force=1':''));
     const d=await r.json();
-    const items=d.news||[];
-    if(!items.length){el.innerHTML='<div class="err-box">No news available right now. Check back later.</div>';return;}
-    const html='<div class="news-grid">'+items.map(n=>{
-      const ic=n.impact==='Bullish'?'imp-bull':n.impact==='Bearish'?'imp-bear':'imp-neu';
-      const st=(n.stocks_affected||[]).map(s=>`<span class="ns-tag">${escHtml(s)}</span>`).join('');
-      return `<div class="news-card">
-        <div class="news-impact ${ic}">${escHtml(n.impact||'Neutral')} · ${escHtml(n.source||'Market')}</div>
-        <div class="news-head">${escHtml(n.headline||'')}</div>
-        <div class="news-sum">${escHtml(n.summary||'')}</div>
-        ${st?`<div class="news-stocks">${st}</div>`:''}
-      </div>`;
-    }).join('')+'</div>';
-    el.innerHTML=html;
+    // Server already sorts latest-first across both feeds combined.
+    _newsItems=d.news||[];
+    _newsActiveIdx=0;
+    renderNewsLayout();
     newsLoaded=true;
   }catch(e){el.innerHTML='<div class="err-box">'+escHtml(e.message)+'</div>';}
+
 }
 
 // ── Intraday Chart ────────────────────────────────────────────
@@ -2609,25 +2669,6 @@ function renderPivots(pivots){
 // ══ EOD REPORT ═══════════════════════════════════════════════
 let eodLoaded=false;
 
-// Auto-save a Buy/Sell signal to EOD tracker (called from stockRow)
-const _eodSaved=new Set();
-async function saveSignalEod(s){
-  const key=s.symbol+'_'+(s.signal||'');
-  if(_eodSaved.has(key))return; // don't double-save per session
-  _eodSaved.add(key);
-  try{
-    const fd=new FormData();
-    fd.append('symbol', s.symbol||'');
-    fd.append('name',   s.name||s.symbol||'');
-    fd.append('signal', s.signal||'');
-    fd.append('entry_price',  s.price||0);
-    fd.append('target_price', s.target||0);
-    fd.append('stoploss',     s.stoploss||0);
-    fd.append('target2',      0);
-    await fetch(apiUrl('api/signal/save'),{method:'POST',body:fd});
-  }catch(e){}
-}
-
 // Manually save from Analyze tab's "Track in EOD Report" button
 async function saveSignalManual(sym,name,signal,entry,target1,sl,target2){
   try{
@@ -3038,9 +3079,40 @@ async function loadEodReport(date){
   }
 }
 
+// Renders the "Given At" cell as a clear date + time. Handles both the
+// fixed format ("2026-07-31 08:33:09") and older rows saved before this
+// fix that only ever stored a bare time ("08:33:09", no date at all) —
+// those fall back to showing just the time with a note, rather than
+// showing a wrong/misleading date.
+function eodGivenAtHtml(savedAt){
+  if(!savedAt) return '—';
+  const parts=savedAt.split(' ');
+  if(parts.length===2){
+    const [datePart,timePart]=parts;
+    const dt=new Date(datePart+'T00:00:00');
+    const niceDate=isNaN(dt.getTime())?datePart:dt.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+    return `<div style="font-weight:600;color:#fff">${escHtml(niceDate)}</div><div style="color:var(--news-text)">${escHtml(timePart)}</div>`;
+  }
+  return `<div style="color:var(--news-text)">${escHtml(savedAt)} <span style="opacity:.7">(date unknown — saved before this was tracked)</span></div>`;
+}
+
 function renderEodReport(d){
   const sum=d.summary||{};
   const sigs=d.signals||[];
+
+  // If today has nothing tracked yet, the backend already fell back to
+  // the most recent day that does — say so plainly instead of just
+  // quietly showing a different date than "today" with no explanation.
+  const fallbackNote=document.getElementById('eodFallbackNote');
+  if(fallbackNote){
+    if(d.is_fallback_date && d.date){
+      fallbackNote.style.display='block';
+      const todayStr=new Date().toISOString().slice(0,10);
+      fallbackNote.innerHTML=`ℹ️ Nothing tracked yet today — showing the last day with saved signals: <strong style="color:#fff">${escHtml(d.date)}</strong>. <a href="#" onclick="document.getElementById('eodDatePicker').value='${todayStr}';loadEodReport('${todayStr}');return false;" style="color:var(--accent2)">View today instead →</a>`;
+    } else {
+      fallbackNote.style.display='none';
+    }
+  }
 
   // Summary KPIs
   document.getElementById('eodSummary').style.display='block';
@@ -3098,7 +3170,7 @@ function renderEodReport(d){
         <div class="co-name">${escHtml(s.name||'')}</div>
       </td>
       <td><span class="badge ${sigBadge}">${escHtml(s.signal||'')}</span></td>
-      <td style="font-size:14px;color:var(--muted2)">${escHtml(s.saved_at||'—')}</td>
+      <td style="font-size:13px;color:var(--news-text)">${eodGivenAtHtml(s.saved_at)}</td>
       <td style="font-weight:700;color:var(--accent2)">₹${fmtNum(entryP)}</td>
       <td>
         <div style="font-weight:700;color:var(--green)">₹${fmtNum(tgtP)}</div>
@@ -3144,7 +3216,7 @@ function renderEodReport(d){
         <span style="color:var(--muted);margin-left:4px">(${sellHits} hit)</span>
       </div>
       <div style="margin-left:auto;font-size:13px;color:var(--muted)">
-        Date: ${escHtml(d.date||'')} · Auto-refreshes on page load
+        Signals given on <strong style="color:#fff">${escHtml(d.date||'')}</strong> · current prices refresh automatically
       </div>
     </div>
     <div style="overflow-x:auto">
@@ -3152,7 +3224,7 @@ function renderEodReport(d){
       <thead><tr>
         <th>Symbol</th>
         <th>Signal</th>
-        <th>Saved At</th>
+        <th>Given At</th>
         <th>Entry Price</th>
         <th>Target</th>
         <th>Stop Loss</th>

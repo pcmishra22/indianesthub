@@ -13,6 +13,20 @@
                 @method('PUT')
 
                 <div class="mb-3">
+                    <label class="form-label fw-semibold">Send To <span class="text-danger">*</span></label>
+                    <select name="audience" class="form-select" required>
+                        @foreach($audiences as $key => $a)
+                            <option value="{{ $key }}" {{ old('audience', $email->audience) === $key ? 'selected' : '' }}>
+                                {{ $a['label'] }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('audience')
+                        <div class="text-danger small mt-1">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                <div class="mb-3">
                     <label class="form-label fw-semibold">Subject <span class="text-danger">*</span></label>
                     <input type="text" name="subject" class="form-control" maxlength="150"
                            value="{{ old('subject', $email->subject) }}" required>

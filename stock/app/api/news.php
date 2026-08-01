@@ -48,22 +48,46 @@ function apiNews(): array
             $nseWords = ['NSE', 'BSE', 'IPO', 'FII', 'DII', 'RBI', 'SEBI', 'GDP', 'CPI', 'EMI', 'SBI', 'LIC', 'HDFC', 'ICICI'];
             $stocks = array_unique(array_filter($m[1] ?? [], fn($w) => strlen($w) >= 3 && !in_array($w, $nseWords)));
 
+            // pubDate (for real "latest first" ordering across BOTH feeds
+            // merged together — the old code just capped at 16 items in
+            // whatever order the two feeds happened to be concatenated in,
+            // which is not the same as chronological). Fall back to "now"
+            // if a feed omits it, so a dateless item doesn't wrongly sort
+            // to the very top or bottom.
+            $pubDateRaw = (string)($item->pubDate ?? '');
+            $pubTs = $pubDateRaw ? strtotime($pubDateRaw) : false;
+            if ($pubTs === false) $pubTs = time();
+
+            $link = trim((string)($item->link ?? ''));
+
             $newsItems[] = [
                 'headline'       => $title,
-                'summary'        => $desc ? substr($desc, 0, 200) . '...' : 'Read full article for details.',
+                // Full RSS teaser text, untruncated — this is already just
+                // the publisher's own short summary/teaser (that's what an
+                // RSS <description> is), not the full article body, so
+                // showing it in full isn't reproducing the article itself.
+                // The "Read full article" link goes to the original for
+                // the actual story.
+                'summary'        => $desc ?: 'Read the full article for details.',
                 'impact'         => $impact,
                 'sector'         => 'Markets',
                 'stocks_affected'=> array_values(array_slice($stocks, 0, 4)),
                 'source'         => $feed['label'],
+                'link'           => $link,
+                'pub_ts'         => $pubTs,
             ];
-            if (count($newsItems) >= 16) break 2;
+            if (count($newsItems) >= 40) break 2;
         }
     }
+
+    // Latest first, across both feeds combined.
+    usort($newsItems, fn($a, $b) => $b['pub_ts'] <=> $a['pub_ts']);
+    $newsItems = array_slice($newsItems, 0, 24);
 
     // Fallback if no news fetched
     if (!$newsItems) {
         $newsItems = [
-            ['headline' => 'Markets open for trading', 'summary' => 'Indian equity markets are open. Check NSE/BSE for live updates.', 'impact' => 'Neutral', 'sector' => 'Markets', 'stocks_affected' => [], 'source' => 'System'],
+            ['headline' => 'Markets open for trading', 'summary' => 'Indian equity markets are open. Check NSE/BSE for live updates.', 'impact' => 'Neutral', 'sector' => 'Markets', 'stocks_affected' => [], 'source' => 'System', 'link' => '', 'pub_ts' => time()],
         ];
     }
 

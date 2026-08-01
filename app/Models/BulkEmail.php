@@ -10,5 +10,5 @@ class BulkEmail extends Model
     use HasFactory;
 
     protected $table = 'bulk_emails';
-    protected $fillable = ['subject', 'body', 'status'];
+    protected $fillable = ['subject', 'body', 'status', 'audience'];
 }
