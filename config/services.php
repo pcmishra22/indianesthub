@@ -52,4 +52,11 @@ return [
         'nominatim_url' => env('OSM_NOMINATIM_URL', 'https://nominatim.openstreetmap.org'),
     ],
 
+    // Google Gemini — used for AI Chat Assistant and future AI features.
+    // Free tier: https://aistudio.google.com/apikey (no credit card needed).
+    'gemini' => [
+        'key'   => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.0-flash'),
+    ],
+
 ];

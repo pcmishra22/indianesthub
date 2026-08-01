@@ -3,14 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('title', config('app.name') . ' – Real Estate in Chandigarh, Mohali, Zirakpur | Buy, Sell, Rent')</title>
+    <title>@yield('title', config('app.name') . ' – India\'s Complete Real Estate Ecosystem')</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="ai-chat-property-id" content="@yield('ai_chat_property_id', '')">
 
     <!-- ══════════════════════════════════════════
          SEO CORE META TAGS
     ══════════════════════════════════════════ -->
-    <meta name="description" content="@yield('meta_description', config('app.name') . ' – Find verified flats, villas &amp; plots for sale &amp; rent in Chandigarh, Mohali, Zirakpur &amp; Panchkula. 10,000+ verified listings on India\'s most trusted Tricity real estate portal.')">
-    <meta name="keywords" content="@yield('meta_keywords', 'property in chandigarh, flats in mohali, property in zirakpur, real estate tricity, flats for sale panchkula, buy flat chandigarh, rent flat mohali, new projects zirakpur')">
+    <meta name="description" content="@yield('meta_description', config('app.name') . ' – India\'s complete real estate ecosystem. Verified properties for sale &amp; rent, new projects, home loans, insurance, legal help, service providers &amp; a home marketplace across Chandigarh, Mohali, Zirakpur, Panchkula, Pune, Bangalore, Hyderabad &amp; Delhi NCR.')">
+    <meta name="keywords" content="@yield('meta_keywords', 'property in chandigarh, flats in mohali, property in zirakpur, real estate tricity, flats for sale panchkula, buy flat chandigarh, rent flat mohali, new projects zirakpur, home loan, property insurance, legal help, home marketplace')">
     <meta name="robots" content="@yield('robots', 'index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1')">
     <link rel="canonical" href="@yield('canonical', url()->current())">
     <link rel="alternate" hreflang="en-IN" href="{{ url()->current() }}">
@@ -21,8 +22,8 @@
     <meta property="og:type"        content="@yield('og_type', 'website')">
     <meta property="og:site_name"   content="{{ config('app.name') }}">
     <meta property="og:locale"      content="en_IN">
-    <meta property="og:title"       content="@yield('og_title', config('app.name') . ' – Real Estate in Chandigarh Tricity')">
-    <meta property="og:description" content="@yield('og_description', 'Find verified flats, villas &amp; plots for sale &amp; rent in Chandigarh, Mohali, Zirakpur. Your most trusted Tricity property portal.')">
+    <meta property="og:title"       content="@yield('og_title', config('app.name') . ' – India\'s Complete Real Estate Ecosystem')">
+    <meta property="og:description" content="@yield('og_description', 'India\'s complete real estate ecosystem — verified properties, new projects, home loans, insurance, legal help, service providers &amp; a home marketplace all in one place.')">
     <meta property="og:url"         content="@yield('og_url', url()->current())">
     <meta property="og:image"       content="@yield('og_image', asset('assets/img/og-default.jpg'))">
     <meta property="og:image:width"  content="1200">
@@ -36,8 +37,8 @@
     @if(env('SOCIAL_TWITTER_HANDLE'))
     <meta name="twitter:site"        content="{{ env('SOCIAL_TWITTER_HANDLE') }}">
     @endif
-    <meta name="twitter:title"       content="@yield('twitter_title', config('app.name') . ' – Real Estate in Chandigarh Tricity')">
-    <meta name="twitter:description" content="@yield('twitter_description', 'Find verified flats, villas &amp; plots for sale &amp; rent in Chandigarh, Mohali, Zirakpur &amp; Panchkula.')">
+    <meta name="twitter:title"       content="@yield('twitter_title', config('app.name') . ' – India\'s Complete Real Estate Ecosystem')">
+    <meta name="twitter:description" content="@yield('twitter_description', 'India\'s complete real estate ecosystem — verified properties, new projects, home loans, insurance, legal help, service providers &amp; a home marketplace all in one place.')">
     <meta name="twitter:image"       content="@yield('twitter_image', asset('assets/img/og-default.jpg'))">
 
     <!-- ══════════════════════════════════════════
@@ -57,7 +58,7 @@
         "height": 60
       },
       "image": "{{ asset('assets/img/og-default.jpg') }}",
-      "description": "{{ config("app.name") }} is India's most trusted real estate portal for Chandigarh Tricity – buy, sell and rent verified properties in Chandigarh, Mohali, Zirakpur and Panchkula.",
+      "description": "{{ config("app.name") }} is India's complete real estate ecosystem – verified properties for sale and rent, new projects, home loans, property insurance, legal help, service providers and a home marketplace across Chandigarh Tricity, Pune, Bangalore, Hyderabad and Delhi NCR.",
       "email": "admin@indianesthub.com",
       "telephone": "+91-{{ config('app.contact_phone','7340753780') }}",
       "address": {
@@ -189,5 +190,8 @@
     @include('frontend.partials.loan-eligibility-modal')
     @include('frontend.partials.insurance-modal')
     @include('frontend.partials.legal-modal')
+
+    {{-- AI Chat Assistant — floating widget (available on every page) --}}
+    @include('frontend.partials.ai-chat-widget')
 </body>
 </html>

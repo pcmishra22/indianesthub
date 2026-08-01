@@ -780,6 +780,10 @@ require __DIR__ . '/admin_properties.php';
         Route::get('/legal-leads/{lead}',                  [\App\Http\Controllers\Admin\LegalLeadController::class, 'show'])->name('legal-leads.show');
         Route::post('/legal-leads/{lead}/status',          [\App\Http\Controllers\Admin\LegalLeadController::class, 'updateStatus'])->name('legal-leads.update-status');
         Route::delete('/legal-leads/{lead}',               [\App\Http\Controllers\Admin\LegalLeadController::class, 'destroy'])->name('legal-leads.destroy');
+        // AI Chat Sessions / Leads
+        Route::get('/ai-chat',                             [\App\Http\Controllers\Admin\AiChatController::class, 'index'])->name('ai-chat.index');
+        Route::get('/ai-chat/{session}',                   [\App\Http\Controllers\Admin\AiChatController::class, 'show'])->name('ai-chat.show');
+        Route::delete('/ai-chat/{session}',                 [\App\Http\Controllers\Admin\AiChatController::class, 'destroy'])->name('ai-chat.destroy');
 
         // FAQs
         Route::resource('faqs', \App\Http\Controllers\Admin\FAQController::class)->except(['show']);
@@ -801,7 +805,9 @@ Route::get('/virtual-tour', [\App\Http\Controllers\Frontend\VirtualTourControlle
 Route::get('/recommendations', [\App\Http\Controllers\Frontend\RecommendationController::class, 'index'])->name('recommendations.index');
 
 // Chatbot for Leads (public)
-Route::get('/chatbot', [\App\Http\Controllers\Frontend\ChatbotController::class, 'index'])->name('chatbot.index');
+Route::get('/chatbot', [\App\Http\Controllers\Frontend\AiChatController::class, 'index'])->name('chatbot.index');
+// AI Chat Assistant — widget send endpoint (public AJAX)
+Route::post('/ai-chat/send', [\App\Http\Controllers\Frontend\AiChatController::class, 'send'])->name('ai-chat.send');
 
 // Property Market Insights (public)
 Route::get('/market-insights', [\App\Http\Controllers\Frontend\MarketInsightsController::class, 'index'])->name('market-insights.index');

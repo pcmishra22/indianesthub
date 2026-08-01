@@ -7,7 +7,7 @@
       <div class="brand-name">
         <i class="bi bi-buildings"></i> {{ config('app.name') }}
       </div>
-      <p class="tagline">Chandigarh Tricity's trusted real estate platform — Buy, Rent &amp; Invest</p>
+      <p class="tagline">India's complete real estate ecosystem — Properties, New Projects, Home Loans, Insurance, Legal Help, Services &amp; Marketplace</p>
     </div>
   </div>
 
@@ -355,9 +355,10 @@
       {{-- About --}}
       <div class="col-lg-4 col-md-12 footer-about">
         <p class="mt-1">
-          {{ config('app.name') }} connects buyers, sellers and renters with verified property listings
-          across Chandigarh, Mohali, Zirakpur, Panchkula and the wider Tricity region. Find your dream home
-          from thousands of flats, villas, plots, and commercial spaces.
+          {{ config('app.name') }} is India's complete real estate ecosystem — verified properties for
+          sale &amp; rent, new projects, home loans, property insurance, legal help, service providers
+          and a home marketplace — all in one place across Chandigarh, Mohali, Zirakpur, Panchkula,
+          Pune, Bangalore, Hyderabad &amp; Delhi NCR.
         </p>
         <div class="social-links d-flex mt-4">
           @if(env('SOCIAL_TWITTER_URL'))

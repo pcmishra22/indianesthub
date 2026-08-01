@@ -13,6 +13,7 @@
 @section('twitter_title', ($property->meta_title ?? $property->title) . ' | ' . config('app.name'))
 @section('twitter_description', $property->meta_description ?? \Illuminate\Support\Str::limit(strip_tags($property->description ?? ''), 155, '...'))
 @section('twitter_image', $property->cover_image ? asset('storage/' . $property->cover_image) : asset('assets/img/og-default.jpg'))
+@section('ai_chat_property_id', $property->id)
 
 @section('schema')
 <script type="application/ld+json">

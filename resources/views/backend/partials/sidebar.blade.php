@@ -90,6 +90,16 @@
                     @endif
                 </a>
             </li>
+            <li class="sidebar-item {{ request()->routeIs('admin.ai-chat.*') ? 'active' : '' }}">
+                <a class="sidebar-link" href="{{ route('admin.ai-chat.index') }}">
+                    <i class="align-middle" data-feather="message-circle"></i>
+                    <span class="align-middle">AI Chat Leads</span>
+                    @php $newAiChatLeads = \App\Models\AiChatSession::where('status','lead-captured')->count(); @endphp
+                    @if($newAiChatLeads > 0)
+                        <span class="badge bg-danger rounded-pill ms-auto" style="font-size:.65rem;">{{ $newAiChatLeads }}</span>
+                    @endif
+                </a>
+            </li>
             {{-- Dealer Management --}}
             <li class="sidebar-header">Dealer Management</li>
             <li class="sidebar-item {{ request()->routeIs('admin.subscriptions.*') ? 'active' : '' }}">

@@ -2,12 +2,12 @@
 @extends('frontend.layout')
 
 {{-- ════════════════════════ SEO META ════════════════════════ --}}
-@section('title', config('app.name') . ' – Property in Top Cities Across India')
-@section('meta_description', 'Find verified flats, villas & plots for sale and rent in Chandigarh, Mohali, Zirakpur & Panchkula. Browse 2,000+ listings from trusted dealers & builders.')
-@section('meta_keywords', 'property in chandigarh, flats in mohali, property in zirakpur, real estate tricity, buy flat chandigarh, rent flat mohali, new projects zirakpur, 3bhk flats mohali, villas chandigarh, plots panchkula')
+@section('title', config('app.name') . ' – India\'s Complete Real Estate Ecosystem')
+@section('meta_description', 'IndianEstHub is India\'s complete real estate ecosystem — verified properties for sale & rent, new projects, home loans, property insurance, legal help, service providers & a home marketplace across Chandigarh, Mohali, Zirakpur, Panchkula, Pune, Bangalore, Hyderabad & Delhi NCR.')
+@section('meta_keywords', 'property in chandigarh, flats in mohali, property in zirakpur, real estate tricity, buy flat chandigarh, rent flat mohali, new projects zirakpur, 3bhk flats mohali, villas chandigarh, plots panchkula, home loan, property insurance, legal help, interior designers, home marketplace')
 @section('canonical', url('/'))
-@section('og_title', config('app.name') . ' – Chandigarh Tricity\'s #1 Real Estate Portal')
-@section('og_description', 'Find verified flats, villas, plots & new projects in Chandigarh, Mohali, Zirakpur & Panchkula. Buy, sell or rent with confidence on ' . config('app.name') . '.')
+@section('og_title', config('app.name') . ' – India\'s Complete Real Estate Ecosystem')
+@section('og_description', 'Explore ' . config('app.name') . ' — India\'s complete real estate ecosystem. Verified properties, new projects, home loans, insurance, legal help, service providers & a home marketplace in one place.')
 
 @section('schema')
 <script type="application/ld+json">
@@ -16,7 +16,7 @@
   "@type": "WebSite",
   "name": "{{ config('app.name') }}",
   "url": "{{ url('/') }}",
-  "description": "India's most trusted real estate portal for Chandigarh Tricity",
+  "description": "India's complete real estate ecosystem",
   "potentialAction": {
     "@type": "SearchAction",
     "target": {
