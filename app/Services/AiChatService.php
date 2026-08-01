@@ -50,7 +50,6 @@ class AiChatService
 
         try {
             $response = Http::timeout(20)
-                ->retry(2, 300)
                 ->post(
                     "https://generativelanguage.googleapis.com/v1beta/models/{$this->model}:generateContent?key={$this->apiKey}",
                     [
@@ -64,6 +63,15 @@ class AiChatService
                         ],
                     ]
                 );
+
+            if ($response->status() === 429) {
+                Log::warning('AiChatService: Gemini rate limit hit', ['body' => $response->body()]);
+
+                return [
+                    'reply' => "We're getting a lot of AI chat requests right now — please try again in about a minute, or WhatsApp us and we'll help directly.",
+                    'error' => true,
+                ];
+            }
 
             if (!$response->successful()) {
                 Log::warning('AiChatService: Gemini API error', [
