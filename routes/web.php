@@ -487,6 +487,9 @@ Route::prefix('dealer')->middleware('auth:dealer')->name('dealer.')->group(funct
     Route::resource('properties', DealerPropertyController::class);
     Route::post('/properties/{property}/pay', [DealerPropertyController::class, 'payProperty'])->name('properties.pay');
 
+    // AI Property Description Generator
+    Route::post('/ai/property-description', [\App\Http\Controllers\PropertyAiController::class, 'generateDescription'])->name('ai.property-description');
+
     // Marketing Studio (brochure generator, WhatsApp share, social post, EDM)
     Route::get('/properties/{property}/marketing', [\App\Http\Controllers\Dealer\MarketingController::class, 'index'])->name('properties.marketing');
     Route::get('/properties/{property}/marketing/brochure', [\App\Http\Controllers\Dealer\MarketingController::class, 'brochure'])->name('properties.marketing.brochure');
@@ -548,6 +551,10 @@ Route::prefix('builder')->middleware('auth:builder')->name('builder.')->group(fu
     Route::get('/projects/{project}/properties/{property}/edit', [\App\Http\Controllers\Builder\PropertyController::class, 'edit'])->name('projects.properties.edit');
     Route::put('/projects/{project}/properties/{property}', [\App\Http\Controllers\Builder\PropertyController::class, 'update'])->name('projects.properties.update');
     Route::delete('/projects/{project}/properties/{property}', [\App\Http\Controllers\Builder\PropertyController::class, 'destroy'])->name('projects.properties.destroy');
+
+    // AI Property Description Generator
+    Route::post('/ai/property-description', [\App\Http\Controllers\PropertyAiController::class, 'generateDescription'])->name('ai.property-description');
+
 
     // Marketing Studio (brochure generator, WhatsApp share, social post, EDM)
     Route::get('/projects/{project}/properties/{property}/marketing', [\App\Http\Controllers\Builder\MarketingController::class, 'index'])->name('projects.properties.marketing');

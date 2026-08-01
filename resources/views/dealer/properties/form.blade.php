@@ -9,7 +9,15 @@
             <input type="text" name="title" class="form-control" value="{{ old('title', $property->title ?? '') }}" required>
         </div>
         <div class="mb-3">
-            <label class="form-label">Description</label>
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="form-label mb-0">Description</label>
+            </div>
+            @include('partials.ai-description-button', [
+                'url' => route('dealer.ai.property-description'),
+                'descriptionField' => 'description-editor',
+                'usesCkeditor' => true,
+                'metaField' => 'meta_description',
+            ])
             <textarea name="description" id="description-editor" class="form-control">{{ old('description', $property->description ?? '') }}</textarea>
         </div>
 

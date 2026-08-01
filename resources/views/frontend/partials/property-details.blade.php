@@ -1100,48 +1100,9 @@
           </div>
           @endif
 
-          {{-- EMI Calculator --}}
+          {{-- EMI Calculator (interactive) --}}
           @if($property->looking_for != 'Rent')
-          @php
-            $price = $property->price ?? 0;
-            $downPayment = round($price * 0.20);
-            $loanAmount = $price - $downPayment;
-            $rate = 8.5 / 12 / 100;
-            $tenure = 240; // 20 years
-            $emi = $rate > 0 ? round($loanAmount * $rate * pow(1+$rate, $tenure) / (pow(1+$rate, $tenure) - 1)) : 0;
-          @endphp
-          <div class="pd-emi-card">
-            <h5><i class="bi bi-calculator-fill me-2 text-primary"></i>EMI Calculator</h5>
-            <div class="emi-row">
-              <span class="emi-label">Property Price</span>
-              <span class="emi-val">₹{{ number_format($price) }}</span>
-            </div>
-            <div class="emi-row">
-              <span class="emi-label">Down Payment (20%)</span>
-              <span class="emi-val">₹{{ number_format($downPayment) }}</span>
-            </div>
-            <div class="emi-row">
-              <span class="emi-label">Loan Amount</span>
-              <span class="emi-val">₹{{ number_format($loanAmount) }}</span>
-            </div>
-            <div class="emi-row">
-              <span class="emi-label">Interest Rate</span>
-              <span class="emi-val">8.5% p.a.</span>
-            </div>
-            <div class="emi-row">
-              <span class="emi-label">Loan Tenure</span>
-              <span class="emi-val">20 Years</span>
-            </div>
-            <div class="emi-total">
-              <span class="emi-label">Est. Monthly EMI</span>
-              <span class="emi-val">₹{{ number_format($emi) }}</span>
-            </div>
-            <p class="text-muted mt-2 mb-0" style="font-size:.72rem;">*Estimates are indicative. Actual EMI may vary based on lender.</p>
-            <button type="button" class="btn btn-success w-100 mt-3 fw-semibold"
-                    onclick="openLoanModal({{ $property->id }}, null, 'property-page')">
-              <i class="bi bi-bank me-2"></i> Apply for Home Loan →
-            </button>
-          </div>
+          @include('frontend.partials.emi-calculator', ['propertyPrice' => $property->price ?? 0])
           @endif
 
           {{-- 🛡️ Insurance CTA card (only for sale properties) --}}

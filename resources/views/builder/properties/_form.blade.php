@@ -60,7 +60,12 @@
                     </div>
                     <div class="col-12">
                         <label class="form-label">Description</label>
-                        <textarea name="description" class="form-control" rows="3"
+                        @include('partials.ai-description-button', [
+                            'url' => route('builder.ai.property-description'),
+                            'descriptionField' => 'description',
+                            'usesCkeditor' => false,
+                        ])
+                        <textarea name="description" id="description" class="form-control" rows="3"
                                   placeholder="Details about this unit...">{{ old('description', $property->description ?? '') }}</textarea>
                     </div>
                 </div>

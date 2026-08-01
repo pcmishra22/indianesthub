@@ -378,6 +378,13 @@
       {{-- Right: sidebar --}}
       <div class="col-lg-4">
 
+        {{-- EMI Calculator (loan pages only) --}}
+        @if($serviceType === 'loan')
+        <div class="mb-4">
+          @include('frontend.partials.emi-calculator')
+        </div>
+        @endif
+
         {{-- Related cities --}}
         @if($cityLabel)
         <div class="card border-0 shadow-sm mb-4">
