@@ -54,7 +54,7 @@
                 <li><i class="bi bi-check-circle"></i> Strategic Marketing Plan</li>
                 <li><i class="bi bi-check-circle"></i> Expert Negotiation</li>
               </ul>
-              <a href="#" class="service-btn">
+              <a href="{{ route('price-estimator') }}" class="service-btn">
                 Get Valuation <i class="bi bi-arrow-right"></i>
               </a>
             </div>

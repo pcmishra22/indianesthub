@@ -822,6 +822,24 @@ Route::post('/ai/legal-checklist', [\App\Http\Controllers\Frontend\LegalAiContro
     ->middleware('throttle:10,1')
     ->name('ai.legal-checklist');
 
+// AI Price Estimator — public page + estimate endpoint
+Route::get('/price-estimator', [\App\Http\Controllers\Frontend\PriceEstimatorController::class, 'index'])->name('price-estimator');
+Route::post('/ai/price-estimate', [\App\Http\Controllers\Frontend\PriceEstimatorController::class, 'estimate'])
+    ->middleware('throttle:10,1')
+    ->name('ai.price-estimate');
+
+// AI Interior Suggestions — public page + suggestions endpoint
+Route::get('/interior-suggestions', [\App\Http\Controllers\Frontend\InteriorAiController::class, 'index'])->name('interior-suggestions');
+Route::post('/ai/interior-suggestions', [\App\Http\Controllers\Frontend\InteriorAiController::class, 'generate'])
+    ->middleware('throttle:10,1')
+    ->name('ai.interior-suggestions');
+
+// AI Investment Advisor — public page + analysis endpoint
+Route::get('/investment-advisor', [\App\Http\Controllers\Frontend\InvestmentAiController::class, 'index'])->name('investment-advisor');
+Route::post('/ai/investment-advisor', [\App\Http\Controllers\Frontend\InvestmentAiController::class, 'analyze'])
+    ->middleware('throttle:10,1')
+    ->name('ai.investment-advisor');
+
 // Property Market Insights (public)
 Route::get('/market-insights', [\App\Http\Controllers\Frontend\MarketInsightsController::class, 'index'])->name('market-insights.index');
 

@@ -403,14 +403,14 @@
 								<i class="bi bi-calculator"></i>
 							</div>
 							<div class="service-info">
-								<h3><a href="service-details.html">Property Valuation</a></h3>
-								<p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium totam rem aperiam</p>
+								<h3><a href="{{ route('price-estimator') }}">Property Valuation</a></h3>
+								<p>Get an instant AI-powered price estimate based on real comparable listings in your area — free, no waiting.</p>
 								<ul class="service-highlights">
 									<li><i class="bi bi-check-circle-fill"></i> Market Analysis</li>
 									<li><i class="bi bi-check-circle-fill"></i> Comparative Reports</li>
 									<li><i class="bi bi-check-circle-fill"></i> Investment Insights</li>
 								</ul>
-								<a href="service-details.html" class="service-link">
+								<a href="{{ route('price-estimator') }}" class="service-link">
 									<span>Get Valuation</span>
 									<i class="bi bi-arrow-up-right"></i>
 								</a>
@@ -451,15 +451,15 @@
 								<i class="bi bi-shield-check"></i>
 							</div>
 							<div class="service-info">
-								<h3><a href="service-details.html">Investment Advisory</a></h3>
-								<p>Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit sed quia consequuntur magni dolores eos</p>
+								<h3><a href="{{ route('investment-advisor') }}">Investment Advisory</a></h3>
+								<p>See what your budget gets you and estimated rental yields in any area — instantly, based on real live listings.</p>
 								<ul class="service-highlights">
-									<li><i class="bi bi-check-circle-fill"></i> Portfolio Planning</li>
-									<li><i class="bi bi-check-circle-fill"></i> Risk Assessment</li>
-									<li><i class="bi bi-check-circle-fill"></i> Market Forecasting</li>
+									<li><i class="bi bi-check-circle-fill"></i> Budget-Based Matching</li>
+									<li><i class="bi bi-check-circle-fill"></i> Rental Yield Estimates</li>
+									<li><i class="bi bi-check-circle-fill"></i> Real Market Data</li>
 								</ul>
-								<a href="service-details.html" class="service-link">
-									<span>Learn More</span>
+								<a href="{{ route('investment-advisor') }}" class="service-link">
+									<span>Get Insight</span>
 									<i class="bi bi-arrow-up-right"></i>
 								</a>
 							</div>
