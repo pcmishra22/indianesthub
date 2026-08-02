@@ -63,6 +63,15 @@ if ($uri === '/api/news') {
     exit;
 }
 
+// Full article body for the News tab's featured panel (fetched on demand
+// per-article, not for the whole list — see apiNewsFull()).
+if ($uri === '/api/news/full') {
+    header('Content-Type: application/json');
+    $link = trim($_GET['link'] ?? '');
+    try { echo json_encode(apiNewsFull($link)); } catch (\Throwable $e) { echo json_encode(['ok' => false, 'error' => $e->getMessage(), 'line' => $e->getLine()]); }
+    exit;
+}
+
 // Per-minute tick — fast quote fetch + signal recording
 if ($uri === '/api/tick') {
     header('Content-Type: application/json');

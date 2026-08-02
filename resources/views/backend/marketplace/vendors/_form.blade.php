@@ -52,6 +52,28 @@
                value="{{ old('address', $vendor->address ?? '') }}">
     </div>
 
+    <div class="col-md-4">
+        <label class="form-label fw-semibold">Latitude</label>
+        <input type="text" name="latitude" class="form-control"
+               value="{{ old('latitude', $vendor->latitude ?? '') }}" placeholder="e.g. 30.7046">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label fw-semibold">Longitude</label>
+        <input type="text" name="longitude" class="form-control"
+               value="{{ old('longitude', $vendor->longitude ?? '') }}" placeholder="e.g. 76.7179">
+    </div>
+    <div class="col-md-4">
+        <label class="form-label fw-semibold">GST Number <span class="text-muted fw-normal">(optional)</span></label>
+        <input type="text" name="gst_number" class="form-control" maxlength="15"
+               value="{{ old('gst_number', $vendor->gst_number ?? '') }}" placeholder="e.g. 03ABCDE1234F1Z5">
+    </div>
+    <div class="col-12">
+        <small class="text-muted">
+            <i class="bi bi-info-circle"></i> To get latitude/longitude: open the vendor's shop location in
+            Google Maps, right-click the exact spot, and click the coordinates shown at the top of the menu to copy them.
+        </small>
+    </div>
+
     <div class="col-12">
         <label class="form-label fw-semibold">Description</label>
         <textarea name="description" rows="3" class="form-control">{{ old('description', $vendor->description ?? '') }}</textarea>

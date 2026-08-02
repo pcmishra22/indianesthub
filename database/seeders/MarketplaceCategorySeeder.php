@@ -70,6 +70,13 @@ class MarketplaceCategorySeeder extends Seeder
                 'tagline'    => 'Cameras, smart locks & home automation',
                 'sort_order' => 8,
             ],
+            [
+                'name'       => 'Building Materials',
+                'slug'       => 'building-materials',
+                'icon'       => 'bi-bricks',
+                'tagline'    => 'Cement, bricks, tiles, sand & core construction supplies',
+                'sort_order' => 9,
+            ],
         ];
 
         foreach ($categories as $category) {

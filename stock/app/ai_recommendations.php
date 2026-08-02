@@ -342,13 +342,50 @@ function buildAiRecommendations(array $stocks, ?string $statePath = null, ?strin
     $topBuy = $buyCandidates[0] ?? null;
     $topSell = $sellCandidates[0] ?? null;
 
+    // ── Box display = today's OPEN positions, not just this refresh's
+    // candidates — same fix as buildPrakashRecommendations(); see the
+    // long comment there for why. Short version: showing $buyCandidates/
+    // $sellCandidates directly meant a symbol dropping out of this
+    // refresh's confidence-ranked pool vanished from the box, and a
+    // fresh page load could show a different set of "just fired" picks
+    // instead of everything still open from earlier today. ──
+    $stocksBySymbol = [];
+    foreach ($tracked as $stock) {
+        $sym = aiNormalizeSymbol((string)($stock['symbol'] ?? ''));
+        if ($sym !== '') $stocksBySymbol[$sym] = $stock;
+    }
+    $openBuyBox = [];
+    $openSellBox = [];
+    foreach ($daily['recommendations'] as $rec) {
+        if (!empty($rec['achieved'])) continue;
+        $sym = aiNormalizeSymbol((string)($rec['symbol'] ?? ''));
+        if ($sym === '') continue;
+        $stock = $stocksBySymbol[$sym] ?? null;
+        $item = [
+            'symbol'            => $sym,
+            'price'             => $stock ? (float)($stock['price'] ?? 0) : (float)($rec['last_checked_price'] ?? $rec['entry_price'] ?? 0),
+            'percentage_change' => $stock ? (float)($stock['change_pct'] ?? 0) : null,
+            'confidence'        => (float)($rec['confidence'] ?? 0),
+            'reason'            => $rec['reason'] ?? ($rec['side'] === 'Buy' ? 'Buy Signal' : 'Sell Signal'),
+            'strength'          => (float)($rec['confidence'] ?? 0),
+            '_entry_time'       => $rec['entry_time'] ?? '',
+        ];
+        if (($rec['side'] ?? '') === 'Buy') $openBuyBox[] = $item; else $openSellBox[] = $item;
+    }
+    usort($openBuyBox, fn($a, $b) => strcmp($b['_entry_time'], $a['_entry_time']));
+    usort($openSellBox, fn($a, $b) => strcmp($b['_entry_time'], $a['_entry_time']));
+    $openBuyBox = array_map(fn($e) => array_diff_key($e, ['_entry_time' => true]), array_slice($openBuyBox, 0, AI_MAX_PER_BOX));
+    $openSellBox = array_map(fn($e) => array_diff_key($e, ['_entry_time' => true]), array_slice($openSellBox, 0, AI_MAX_PER_BOX));
+    if (!$openBuyBox) $openBuyBox = $buyCandidates;
+    if (!$openSellBox) $openSellBox = $sellCandidates;
+
     return [
         'updated_at' => $timestamp,
         'market_open' => prakashIsMarketHours(),
         'buy_recommendation' => $topBuy ? array_merge($topBuy, ['recommendation' => 'Buy']) : null,
         'sell_recommendation' => $topSell ? array_merge($topSell, ['recommendation' => 'Sell']) : null,
-        'buy_box' => $buyCandidates,
-        'sell_box' => $sellCandidates,
+        'buy_box' => $openBuyBox,
+        'sell_box' => $openSellBox,
         'daily_summary' => $dailySummary,
         'tracked_count' => count($tracked),
         'history_file' => $historyPath,

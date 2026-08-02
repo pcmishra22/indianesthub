@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Frontend;
 
 use App\Http\Controllers\Controller;
 use App\Models\MarketplaceCategory;
+use App\Models\MarketplaceLead;
 use App\Models\MarketplaceProduct;
 use App\Models\MarketplaceVendor;
 use Illuminate\Http\Request;
@@ -122,5 +123,55 @@ class MarketplaceController extends Controller
             ->get();
 
         return view('frontend.marketplace.product', compact('product', 'category', 'relatedProducts'));
+    }
+
+    /** /marketplace/vendor/{vendor} — vendor profile: reviews, portfolio, map, GST, product catalog */
+    public function vendor(MarketplaceVendor $vendor, Request $request)
+    {
+        if (!$vendor->is_active) {
+            abort(404);
+        }
+
+        $vendor->load('portfolios');
+
+        $products = $vendor->products()
+            ->where('is_active', true)
+            ->orderByDesc('is_featured')
+            ->orderBy('sort_order')
+            ->paginate(12);
+
+        $reviews = $vendor->approvedReviews()->with('user')->latest()->paginate(10);
+
+        return view('frontend.marketplace.vendor', compact('vendor', 'products', 'reviews'));
+    }
+
+    /**
+     * Records a lead when a logged-in visitor clicks Call or WhatsApp on a
+     * vendor's profile — reuses the existing MarketplaceLead system (same
+     * one the quote-request forms feed into) rather than a separate
+     * tracking table, so these show up in the same admin Leads view.
+     * AJAX-friendly: always 204, never blocks the actual tel:/wa.me
+     * navigation even if the visitor isn't logged in (in which case
+     * nothing is recorded).
+     */
+    public function recordVendorContactClick(MarketplaceVendor $vendor, Request $request)
+    {
+        $request->validate(['contact_method' => 'required|in:call,whatsapp']);
+
+        if (\Illuminate\Support\Facades\Auth::check()) {
+            $user = \Illuminate\Support\Facades\Auth::user();
+            MarketplaceLead::create([
+                'vendor_id'   => $vendor->id,
+                'name'        => $user->name,
+                'email'       => $user->email,
+                'phone'       => $user->phone ?? '',
+                'source_page' => 'vendor_profile_' . $request->contact_method,
+                'ip_address'  => $request->ip(),
+                'user_agent'  => $request->userAgent(),
+                'status'      => 'new',
+            ]);
+        }
+
+        return response()->noContent();
     }
 }

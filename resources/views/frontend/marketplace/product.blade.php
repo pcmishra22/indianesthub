@@ -103,7 +103,7 @@
 
         {{-- Vendor card --}}
         <div class="mkt-vendor-card mt-4">
-          <div class="d-flex align-items-center gap-3">
+          <a href="{{ $product->vendor ? route('marketplace.vendor', $product->vendor) : '#' }}" class="d-flex align-items-center gap-3 text-decoration-none">
             @if($product->vendor?->logo)
               <img src="{{ asset('storage/'.$product->vendor->logo) }}" style="width:52px;height:52px;border-radius:50%;object-fit:cover;">
             @else
@@ -120,10 +120,23 @@
                   &middot; {{ $product->vendor->years_in_business }}+ yrs in business
                 @endif
               </div>
+              @if($product->vendor && $product->vendor->reviews_count > 0)
+                <div class="small">
+                  @for($i = 1; $i <= 5; $i++)
+                    <i class="bi bi-star{{ $i <= round($product->vendor->average_rating) ? '-fill' : '' }}" style="color:#ffd166;font-size:.7rem;"></i>
+                  @endfor
+                  <span class="text-muted">{{ $product->vendor->average_rating }} ({{ $product->vendor->reviews_count }})</span>
+                </div>
+              @endif
             </div>
-          </div>
+          </a>
           @if($product->vendor?->description)
             <p class="small text-muted mt-2 mb-0">{{ Str::limit($product->vendor->description, 160) }}</p>
+          @endif
+          @if($product->vendor)
+            <a href="{{ route('marketplace.vendor', $product->vendor) }}" class="small fw-semibold d-inline-block mt-2" style="color:#0078d4;">
+              View full profile &amp; reviews <i class="bi bi-arrow-right"></i>
+            </a>
           @endif
         </div>
       </div>

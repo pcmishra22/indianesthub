@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Review extends Model
 {
-    protected $fillable = ['user_id', 'property_id', 'agent_id', 'service_provider_id', 'rating', 'review_text', 'status'];
+    protected $fillable = ['user_id', 'property_id', 'agent_id', 'service_provider_id', 'marketplace_vendor_id', 'rating', 'review_text', 'status'];
 
     public function user()
     {
@@ -21,5 +21,10 @@ class Review extends Model
     public function serviceProvider()
     {
         return $this->belongsTo(ServiceProvider::class);
+    }
+
+    public function marketplaceVendor()
+    {
+        return $this->belongsTo(MarketplaceVendor::class, 'marketplace_vendor_id');
     }
 }

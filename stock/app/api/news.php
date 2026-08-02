@@ -97,3 +97,103 @@ function apiNews(): array
     return $result;
 }
 
+/**
+ * apiNewsFull($link) — fetches the original article page and extracts its
+ * body text (readability-lite: strip nav/script/ad noise, pick the element
+ * with the most substantial <p> content, join those paragraphs). Used by
+ * the News tab so the featured panel can show the full story instead of
+ * just the short RSS teaser.
+ *
+ * Restricted to the two feed domains only — this endpoint fetches a
+ * caller-supplied URL, so without a domain allowlist it would be an open
+ * fetch proxy.
+ *
+ * Note: unlike the RSS teaser (the publisher's own short summary), this
+ * reproduces the full article body on our own pages. That's more
+ * copyright/ToS exposure for the site than a teaser + outbound link,
+ * since it can substitute for visiting the source. Worth keeping an eye
+ * on if ET/Moneycontrol object.
+ */
+function apiNewsFull(string $link): array
+{
+    $host = parse_url($link, PHP_URL_HOST) ?: '';
+    $allowed = ['economictimes.indiatimes.com', 'www.moneycontrol.com', 'moneycontrol.com'];
+    $hostOk = false;
+    foreach ($allowed as $a) {
+        if ($host === $a || str_ends_with($host, '.' . $a)) { $hostOk = true; break; }
+    }
+    if (!$link || !$hostOk) {
+        return ['ok' => false, 'error' => 'Unsupported or missing article URL'];
+    }
+
+    $cacheKey  = 'news_full_' . md5($link) . '.json';
+    $cacheFile = STORAGE . '/' . $cacheKey;
+    if (file_exists($cacheFile)) {
+        $cached = json_decode(file_get_contents($cacheFile), true);
+        // Articles don't change once published — cache for a full day.
+        if ($cached && (time() - ($cached['ts'] ?? 0)) < 86400) return $cached;
+    }
+
+    $html = httpGet($link, 12);
+    if (!$html) {
+        return ['ok' => false, 'error' => 'Could not fetch article'];
+    }
+
+    $text = extractArticleText($html);
+    if (!$text) {
+        return ['ok' => false, 'error' => 'Could not extract article text'];
+    }
+
+    $result = ['ok' => true, 'text' => $text, 'ts' => time()];
+    if (!is_dir(STORAGE)) mkdir(STORAGE, 0755, true);
+    file_put_contents($cacheFile, json_encode($result));
+    return $result;
+}
+
+/**
+ * extractArticleText($html) — very small readability-lite extractor:
+ * drop obvious noise tags, then score every <p>'s parent by combined
+ * paragraph text length and pick the highest-scoring container.
+ * Good enough for standard news article markup (ET/Moneycontrol both
+ * use a single main content div); not a general-purpose parser.
+ */
+function extractArticleText(string $html): string
+{
+    libxml_use_internal_errors(true);
+    $doc = new DOMDocument();
+    $doc->loadHTML('<?xml encoding="utf-8" ?>' . $html);
+    libxml_clear_errors();
+
+    $xpath = new DOMXPath($doc);
+    foreach ($xpath->query('//script|//style|//nav|//header|//footer|//aside|//iframe|//form|//noscript') as $node) {
+        $node->parentNode?->removeChild($node);
+    }
+
+    $paragraphs = $xpath->query('//p');
+    $scores = []; // spl_object_id(parent) => [score, parent]
+    foreach ($paragraphs as $p) {
+        $txt = trim($p->textContent);
+        $len = strlen($txt);
+        if ($len < 40) continue; // skip captions/bylines/short noise
+        $parent = $p->parentNode;
+        if (!$parent) continue;
+        $id = spl_object_id($parent);
+        if (!isset($scores[$id])) $scores[$id] = ['score' => 0, 'node' => $parent];
+        $scores[$id]['score'] += $len;
+    }
+    if (!$scores) return '';
+
+    usort($scores, fn($a, $b) => $b['score'] <=> $a['score']);
+    $best = $scores[0]['node'];
+
+    $out = [];
+    foreach ($xpath->query('.//p', $best) as $p) {
+        $txt = trim(preg_replace('/\s+/', ' ', $p->textContent));
+        if (strlen($txt) < 40) continue;
+        // Skip common boilerplate lines that leak in from around articles.
+        if (preg_match('/^(also read|disclaimer|download the economic times|catch all the|subscribe to|follow us)/i', $txt)) continue;
+        $out[] = $txt;
+    }
+    return trim(implode("\n\n", array_unique($out)));
+}
+

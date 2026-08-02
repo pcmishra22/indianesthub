@@ -15,9 +15,9 @@ class MarketplaceVendor extends Model
     protected $fillable = [
         'business_name', 'slug', 'owner_name',
         'phone', 'whatsapp', 'email',
-        'city', 'area', 'address',
+        'city', 'area', 'address', 'latitude', 'longitude',
         'description', 'logo', 'years_in_business',
-        'is_verified', 'is_active', 'commission_pct',
+        'is_verified', 'is_active', 'commission_pct', 'gst_number',
     ];
 
     protected $casts = [
@@ -61,6 +61,36 @@ class MarketplaceVendor extends Model
     public function leads()
     {
         return $this->hasMany(MarketplaceLead::class, 'vendor_id');
+    }
+
+    public function reviews()
+    {
+        return $this->hasMany(Review::class, 'marketplace_vendor_id');
+    }
+
+    public function approvedReviews()
+    {
+        return $this->reviews()->where('status', 'approved');
+    }
+
+    public function getAverageRatingAttribute(): float
+    {
+        return round((float) $this->approvedReviews()->avg('rating'), 1);
+    }
+
+    public function getReviewsCountAttribute(): int
+    {
+        return $this->approvedReviews()->count();
+    }
+
+    public function portfolios()
+    {
+        return $this->hasMany(MarketplaceVendorPortfolio::class, 'vendor_id')->orderBy('sort_order');
+    }
+
+    public function getHasMapLocationAttribute(): bool
+    {
+        return $this->latitude !== null && $this->longitude !== null;
     }
 
     /**

@@ -391,6 +391,10 @@ Route::get('/marketplace/{category:slug}', [\App\Http\Controllers\Frontend\Marke
     ->name('marketplace.category');
 Route::get('/marketplace/{category:slug}/{product:slug}', [\App\Http\Controllers\Frontend\MarketplaceController::class, 'product'])
     ->name('marketplace.product');
+Route::get('/marketplace/vendor/{vendor:slug}', [\App\Http\Controllers\Frontend\MarketplaceController::class, 'vendor'])
+    ->name('marketplace.vendor');
+Route::post('/marketplace/vendor/{vendor:slug}/contact-click', [\App\Http\Controllers\Frontend\MarketplaceController::class, 'recordVendorContactClick'])
+    ->name('marketplace.vendor.contact-click');
 
 // Home Marketplace — public lead capture
 Route::post('/marketplace/lead', [\App\Http\Controllers\Frontend\MarketplaceLeadController::class, 'submit'])

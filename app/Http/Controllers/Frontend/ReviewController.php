@@ -27,6 +27,7 @@ class ReviewController extends Controller
             'property_id' => 'nullable|integer|exists:properties,id',
             'agent_id' => 'nullable|integer|exists:agents,id',
             'service_provider_id' => 'nullable|integer|exists:service_providers,id',
+            'marketplace_vendor_id' => 'nullable|integer|exists:marketplace_vendors,id',
             'rating' => 'required|integer|min:1|max:5',
             'review_text' => 'required|string',
         ]);
@@ -36,6 +37,7 @@ class ReviewController extends Controller
             'property_id' => $validated['property_id'] ?? null,
             'agent_id' => $validated['agent_id'] ?? null,
             'service_provider_id' => $validated['service_provider_id'] ?? null,
+            'marketplace_vendor_id' => $validated['marketplace_vendor_id'] ?? null,
             'rating' => $validated['rating'],
             'review_text' => $validated['review_text'],
         ]);

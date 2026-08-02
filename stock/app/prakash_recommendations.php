@@ -1931,6 +1931,63 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
         ], $statePath);
     }
 
+    // ── Box display = today's OPEN positions, not just this refresh's
+    // candidates ────────────────────────────────────────────────────
+    //
+    // $buyCandidates / $sellCandidates above are "whatever fired THIS
+    // refresh" — momentum/new-entry/rank picks computed from the current
+    // live tick. Using them directly as buy_box/sell_box meant a stock
+    // dropping out of this refresh's candidate set (e.g. a different
+    // stock now leads the momentum ranking) made it vanish from the box
+    // entirely, and a symbol re-entering later got a brand-new box entry
+    // built from $buyCandidates' live 'price' field — even though the
+    // frontend's entry-price lookup would still show the correct locked
+    // price for it, the card itself would flicker in/out and, right
+    // after a fresh login/page-load, could show only whatever happens to
+    // be live-active at that exact moment rather than everything given
+    // earlier today. That's what read as "recommendations refreshed at
+    // login" — the same underlying entry_price was always correctly
+    // locked in $daily['recommendations'], but the box surfacing it
+    // wasn't reliably showing every still-open pick.
+    //
+    // Fix: build the box straight from $daily['recommendations'] — every
+    // symbol with an OPEN (not yet target-hit) position today, on the
+    // correct side, using its ORIGINAL locked reason/confidence and
+    // current live price/%change (for the "today" stat) where the stock
+    // is still tracked. This is a strict superset of "this refresh's
+    // candidates" (they were registered into $daily just above, before
+    // this point) plus every earlier-today pick that's still open —
+    // capped at the same box size, most-recently-entered first, so it
+    // doesn't grow unbounded across the day.
+    $openBuyBox = [];
+    $openSellBox = [];
+    foreach ($daily['recommendations'] as $rec) {
+        if (!empty($rec['achieved'])) continue; // only still-open picks belong in the live box
+        $sym = prakashNormalizeSymbol((string)($rec['symbol'] ?? ''));
+        if ($sym === '') continue;
+        $stock = $stocksBySymbol[$sym] ?? null;
+        $item = [
+            'symbol'             => $sym,
+            'price'              => $stock ? (float)($stock['price'] ?? 0) : (float)($rec['last_checked_price'] ?? $rec['entry_price'] ?? 0),
+            'percentage_change'  => $stock ? (float)($stock['change_pct'] ?? 0) : null,
+            'reason'             => $rec['reason'] ?? ($rec['side'] === 'Buy' ? 'Momentum Buy' : 'Momentum Sell'),
+            'confidence'         => (float)($rec['confidence'] ?? 0.0),
+            '_entry_time'        => $rec['entry_time'] ?? '',
+        ];
+        $ps = $pointScores[$sym][$rec['side']] ?? null;
+        if ($ps) { $item['point_score'] = $ps['score']; $item['stars'] = $ps['stars']; $item['tier'] = $ps['tier']; }
+        if (($rec['side'] ?? '') === 'Buy') $openBuyBox[] = $item; else $openSellBox[] = $item;
+    }
+    usort($openBuyBox, fn($a, $b) => strcmp($b['_entry_time'], $a['_entry_time']));
+    usort($openSellBox, fn($a, $b) => strcmp($b['_entry_time'], $a['_entry_time']));
+    $openBuyBox = array_map(fn($e) => array_diff_key($e, ['_entry_time' => true]), array_slice($openBuyBox, 0, $boxCap));
+    $openSellBox = array_map(fn($e) => array_diff_key($e, ['_entry_time' => true]), array_slice($openSellBox, 0, $boxCap));
+    // Nothing open yet today (very first moments before any registration
+    // has happened) — fall back to this refresh's live candidates so the
+    // box isn't blank.
+    if (!$openBuyBox) $openBuyBox = $buyCandidates;
+    if (!$openSellBox) $openSellBox = $sellCandidates;
+
     return [
         'updated_at' => $timestamp,
         'market_open' => $marketHoursNow,
@@ -1976,8 +2033,8 @@ function buildPrakashRecommendations(array $stocks, ?string $statePath = null, ?
             $rankMovementSell,
             ['recommendation' => 'Sell', 'reason' => 'Rank Movement Down']
         ) : null,
-        'buy_box'   => $buyCandidates,
-        'sell_box'  => $sellCandidates,
+        'buy_box'   => $openBuyBox,
+        'sell_box'  => $openSellBox,
         'top5_buy'  => $top5Buy,
         'top5_sell' => $top5Sell,
         'momentum_up'   => $momentumUp,

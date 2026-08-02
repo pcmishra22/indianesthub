@@ -79,6 +79,7 @@ class DatabaseSeeder extends Seeder
             RevenueReportSeeder::class,
             ReviewSeeder::class,
             SearchStatSeeder::class,
+            ServiceCategorySeeder::class,
             SubscriptionSeeder::class,
             TaxSeeder::class,
             TricityBuilderProjectsBatch3::class,

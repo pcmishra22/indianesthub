@@ -143,6 +143,10 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .news-featured-impact{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px;display:flex;align-items:center;gap:10px}
 .news-featured-headline{font-size:1.65rem;font-weight:700;color:#fff;line-height:1.35;margin-bottom:14px}
 .news-featured-summary{font-size:1.08rem;color:var(--news-text);line-height:1.75;margin-bottom:18px}
+.news-featured-fulltext{font-size:1.05rem;color:var(--news-text);line-height:1.8;margin-bottom:18px}
+.news-featured-fulltext p{margin:0 0 14px}
+.news-featured-fulltext p:last-child{margin-bottom:0}
+.news-fulltext-status{font-size:13px;color:var(--muted);margin-bottom:18px;font-style:italic}
 .news-featured-link{display:inline-flex;align-items:center;gap:6px;font-size:15px;font-weight:600;color:var(--accent2);text-decoration:none}
 .news-featured-link:hover{text-decoration:underline}
 .news-sidebar-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--news-text);margin-bottom:10px;padding:0 2px}
@@ -564,6 +568,9 @@ tr:hover td{background:rgba(255,255,255,.02)}
         <option value="5m">5 Min</option>
         <option value="15m">15 Min</option>
         <option value="1h">1 Hour</option>
+        <option value="1wk">1 Week</option>
+        <option value="1mo">1 Month</option>
+        <option value="1y">1 Year</option>
       </select>
       <button class="btn btn-primary" onclick="loadChart()" style="padding:7px 16px">📊 Load Chart</button>
     </div>
@@ -623,11 +630,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <!-- At-a-glance KPIs: what a trader checks first — how many are still
          live, how many won, how many missed, overall hit rate. -->
     <div class="kpi-row" id="combinedEodKpis" style="display:none;margin-bottom:12px">
-      <div class="kpi"><div class="kpi-label">Stocks Recommended</div><div class="kpi-val" id="ceodStocks" style="font-size:1.3rem">—</div><div class="kpi-sub" id="ceodStocksSub">distinct Buy / Sell</div></div>
-      <div class="kpi orange"><div class="kpi-label">Open ⏳</div><div class="kpi-val" id="ceodOpen">—</div><div class="kpi-sub">still in play</div></div>
-      <div class="kpi green"><div class="kpi-label">Achieved ✅</div><div class="kpi-val" id="ceodAchieved">—</div><div class="kpi-sub">target hit</div></div>
-      <div class="kpi red"><div class="kpi-label">Not Achieved ❌</div><div class="kpi-val" id="ceodNotAchieved">—</div><div class="kpi-sub">day closed, missed</div></div>
-      <div class="kpi" style="border-top:3px solid #a78bfa"><div class="kpi-label">Success Rate</div><div class="kpi-val" id="ceodRate">—</div><div class="kpi-sub">of resolved picks</div></div>
+      <div class="kpi" style="cursor:pointer" onclick="ceodKpiFilter('all')" title="Click to see every Buy/Sell pick logged today"><div class="kpi-label">Stocks Recommended</div><div class="kpi-val" id="ceodStocks" style="font-size:1.3rem">—</div><div class="kpi-sub" id="ceodStocksSub">distinct symbols, Buy + Sell</div></div>
+      <div class="kpi orange" style="cursor:pointer" onclick="ceodKpiFilter('open')" title="Click to see exactly which stocks are still open"><div class="kpi-label">Open ⏳</div><div class="kpi-val" id="ceodOpen">—</div><div class="kpi-sub">still in play — click to see which</div></div>
+      <div class="kpi green" style="cursor:pointer" onclick="ceodKpiFilter('achieved')" title="Click to see exactly which stocks hit target, and when"><div class="kpi-label">Achieved ✅</div><div class="kpi-val" id="ceodAchieved">—</div><div class="kpi-sub">target hit — click to see which</div></div>
+      <div class="kpi red" style="cursor:pointer" onclick="ceodKpiFilter('not_achieved')" title="Click to see exactly which stocks missed"><div class="kpi-label">Not Achieved ❌</div><div class="kpi-val" id="ceodNotAchieved">—</div><div class="kpi-sub">day closed, missed — click to see which</div></div>
+      <div class="kpi" style="border-top:3px solid #a78bfa"><div class="kpi-label">Success Rate</div><div class="kpi-val" id="ceodRate">—</div><div class="kpi-sub">Achieved ÷ (Achieved + Not Achieved) — Open picks aren't counted yet</div></div>
     </div>
 
     <!-- Filters — a trader almost always wants "what's open right now" first,
@@ -2137,6 +2144,7 @@ function addHistory(sym){
 let newsLoaded=false;
 let _newsItems=[];
 let _newsActiveIdx=0;
+let _newsFullCache={}; // link -> {ok, text} from /api/news/full, so revisiting an article doesn't refetch
 
 function newsRelTime(ts){
   if(!ts) return '';
@@ -2156,11 +2164,17 @@ function renderNewsLayout(){
   const featured = _newsItems[_newsActiveIdx] || _newsItems[0];
   const fic = featured.impact==='Bullish'?'imp-bull':featured.impact==='Bearish'?'imp-bear':'imp-neu';
   const fSt = (featured.stocks_affected||[]).map(s=>`<span class="ns-tag">${escHtml(s)}</span>`).join('');
+  const cached = _newsFullCache[featured.link];
+  const fullBodyHtml = cached && cached.ok
+    ? `<div class="news-featured-fulltext" id="newsFullText">${cached.text.split('\n\n').map(p=>`<p>${escHtml(p)}</p>`).join('')}</div>`
+    : `<div class="news-featured-summary">${escHtml(featured.summary||'')}</div>
+       <div class="news-fulltext-status" id="newsFullText">${featured.link?'Loading full article…':''}</div>`;
+
   const featuredHtml = `<div class="news-featured">
       <div class="news-featured-impact ${fic}">${escHtml(featured.impact||'Neutral')} · ${escHtml(featured.source||'Market')} · <span class="news-list-time">${newsRelTime(featured.pub_ts)}</span></div>
       <div class="news-featured-headline">${escHtml(featured.headline||'')}</div>
-      <div class="news-featured-summary">${escHtml(featured.summary||'')}</div>
-      ${featured.link?`<a class="news-featured-link" href="${escHtml(featured.link)}" target="_blank" rel="noopener noreferrer">Read full article on ${escHtml(featured.source||'source')} →</a>`:''}
+      ${fullBodyHtml}
+      ${featured.link?`<a class="news-featured-link" href="${escHtml(featured.link)}" target="_blank" rel="noopener noreferrer">Read on ${escHtml(featured.source||'source')} →</a>`:''}
       ${fSt?`<div class="news-stocks">${fSt}</div>`:''}
     </div>`;
 
@@ -2180,6 +2194,30 @@ function renderNewsLayout(){
         <div class="news-list">${listHtml}</div>
       </div>
     </div>`;
+
+  if (featured.link && !(cached && cached.ok)) fetchFullArticle(featured.link, _newsActiveIdx);
+}
+
+// Fetch the full article body for one news item and patch it into the DOM
+// if that item is still the one being viewed (guards against a slow
+// response landing after the user has clicked to a different article).
+async function fetchFullArticle(link, forIdx){
+  try{
+    const r = await fetch(apiUrl('api/news/full') + '?link=' + encodeURIComponent(link));
+    const d = await r.json();
+    _newsFullCache[link] = d;
+    if (forIdx !== _newsActiveIdx) return; // user moved on, don't repaint
+    const holder = document.getElementById('newsFullText');
+    if (!holder) return;
+    if (d.ok && d.text) {
+      holder.outerHTML = `<div class="news-featured-fulltext" id="newsFullText">${d.text.split('\n\n').map(p=>`<p>${escHtml(p)}</p>`).join('')}</div>`;
+    } else {
+      holder.textContent = ''; // couldn't extract — summary above stays as-is
+    }
+  } catch(e) {
+    const holder = document.getElementById('newsFullText');
+    if (holder) holder.textContent = '';
+  }
 }
 
 function selectNewsItem(i){
@@ -2517,40 +2555,81 @@ function renderLeaders(d){
 
 // Start auto-tick when leaders tab is active — handled inside showTab above
 
-// ── Intraday Chart ────────────────────────────────────────────
+// ── Intraday / Week / Month / Year Chart ──────────────────────
 let priceChartInst = null, volChartInst = null;
+
+// Interval -> data source. 5m/15m/1h come from /api/intraday (true
+// intraday candles, today only). 1wk/1mo/1y are daily-granularity views
+// built from /api/history (the same daily OHLCV series used elsewhere
+// for technical analysis) — 1 Week just slices the most recent 7
+// trading days off that series, 1 Month the most recent 30, 1 Year the
+// full 365-day history the endpoint supports.
+const CHART_HISTORY_DAYS = {'1wk': 7, '1mo': 30, '1y': 365};
+const CHART_INTERVAL_LABEL = {'5m':'5 Min Intraday','15m':'15 Min Intraday','1h':'1 Hour Intraday','1wk':'1 Week','1mo':'1 Month','1y':'1 Year'};
 
 async function loadChart(){
   let sym = (document.getElementById('chartSymInput').value||'').trim().toUpperCase();
   if(!sym){ document.getElementById('chartSymInput').focus(); return; }
   const interval = document.getElementById('chartInterval').value;
-  document.getElementById('chartStatus').innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted)"><div class="spin" style="width:24px;height:24px;border-width:3px;display:inline-block"></div><br><br>Fetching intraday data for <strong>'+escHtml(sym)+'</strong>…</div>';
+  const isDaily = Object.prototype.hasOwnProperty.call(CHART_HISTORY_DAYS, interval);
+  document.getElementById('chartStatus').innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted)"><div class="spin" style="width:24px;height:24px;border-width:3px;display:inline-block"></div><br><br>Fetching '+(isDaily?'price history':'intraday data')+' for <strong>'+escHtml(sym)+'</strong>…</div>';
   document.getElementById('chartStatus').style.display='block';
   document.getElementById('chartWrap').style.display='none';
   try{
-    const r = await fetch(apiUrl('api/intraday')+'?symbol='+encodeURIComponent(sym)+'&interval='+interval);
-    const d = await r.json();
-    if(d.error){ document.getElementById('chartStatus').innerHTML='<div class="err-box" style="margin:16px">'+escHtml(d.error)+'</div>'; return; }
-    renderChart(d, sym, interval);
-    // Also load pivots
-    const pr = await fetch(apiUrl('api/pivots')+'?symbol='+encodeURIComponent(sym));
-    const pd = await pr.json();
-    if(pd.pivots) renderPivots(pd.pivots);
+    let d;
+    if(isDaily){
+      const days = CHART_HISTORY_DAYS[interval];
+      // /api/history enforces a 30-day minimum server-side (it's shared
+      // with the technical-analysis lookback elsewhere), so 1 Week's
+      // days=7 would otherwise silently come back as 30 days of rows.
+      // Request enough to satisfy that floor, then slice to the actual
+      // window we want to display.
+      const r = await fetch(apiUrl('api/history')+'?symbol='+encodeURIComponent(sym)+'&days='+Math.max(days,30));
+      const hd = await r.json();
+      if(hd.error){ document.getElementById('chartStatus').innerHTML='<div class="err-box" style="margin:16px">'+escHtml(hd.error)+'</div>'; return; }
+      const rows = (hd.rows||[]).slice(-days);
+      // Same shape /api/intraday returns (t/o/h/l/c/v), so renderChart()
+      // doesn't need to know which source it came from — just whether
+      // to format the x-axis as dates instead of times (isDaily below).
+      d = {candles: rows.map(row=>({
+        t: Math.floor(new Date(row.date+'T00:00:00').getTime()/1000),
+        o: row.open, h: row.high, l: row.low, c: row.close, v: row.volume,
+      }))};
+    } else {
+      const r = await fetch(apiUrl('api/intraday')+'?symbol='+encodeURIComponent(sym)+'&interval='+interval);
+      d = await r.json();
+      if(d.error){ document.getElementById('chartStatus').innerHTML='<div class="err-box" style="margin:16px">'+escHtml(d.error)+'</div>'; return; }
+    }
+    renderChart(d, sym, interval, isDaily);
+    // Pivot points (S/R levels off the prior day's OHLC) are an intraday
+    // concept — skip them for the week/month/year views where they'd
+    // just be noise against a much longer price range.
+    if(!isDaily){
+      const pr = await fetch(apiUrl('api/pivots')+'?symbol='+encodeURIComponent(sym));
+      const pd = await pr.json();
+      if(pd.pivots) renderPivots(pd.pivots);
+    } else {
+      const pivotEl=document.getElementById('pivotDisplay');
+      if(pivotEl) pivotEl.innerHTML='';
+    }
   }catch(e){
     document.getElementById('chartStatus').innerHTML='<div class="err-box" style="margin:16px">Error: '+escHtml(e.message)+'</div>';
   }
 }
 
-function renderChart(d, sym, interval){
+function renderChart(d, sym, interval, isDaily){
   const candles = d.candles||[];
-  if(!candles.length){ document.getElementById('chartStatus').innerHTML='<div style="padding:40px;text-align:center;color:var(--muted)">No intraday data available. Market may be closed.</div>'; return; }
+  if(!candles.length){ document.getElementById('chartStatus').innerHTML='<div style="padding:40px;text-align:center;color:var(--muted)">No '+(isDaily?'price history':'intraday data')+' available'+(isDaily?'.':'. Market may be closed.')+'</div>'; return; }
 
   document.getElementById('chartStatus').style.display='none';
   document.getElementById('chartWrap').style.display='block';
 
   const labels = candles.map(c=>{
     const dt = new Date(c.t*1000);
-    return dt.toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit'});
+    if(!isDaily) return dt.toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit'});
+    // Date-granularity views: "DD MMM" is enough for 1W/1M; add the year
+    // for 1Y so ticks spanning a year boundary stay unambiguous.
+    return dt.toLocaleDateString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:interval==='1y'?'2-digit':undefined});
   });
   const closes  = candles.map(c=>c.c);
   const volumes = candles.map(c=>c.v);
@@ -2566,14 +2645,16 @@ function renderChart(d, sym, interval){
   const chg  = first>0 ? ((last-first)/first*100).toFixed(2) : '0.00';
   const vol  = volumes.reduce((a,b)=>a+b,0);
 
-  document.getElementById('chartTitle').textContent = sym + ' — ' + interval + ' Intraday';
-  document.getElementById('chartMeta').textContent  = `${candles.length} candles · ${new Date().toLocaleDateString('en-IN')}`;
+  document.getElementById('chartTitle').textContent = sym + ' — ' + (CHART_INTERVAL_LABEL[interval]||interval);
+  document.getElementById('chartMeta').textContent  = isDaily
+    ? `${candles.length} sessions · through ${new Date().toLocaleDateString('en-IN')}`
+    : `${candles.length} candles · ${new Date().toLocaleDateString('en-IN')}`;
 
   document.getElementById('intradayStats').innerHTML = [
     {l:'Last Price', v:'₹'+fmtNum(last), c:isUp?'var(--green)':'var(--red)'},
     {l:'Change',     v:(isUp?'▲ +':' ▼ ')+chg+'%', c:isUp?'var(--green)':'var(--red)'},
-    {l:'Day High',   v:'₹'+fmtNum(high), c:'var(--green)'},
-    {l:'Day Low',    v:'₹'+fmtNum(low),  c:'var(--red)'},
+    {l:isDaily?'Period High':'Day High',   v:'₹'+fmtNum(high), c:'var(--green)'},
+    {l:isDaily?'Period Low':'Day Low',    v:'₹'+fmtNum(low),  c:'var(--red)'},
     {l:'Open',       v:'₹'+fmtNum(opens[0]), c:'var(--accent2)'},
     {l:'Volume',     v:N(vol), c:'var(--text)'},
   ].map(s=>`<div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
@@ -2702,6 +2783,18 @@ function setEodFilter(kind, value){
     btn.classList.toggle('active', btn.dataset.filter===value);
   });
   renderCombinedEodCards(_lastCombinedEod);
+}
+
+// Clicking a KPI number (e.g. "Achieved ✅ 4") is the direct answer to
+// "which stocks?" — applies the matching status filter (also resetting
+// the engine filter to both, so nothing is hidden unexpectedly) and
+// scrolls the now-filtered list into view, instead of leaving the person
+// to find the filter chips and match the count up themselves.
+function ceodKpiFilter(status){
+  setEodFilter('engine','all');
+  setEodFilter('status',status);
+  const tableEl=document.getElementById('combinedEodTable');
+  if(tableEl) tableEl.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 // A trader opening this report wants to know, in order: what's still live
@@ -2871,10 +2964,14 @@ async function loadCombinedEodReport(date){
       kpiEl.style.display='';
       const stocksEl=document.getElementById('ceodStocks');
       const stocksSubEl=document.getElementById('ceodStocksSub');
-      if(stocksEl) stocksEl.innerHTML=`<span style="color:var(--green)">${buyStockSet.size}</span> / <span style="color:var(--red)">${sellStockSet.size}</span>`;
+      // Previously rendered as "8 / 10", which reads like a fraction
+      // ("8 out of 10") — it's actually two independent counts (distinct
+      // Buy symbols, distinct Sell symbols). Spelling out which is which
+      // removes that ambiguity.
+      if(stocksEl) stocksEl.innerHTML=`<span style="color:var(--green)">${buyStockSet.size} Buy</span> <span style="color:var(--muted);font-weight:400">+</span> <span style="color:var(--red)">${sellStockSet.size} Sell</span>`;
       if(stocksSubEl) stocksSubEl.textContent = (buyEntries+sellEntries) > (buyStockSet.size+sellStockSet.size)
-        ? `distinct Buy / Sell (${buyEntries+sellEntries} entries total)`
-        : 'distinct Buy / Sell';
+        ? `distinct symbols (${buyEntries+sellEntries} entries total incl. re-picks)`
+        : 'distinct symbols, Buy + Sell';
       document.getElementById('ceodOpen').textContent=openCount;
       document.getElementById('ceodAchieved').textContent=achievedCount;
       document.getElementById('ceodNotAchieved').textContent=notAchievedCount;
