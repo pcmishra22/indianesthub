@@ -59,4 +59,15 @@ return [
         'model' => env('GEMINI_MODEL', 'gemini-2.0-flash'),
     ],
 
+    // Meta (Facebook/Instagram) — used for Page connection (OAuth) and
+    // Lead Ads webhook capture. Requires a Meta for Developers app with
+    // Business verification + App Review for the 'leads_retrieval' and
+    // 'pages_manage_ads' permissions before this works in production.
+    'facebook' => [
+        'app_id'        => env('FACEBOOK_APP_ID'),
+        'app_secret'    => env('FACEBOOK_APP_SECRET'),
+        'verify_token'  => env('FACEBOOK_WEBHOOK_VERIFY_TOKEN'),
+        'graph_version' => env('FACEBOOK_GRAPH_VERSION', 'v21.0'),
+    ],
+
 ];

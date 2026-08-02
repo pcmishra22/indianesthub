@@ -14,6 +14,7 @@ class BuilderLead extends Model
         'lead_type', 'source', 'status',
         'notes', 'follow_up_at', 'hot_score',
         'ip_address', 'user_agent', 'visitor_token', 'call_log',
+        'external_lead_id',
     ];
 
     protected $casts = [
@@ -42,11 +43,12 @@ class BuilderLead extends Model
 
         // Lead type weight
         $score += match ($this->lead_type) {
-            'visit'    => 40,
-            'callback' => 30,
-            'general'  => 20,
-            'brochure' => 10,
-            default    => 10,
+            'visit'         => 40,
+            'callback'      => 30,
+            'facebook_lead' => 35,
+            'general'       => 20,
+            'brochure'      => 10,
+            default         => 10,
         };
 
         // Freshness (created in last 24h → +30, last 72h → +15)

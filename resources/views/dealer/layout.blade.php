@@ -68,6 +68,12 @@
 						</a>
 					</li>
 
+				<li class="sidebar-item {{ request()->routeIs('dealer.social.*') ? 'active' : '' }}">
+						<a class="sidebar-link" href="{{ route('dealer.social.index') }}">
+							<i class="align-middle" data-feather="facebook"></i> <span class="align-middle">Social Lead Capture</span>
+						</a>
+					</li>
+
 					<li class="sidebar-item {{ request()->routeIs('dealer.schedule-viewings.*') ? 'active' : '' }}">
 						<a class="sidebar-link" href="{{ route('dealer.schedule-viewings.index') }}">
 							<i class="align-middle" data-feather="calendar"></i> <span class="align-middle">Schedule Viewings</span>

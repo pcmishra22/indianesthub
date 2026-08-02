@@ -48,6 +48,25 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
+        // ── "Today" action list ──────────────────────────────────────────
+        $overdueFollowUps = BuilderLead::where('builder_id', $builder->id)
+            ->overdue()
+            ->with('project:id,title')
+            ->orderBy('follow_up_at')
+            ->take(8)
+            ->get();
+
+        $hotUncalledLeads = BuilderLead::where('builder_id', $builder->id)
+            ->where('hot_score', '>=', 80)
+            ->where(function ($q) {
+                $q->whereNull('call_log')->orWhereRaw("JSON_LENGTH(call_log) = 0");
+            })
+            ->whereNotIn('status', ['converted', 'lost'])
+            ->with('project:id,title')
+            ->orderByDesc('hot_score')
+            ->take(8)
+            ->get();
+
         return view('builder.dashboard', compact(
             'builder',
             'totalProjects',
@@ -58,7 +77,9 @@ class DashboardController extends Controller
             'newLeads',
             'recentLeads',
             'recentProjects',
-            'recentProperties'
+            'recentProperties',
+            'overdueFollowUps',
+            'hotUncalledLeads'
         ));
     }
 }

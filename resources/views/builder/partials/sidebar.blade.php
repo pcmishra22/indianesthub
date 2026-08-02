@@ -38,6 +38,13 @@
                 </a>
             </li>
 
+            <li class="sidebar-item {{ request()->routeIs('builder.social.*') ? 'active' : '' }}">
+                <a class="sidebar-link" href="{{ route('builder.social.index') }}">
+                    <i class="align-middle" data-feather="facebook"></i>
+                    <span class="align-middle">Social Lead Capture</span>
+                </a>
+            </li>
+
             <li class="sidebar-header">Account</li>
 
             <li class="sidebar-item {{ request()->routeIs('builder.profile') ? 'active' : '' }}">

@@ -5,6 +5,87 @@
 @section('content')
 <h1 class="h3 mb-3"><strong>Analytics</strong> Dashboard</h1>
 
+{{-- ═══════════════════ TODAY: what needs your attention right now ═══════════════════ --}}
+@php
+    $todayTotal = $overdueFollowUps->count() + $hotUncalledLeads->count() + $todaysVisits->count();
+@endphp
+<div class="card mb-4" style="border-radius:12px;border:1px solid #e2e8f0;">
+    <div class="card-header bg-transparent d-flex align-items-center justify-content-between" style="border-bottom:1px solid #e2e8f0;">
+        <h5 class="mb-0"><i class="align-middle me-1" data-feather="zap" style="color:#f59e0b;"></i> Today</h5>
+        @if($todayTotal > 0)
+            <span class="badge bg-warning text-dark">{{ $todayTotal }} need{{ $todayTotal === 1 ? 's' : '' }} attention</span>
+        @else
+            <span class="badge bg-success">All caught up</span>
+        @endif
+    </div>
+    <div class="card-body">
+        @if($todayTotal === 0)
+            <p class="text-muted mb-0 small"><i class="align-middle me-1" data-feather="check-circle"></i> No overdue follow-ups, uncalled hot leads, or visits scheduled for today. Nice work!</p>
+        @else
+        <div class="row g-3">
+
+            {{-- Overdue follow-ups --}}
+            @if($overdueFollowUps->count())
+            <div class="col-md-4">
+                <h6 class="small text-uppercase text-danger fw-bold mb-2"><i class="align-middle me-1" data-feather="alert-triangle" style="width:14px;height:14px;"></i> Overdue Follow-ups ({{ $overdueFollowUps->count() }})</h6>
+                @foreach($overdueFollowUps as $lead)
+                <div class="d-flex align-items-center justify-content-between py-2" style="border-bottom:1px solid #f1f5f9;">
+                    <div class="me-2" style="min-width:0;">
+                        <div class="fw-semibold small text-truncate">{{ $lead->name }}</div>
+                        <div class="text-muted" style="font-size:.72rem;">{{ $lead->follow_up_at->diffForHumans() }} &middot; {{ $lead->property->title ?? 'General' }}</div>
+                    </div>
+                    <div class="d-flex gap-1 flex-shrink-0">
+                        <a href="tel:{{ $lead->phone }}" class="btn btn-sm btn-outline-success py-0 px-2"><i class="align-middle" data-feather="phone" style="width:13px;height:13px;"></i></a>
+                        <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $lead->phone) }}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-2" style="color:#25d366;border-color:#86efac;"><i class="align-middle" data-feather="message-circle" style="width:13px;height:13px;"></i></a>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+            @endif
+
+            {{-- Hot uncalled leads --}}
+            @if($hotUncalledLeads->count())
+            <div class="col-md-4">
+                <h6 class="small text-uppercase fw-bold mb-2" style="color:#dc2626;"><i class="align-middle me-1" data-feather="target" style="width:14px;height:14px;"></i> Hot Leads, Not Called Yet ({{ $hotUncalledLeads->count() }})</h6>
+                @foreach($hotUncalledLeads as $lead)
+                <div class="d-flex align-items-center justify-content-between py-2" style="border-bottom:1px solid #f1f5f9;">
+                    <div class="me-2" style="min-width:0;">
+                        <div class="fw-semibold small text-truncate">🔥 {{ $lead->name }}</div>
+                        <div class="text-muted" style="font-size:.72rem;">Score {{ $lead->hot_score }} &middot; {{ $lead->created_at->diffForHumans() }}</div>
+                    </div>
+                    <div class="d-flex gap-1 flex-shrink-0">
+                        <a href="tel:{{ $lead->phone }}" class="btn btn-sm btn-outline-success py-0 px-2"><i class="align-middle" data-feather="phone" style="width:13px;height:13px;"></i></a>
+                        <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $lead->phone) }}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-2" style="color:#25d366;border-color:#86efac;"><i class="align-middle" data-feather="message-circle" style="width:13px;height:13px;"></i></a>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+            @endif
+
+            {{-- Today's visits --}}
+            @if($todaysVisits->count())
+            <div class="col-md-4">
+                <h6 class="small text-uppercase fw-bold mb-2" style="color:#0078d4;"><i class="align-middle me-1" data-feather="calendar" style="width:14px;height:14px;"></i> Visits Scheduled Today ({{ $todaysVisits->count() }})</h6>
+                @foreach($todaysVisits as $visit)
+                <div class="d-flex align-items-center justify-content-between py-2" style="border-bottom:1px solid #f1f5f9;">
+                    <div class="me-2" style="min-width:0;">
+                        <div class="fw-semibold small text-truncate">{{ $visit->name }} &middot; {{ $visit->time }}</div>
+                        <div class="text-muted text-truncate" style="font-size:.72rem;">{{ $visit->property->title ?? '' }}</div>
+                    </div>
+                    <div class="d-flex gap-1 flex-shrink-0">
+                        <a href="tel:{{ $visit->phone }}" class="btn btn-sm btn-outline-success py-0 px-2"><i class="align-middle" data-feather="phone" style="width:13px;height:13px;"></i></a>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+            @endif
+
+        </div>
+        @endif
+    </div>
+</div>
+{{-- ═══════════════════ END TODAY ═══════════════════ --}}
+
 <div class="row">
     <div class="col-sm-6 col-xl-3">
         <div class="card">

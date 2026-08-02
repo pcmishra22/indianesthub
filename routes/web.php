@@ -500,12 +500,25 @@ Route::prefix('dealer')->middleware('auth:dealer')->name('dealer.')->group(funct
     Route::get('/properties/{property}/marketing/social-post', [\App\Http\Controllers\Dealer\MarketingController::class, 'socialPost'])->name('properties.marketing.social-post');
     Route::get('/properties/{property}/marketing/edm', [\App\Http\Controllers\Dealer\MarketingController::class, 'edm'])->name('properties.marketing.edm');
     Route::post('/properties/{property}/marketing/edm', [\App\Http\Controllers\Dealer\MarketingController::class, 'sendEdm'])->name('properties.marketing.edm.send');
+
+    // Social Media Lead Capture (Facebook/Instagram Page connection)
+    Route::get('/social-connections', [\App\Http\Controllers\Dealer\SocialConnectionController::class, 'index'])->name('social.index');
+    Route::get('/social-connections/connect', [\App\Http\Controllers\Dealer\SocialConnectionController::class, 'connect'])->name('social.connect');
+    Route::get('/social-connections/callback', [\App\Http\Controllers\Dealer\SocialConnectionController::class, 'callback'])->name('social.callback');
+    Route::get('/social-connections/select-page', [\App\Http\Controllers\Dealer\SocialConnectionController::class, 'showPagePicker'])->name('social.select-page');
+    Route::post('/social-connections/select-page', [\App\Http\Controllers\Dealer\SocialConnectionController::class, 'selectPage'])->name('social.select-page.submit');
+    Route::delete('/social-connections/{connection}', [\App\Http\Controllers\Dealer\SocialConnectionController::class, 'disconnect'])->name('social.disconnect');
     // Bulk CSV upload
     Route::get('/properties/upload-csv', [DealerPropertyController::class, 'showCsvUploadForm'])->name('properties.uploadCsvForm');
         Route::post('/properties/upload-csv', [DealerPropertyController::class, 'uploadCsv'])->name('properties.uploadCsv');
 
     // Inquiries
     Route::get('/inquiries', [DealerInquiryController::class, 'index'])->name('inquiries.index');
+    Route::patch('/inquiries/{inquiry}/status', [DealerInquiryController::class, 'updateStatus'])->name('inquiries.update-status');
+    Route::post('/inquiries/{inquiry}/notes', [DealerInquiryController::class, 'saveNotes'])->name('inquiries.save-notes');
+    Route::post('/inquiries/{inquiry}/call-log', [DealerInquiryController::class, 'addCallLog'])->name('inquiries.add-call-log');
+    Route::get('/inquiries/export', [DealerInquiryController::class, 'export'])->name('inquiries.export');
+    Route::delete('/inquiries/{inquiry}', [DealerInquiryController::class, 'destroy'])->name('inquiries.destroy');
 
     // Schedule Viewings
     Route::get('/schedule-viewings', [DealerScheduleViewingController::class, 'index'])->name('schedule-viewings.index');
@@ -566,6 +579,14 @@ Route::prefix('builder')->middleware('auth:builder')->name('builder.')->group(fu
     Route::get('/projects/{project}/properties/{property}/marketing/social-post', [\App\Http\Controllers\Builder\MarketingController::class, 'socialPost'])->name('projects.properties.marketing.social-post');
     Route::get('/projects/{project}/properties/{property}/marketing/edm', [\App\Http\Controllers\Builder\MarketingController::class, 'edm'])->name('projects.properties.marketing.edm');
     Route::post('/projects/{project}/properties/{property}/marketing/edm', [\App\Http\Controllers\Builder\MarketingController::class, 'sendEdm'])->name('projects.properties.marketing.edm.send');
+
+    // Social Media Lead Capture (Facebook/Instagram Page connection)
+    Route::get('/social-connections', [\App\Http\Controllers\Builder\SocialConnectionController::class, 'index'])->name('social.index');
+    Route::get('/social-connections/connect', [\App\Http\Controllers\Builder\SocialConnectionController::class, 'connect'])->name('social.connect');
+    Route::get('/social-connections/callback', [\App\Http\Controllers\Builder\SocialConnectionController::class, 'callback'])->name('social.callback');
+    Route::get('/social-connections/select-page', [\App\Http\Controllers\Builder\SocialConnectionController::class, 'showPagePicker'])->name('social.select-page');
+    Route::post('/social-connections/select-page', [\App\Http\Controllers\Builder\SocialConnectionController::class, 'selectPage'])->name('social.select-page.submit');
+    Route::delete('/social-connections/{connection}', [\App\Http\Controllers\Builder\SocialConnectionController::class, 'disconnect'])->name('social.disconnect');
 
     // Leads
     Route::get('/leads', [\App\Http\Controllers\Builder\LeadsController::class, 'index'])->name('leads.index');
@@ -843,6 +864,10 @@ Route::get('/investment-advisor', [\App\Http\Controllers\Frontend\InvestmentAiCo
 Route::post('/ai/investment-advisor', [\App\Http\Controllers\Frontend\InvestmentAiController::class, 'analyze'])
     ->middleware('throttle:10,1')
     ->name('ai.investment-advisor');
+
+// Facebook/Instagram Lead Ads webhook (called by Meta's servers — no auth, CSRF-exempt)
+Route::get('/webhooks/facebook', [\App\Http\Controllers\FacebookWebhookController::class, 'verify'])->name('webhooks.facebook.verify');
+Route::post('/webhooks/facebook', [\App\Http\Controllers\FacebookWebhookController::class, 'receive'])->name('webhooks.facebook.receive');
 
 // Property Market Insights (public)
 Route::get('/market-insights', [\App\Http\Controllers\Frontend\MarketInsightsController::class, 'index'])->name('market-insights.index');

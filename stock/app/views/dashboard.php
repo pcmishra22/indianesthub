@@ -213,6 +213,15 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .eod-progress-fill{position:absolute;top:0;height:100%;border-radius:4px}
 .eod-progress-tick{position:absolute;top:-3px;width:2px;height:12px;background:var(--muted2);border-radius:1px}
 .eod-progress-marker{position:absolute;top:-4px;width:14px;height:14px;border-radius:50%;border:2px solid var(--bg);transform:translateX(-50%)}
+/* Achieved Today showcase — a ranked "what actually hit target" strip */
+.eod-showcase{background:linear-gradient(135deg,rgba(16,185,129,.08),rgba(16,185,129,.02));border:1px solid rgba(16,185,129,.25);border-radius:12px;padding:12px 14px}
+.eod-showcase-title{font-size:.85rem;font-weight:700;color:var(--green2);display:flex;align-items:center;gap:6px;margin-bottom:10px}
+.eod-showcase-row{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px}
+.eod-showcase-card{flex:0 0 auto;min-width:190px;background:rgba(0,0,0,.18);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:10px 12px}
+.eod-showcase-rank{font-size:18px;line-height:1;margin-bottom:4px}
+.eod-showcase-sym{font-weight:800;color:#fff;font-size:14px}
+.eod-showcase-gain{font-weight:800;color:var(--green2);font-size:15px;margin:4px 0}
+.eod-showcase-detail{font-size:12px;color:var(--muted);line-height:1.6}
 @media(max-width:680px){
   .eod-chip{font-size:12px;padding:5px 10px}
 }
@@ -626,6 +635,13 @@ tr:hover td{background:rgba(255,255,255,.02)}
       <h3 style="font-size:.95rem;font-weight:700;color:#fff;margin:0">🗂 Momentum + AI Recommendation Log</h3>
       <div id="combinedEodSummary" style="font-size:14px;color:var(--muted)"></div>
     </div>
+
+    <!-- Achieved showcase — the direct answer to "which stocks actually hit
+         target?". Ranked by gain%, with entry→achieved price and how long
+         it took, so this is a real leaderboard rather than just a filtered
+         copy of the row list below. Hidden entirely when nothing's achieved
+         yet today. -->
+    <div id="ceodAchievedShowcase" style="display:none;margin-bottom:14px"></div>
 
     <!-- At-a-glance KPIs: what a trader checks first — how many are still
          live, how many won, how many missed, overall hit rate. -->
@@ -2793,8 +2809,9 @@ function setEodFilter(kind, value){
 function ceodKpiFilter(status){
   setEodFilter('engine','all');
   setEodFilter('status',status);
-  const tableEl=document.getElementById('combinedEodTable');
-  if(tableEl) tableEl.scrollIntoView({behavior:'smooth', block:'start'});
+  const showcaseEl=document.getElementById('ceodAchievedShowcase');
+  const target = (status==='achieved' && showcaseEl && showcaseEl.style.display!=='none') ? showcaseEl : document.getElementById('combinedEodTable');
+  if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 // A trader opening this report wants to know, in order: what's still live
@@ -2886,6 +2903,58 @@ function eodCardHtml(r){
   </div>`;
 }
 
+// The direct, prominent answer to "which stocks actually achieved target?"
+// — a horizontally-scrollable, medal-ranked strip (best gain% first) with
+// entry price, achieved price, gain%, and how long the pick took to hit
+// target. Separate from the filterable card list below: that list is for
+// browsing everything, this is for the one question people keep asking.
+function renderAchievedShowcase(rows){
+  const el=document.getElementById('ceodAchievedShowcase');
+  if(!el) return;
+  const achieved=(rows||[]).filter(r=>eodRowStatusKey(r)==='achieved');
+  if(!achieved.length){ el.style.display='none'; el.innerHTML=''; return; }
+
+  const withGain = achieved.map(r=>{
+    const entry=+r.entry_price||0;
+    const done=r.achieved_price ?? r.last_checked_price ?? entry;
+    const isBuy = r.side==='Buy';
+    const gainPct = entry>0 ? ((done-entry)/entry)*100*(isBuy?1:-1) : 0;
+    let durationLabel='';
+    if(r.entry_time && r.achieved_at){
+      const t0=Date.parse(r.entry_time.replace(' ','T'));
+      const t1=Date.parse(r.achieved_at.replace(' ','T'));
+      if(!isNaN(t0) && !isNaN(t1) && t1>=t0){
+        const mins=Math.round((t1-t0)/60000);
+        durationLabel = mins<60 ? `${mins}m` : `${(mins/60).toFixed(1)}h`;
+      }
+    }
+    return {...r, _gainPct:gainPct, _done:done, _duration:durationLabel};
+  }).sort((a,b)=>b._gainPct-a._gainPct);
+
+  const medals=['🥇','🥈','🥉'];
+  const cards = withGain.map((r,i)=>{
+    const engineLabel = r.engine==='AI' ? '🤖 AI' : '📊 Momentum';
+    const rankHtml = i<3 ? medals[i] : `#${i+1}`;
+    const timeStr = r.achieved_at ? r.achieved_at.split(' ')[1]||r.achieved_at : '';
+    return `<div class="eod-showcase-card">
+      <div class="eod-showcase-rank">${rankHtml}</div>
+      <div class="eod-showcase-sym">${escHtml(r.symbol)} <span class="eod-side-pill ${r.side==='Buy'?'buy':'sell'}">${escHtml(r.side)}</span></div>
+      <div class="eod-showcase-gain">+${r._gainPct.toFixed(2)}%</div>
+      <div class="eod-showcase-detail">
+        Entry ₹${fmtNum(+r.entry_price||0)} → Hit ₹${fmtNum(r._done)}<br>
+        ${timeStr?`Achieved @ ${escHtml(timeStr)}`:''}${r._duration?` · took ${r._duration}`:''}<br>
+        ${engineLabel}
+      </div>
+    </div>`;
+  }).join('');
+
+  el.style.display='block';
+  el.innerHTML = `<div class="eod-showcase">
+      <div class="eod-showcase-title">🏆 Achieved Today — ${withGain.length} target${withGain.length===1?'':'s'} hit, best first</div>
+      <div class="eod-showcase-row">${cards}</div>
+    </div>`;
+}
+
 function renderCombinedEodCards(d){
   const tableEl=document.getElementById('combinedEodTable');
   if(!tableEl || !d) return;
@@ -2922,6 +2991,8 @@ async function loadCombinedEodReport(date){
       // from the dropdown still works normally for reviewing prior days.
       if(kpiEl) kpiEl.style.display='none';
       if(summaryEl) summaryEl.textContent='';
+      const showcaseElClosed=document.getElementById('ceodAchievedShowcase');
+      if(showcaseElClosed) showcaseElClosed.style.display='none';
       tableEl.innerHTML=`<div style="text-align:center;padding:24px;color:var(--muted);font-size:14px;border:1px dashed var(--border2);border-radius:12px">
         🌙 Market is closed — today's log resumes during trading hours (9:10 AM – 3:30 PM IST)<br>
         <span style="font-size:13px">Pick a previous date above to review past days.</span>
@@ -2950,6 +3021,8 @@ async function loadCombinedEodReport(date){
     }
     if(rows.length===0){
       if(kpiEl) kpiEl.style.display='none';
+      const showcaseElEmpty=document.getElementById('ceodAchievedShowcase');
+      if(showcaseElEmpty) showcaseElEmpty.style.display='none';
       tableEl.innerHTML='<div style="color:var(--muted);padding:20px;text-align:center">No Momentum/AI recommendations logged for this date yet.</div>';
       return;
     }
@@ -2979,6 +3052,7 @@ async function loadCombinedEodReport(date){
       rateEl.textContent = rate!==null ? rate+'%' : '—';
       rateEl.style.color = rate===null?'#fff':(rate>=50?'var(--green)':'var(--red)');
     }
+    renderAchievedShowcase(rows);
     renderCombinedEodCards(d);
   }catch(e){
     tableEl.innerHTML=`<div class="err-box">Error: ${escHtml(e.message)}</div>`;

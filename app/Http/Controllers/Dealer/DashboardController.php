@@ -44,6 +44,36 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
+        // ── "Today" action list ──────────────────────────────────────────
+        // Overdue follow-ups: promised a callback and it's now past due.
+        $overdueFollowUps = Inquiry::where('broker_id', $dealer->id)
+            ->overdue()
+            ->with('property:id,title')
+            ->orderBy('follow_up_at')
+            ->take(8)
+            ->get();
+
+        // Hot leads (score 80+) that haven't been called yet — the ones
+        // most likely to convert if contacted today.
+        $hotUncalledLeads = Inquiry::where('broker_id', $dealer->id)
+            ->where('hot_score', '>=', 80)
+            ->where(function ($q) {
+                $q->whereNull('call_log')->orWhereRaw("JSON_LENGTH(call_log) = 0");
+            })
+            ->whereNotIn('status', ['Converted', 'Lost'])
+            ->with('property:id,title')
+            ->orderByDesc('hot_score')
+            ->take(8)
+            ->get();
+
+        // Site visits scheduled for today.
+        $todaysVisits = ScheduleViewing::where('dealer_id', $dealer->id)
+            ->whereDate('date', today())
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->with('property:id,title')
+            ->orderBy('time')
+            ->get();
+
         return view('dealer.dashboard', compact(
             'totalProperties',
             'activeProperties',
@@ -52,7 +82,10 @@ class DashboardController extends Controller
             'totalViews',
             'recentInquiries',
             'recentViewings',
-            'topProperties'
+            'topProperties',
+            'overdueFollowUps',
+            'hotUncalledLeads',
+            'todaysVisits'
         ));
     }
 }

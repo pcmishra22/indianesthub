@@ -11,6 +11,69 @@
         <span class="text-muted ms-2">Welcome, {{ $builder->display_name }}!</span>
     </div>
 
+    {{-- ═══════════════════ TODAY: what needs your attention right now ═══════════════════ --}}
+    @php
+        $todayTotal = $overdueFollowUps->count() + $hotUncalledLeads->count();
+    @endphp
+    <div class="px-3 mb-4">
+        <div class="card" style="border-radius:12px;border:1px solid #e2e8f0;">
+            <div class="card-header bg-transparent d-flex align-items-center justify-content-between" style="border-bottom:1px solid #e2e8f0;">
+                <h5 class="mb-0"><i class="bi bi-lightning-charge-fill me-1" style="color:#f59e0b;"></i> Today</h5>
+                @if($todayTotal > 0)
+                    <span class="badge bg-warning text-dark">{{ $todayTotal }} need{{ $todayTotal === 1 ? 's' : '' }} attention</span>
+                @else
+                    <span class="badge bg-success">All caught up</span>
+                @endif
+            </div>
+            <div class="card-body">
+                @if($todayTotal === 0)
+                    <p class="text-muted mb-0 small"><i class="bi bi-check-circle me-1"></i> No overdue follow-ups or uncalled hot leads. Nice work!</p>
+                @else
+                <div class="row g-3">
+
+                    @if($overdueFollowUps->count())
+                    <div class="col-md-6">
+                        <h6 class="small text-uppercase text-danger fw-bold mb-2"><i class="bi bi-exclamation-triangle-fill me-1" style="font-size:.8rem;"></i> Overdue Follow-ups ({{ $overdueFollowUps->count() }})</h6>
+                        @foreach($overdueFollowUps as $lead)
+                        <div class="d-flex align-items-center justify-content-between py-2" style="border-bottom:1px solid #f1f5f9;">
+                            <div class="me-2" style="min-width:0;">
+                                <div class="fw-semibold small text-truncate">{{ $lead->name }}</div>
+                                <div class="text-muted" style="font-size:.72rem;">{{ $lead->follow_up_at->diffForHumans() }} &middot; {{ $lead->project->title ?? 'General' }}</div>
+                            </div>
+                            <div class="d-flex gap-1 flex-shrink-0">
+                                <a href="tel:{{ $lead->phone }}" class="btn btn-sm btn-outline-success py-0 px-2"><i class="bi bi-telephone-fill" style="font-size:.75rem;"></i></a>
+                                <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $lead->phone) }}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-2" style="color:#25d366;border-color:#86efac;"><i class="bi bi-whatsapp" style="font-size:.75rem;"></i></a>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                    @endif
+
+                    @if($hotUncalledLeads->count())
+                    <div class="col-md-6">
+                        <h6 class="small text-uppercase fw-bold mb-2" style="color:#dc2626;"><i class="bi bi-bullseye me-1" style="font-size:.8rem;"></i> Hot Leads, Not Called Yet ({{ $hotUncalledLeads->count() }})</h6>
+                        @foreach($hotUncalledLeads as $lead)
+                        <div class="d-flex align-items-center justify-content-between py-2" style="border-bottom:1px solid #f1f5f9;">
+                            <div class="me-2" style="min-width:0;">
+                                <div class="fw-semibold small text-truncate">🔥 {{ $lead->name }}</div>
+                                <div class="text-muted" style="font-size:.72rem;">Score {{ $lead->hot_score }} &middot; {{ $lead->created_at->diffForHumans() }}</div>
+                            </div>
+                            <div class="d-flex gap-1 flex-shrink-0">
+                                <a href="tel:{{ $lead->phone }}" class="btn btn-sm btn-outline-success py-0 px-2"><i class="bi bi-telephone-fill" style="font-size:.75rem;"></i></a>
+                                <a href="https://wa.me/91{{ preg_replace('/[^0-9]/', '', $lead->phone) }}" target="_blank" class="btn btn-sm btn-outline-secondary py-0 px-2" style="color:#25d366;border-color:#86efac;"><i class="bi bi-whatsapp" style="font-size:.75rem;"></i></a>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                    @endif
+
+                </div>
+                @endif
+            </div>
+        </div>
+    </div>
+    {{-- ═══════════════════ END TODAY ═══════════════════ --}}
+
     {{-- Stat Cards --}}
     <div class="row g-3 px-3 mb-4">
         <div class="col-sm-6 col-xl-3">
