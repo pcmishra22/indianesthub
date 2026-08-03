@@ -334,6 +334,10 @@ Route::post('/insurance/lead', [\App\Http\Controllers\Frontend\InsuranceLeadCont
 // Legal Help Lead — public AJAX submit
 Route::post('/legal/lead', [\App\Http\Controllers\Frontend\LegalLeadController::class, 'store'])->name('legal.lead.store');
 
+// Property Management — landing page + public AJAX submit
+Route::get('/property-management', [\App\Http\Controllers\Frontend\PropertyManagementLeadController::class, 'index'])->name('property-management.index');
+Route::post('/property-management/lead', [\App\Http\Controllers\Frontend\PropertyManagementLeadController::class, 'store'])->name('property-management.lead.store');
+
 // ── SEO Service Landing Pages ─────────────────────────────────────────────
 
 // Home Loan
@@ -798,6 +802,12 @@ require __DIR__ . '/admin_properties.php';
         Route::get('/loan-leads/{lead}',                   [\App\Http\Controllers\Admin\LoanLeadController::class, 'show'])->name('loan-leads.show');
         Route::post('/loan-leads/{lead}/status',           [\App\Http\Controllers\Admin\LoanLeadController::class, 'updateStatus'])->name('loan-leads.update-status');
         Route::delete('/loan-leads/{lead}',                [\App\Http\Controllers\Admin\LoanLeadController::class, 'destroy'])->name('loan-leads.destroy');
+
+        Route::get('/property-management-leads',                [\App\Http\Controllers\Admin\PropertyManagementLeadController::class, 'index'])->name('property-management-leads.index');
+        Route::get('/property-management-leads/export',         [\App\Http\Controllers\Admin\PropertyManagementLeadController::class, 'export'])->name('property-management-leads.export');
+        Route::get('/property-management-leads/{lead}',         [\App\Http\Controllers\Admin\PropertyManagementLeadController::class, 'show'])->name('property-management-leads.show');
+        Route::post('/property-management-leads/{lead}/status', [\App\Http\Controllers\Admin\PropertyManagementLeadController::class, 'updateStatus'])->name('property-management-leads.update-status');
+        Route::delete('/property-management-leads/{lead}',      [\App\Http\Controllers\Admin\PropertyManagementLeadController::class, 'destroy'])->name('property-management-leads.destroy');
 
         // Insurance Leads
         Route::get('/insurance-leads',                     [\App\Http\Controllers\Admin\InsuranceLeadController::class, 'index'])->name('insurance-leads.index');

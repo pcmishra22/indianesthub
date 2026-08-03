@@ -70,6 +70,16 @@
                     @endif
                 </a>
             </li>
+            <li class="sidebar-item {{ request()->routeIs('admin.property-management-leads.*') ? 'active' : '' }}">
+                <a class="sidebar-link" href="{{ route('admin.property-management-leads.index') }}">
+                    <i class="align-middle" data-feather="key"></i>
+                    <span class="align-middle">Property Management Leads</span>
+                    @php $newPmLeads = \App\Models\PropertyManagementLead::where('status','new')->count(); @endphp
+                    @if($newPmLeads > 0)
+                        <span class="badge bg-danger rounded-pill ms-auto" style="font-size:.65rem;">{{ $newPmLeads }}</span>
+                    @endif
+                </a>
+            </li>
             <li class="sidebar-item {{ request()->routeIs('admin.insurance-leads.*') ? 'active' : '' }}">
                 <a class="sidebar-link" href="{{ route('admin.insurance-leads.index') }}">
                     <i class="align-middle" data-feather="shield"></i>
