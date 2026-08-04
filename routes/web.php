@@ -652,11 +652,11 @@ Route::prefix('admin')->name('admin.')->group(function () {
 Route::prefix('admin')->middleware('auth:admin')->name('admin.')->group(function () {
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
 
-    // Manage Users
-    Route::resource('users', AdminUserController::class)->only(['index', 'show', 'destroy']);
-    Route::post('/users/{user}/toggle-status', [AdminUserController::class, 'toggleStatus'])->name('users.toggle-status');
-
     // User Bulk Email
+    // NOTE: these literal routes must be registered BEFORE the users resource
+    // below — Route::resource's GET /users/{user} (show) route would otherwise
+    // match /users/bulk-email first, treating "bulk-email" as a user ID and
+    // 404ing via User::findOrFail('bulk-email').
     Route::get('/users/bulk-email', [\App\Http\Controllers\Admin\UserBulkEmailController::class, 'index'])->name('users.bulk-email.index');
     Route::get('/users/bulk-email/create', [\App\Http\Controllers\Admin\UserBulkEmailController::class, 'create'])->name('users.bulk-email.create');
     Route::post('/users/bulk-email', [\App\Http\Controllers\Admin\UserBulkEmailController::class, 'store'])->name('users.bulk-email.store');
@@ -664,6 +664,10 @@ Route::prefix('admin')->middleware('auth:admin')->name('admin.')->group(function
     Route::put('/users/bulk-email/{id}', [\App\Http\Controllers\Admin\UserBulkEmailController::class, 'update'])->name('users.bulk-email.update');
     Route::delete('/users/bulk-email/{id}', [\App\Http\Controllers\Admin\UserBulkEmailController::class, 'destroy'])->name('users.bulk-email.destroy');
     Route::post('/users/bulk-email/{id}/queue', [\App\Http\Controllers\Admin\UserBulkEmailController::class, 'queue'])->name('users.bulk-email.queue');
+
+    // Manage Users
+    Route::resource('users', AdminUserController::class)->only(['index', 'show', 'destroy']);
+    Route::post('/users/{user}/toggle-status', [AdminUserController::class, 'toggleStatus'])->name('users.toggle-status');
 
     // Dealer Bulk Email
     // Dealer Bulk Email now redirects into the unified Users Bulk Email
@@ -680,9 +684,18 @@ Route::prefix('admin')->middleware('auth:admin')->name('admin.')->group(function
 
 
         // Manage Properties
-        Route::resource('properties', AdminPropertyController::class)->only(['index', 'show', 'destroy']);
+        Route::resource('properties', AdminPropertyController::class)->only(['index', 'show', 'create', 'store', 'edit', 'update', 'destroy']);
+        Route::post('/ai/property-description', [\App\Http\Controllers\PropertyAiController::class, 'generateDescription'])->name('ai.property-description');
 Route::post('/properties/{property:id}/toggle-featured', [AdminPropertyController::class, 'toggleFeatured'])->name('properties.toggle-featured');
 Route::post('/properties/{property:id}/toggle-status', [AdminPropertyController::class, 'toggleStatus'])->name('properties.toggle-status');
+
+        // Marketing Studio (brochure generator, WhatsApp share, social post, EDM)
+        // Bound by :id (not the default slug) to match how admin.properties.show links work.
+        Route::get('/properties/{property:id}/marketing', [\App\Http\Controllers\Admin\MarketingController::class, 'index'])->name('properties.marketing');
+        Route::get('/properties/{property:id}/marketing/brochure', [\App\Http\Controllers\Admin\MarketingController::class, 'brochure'])->name('properties.marketing.brochure');
+        Route::get('/properties/{property:id}/marketing/social-post', [\App\Http\Controllers\Admin\MarketingController::class, 'socialPost'])->name('properties.marketing.social-post');
+        Route::get('/properties/{property:id}/marketing/edm', [\App\Http\Controllers\Admin\MarketingController::class, 'edm'])->name('properties.marketing.edm');
+        Route::post('/properties/{property:id}/marketing/edm', [\App\Http\Controllers\Admin\MarketingController::class, 'sendEdm'])->name('properties.marketing.edm.send');
 
         // Manage Service Providers
         Route::resource('service-providers', \App\Http\Controllers\Admin\ServiceProviderController::class);

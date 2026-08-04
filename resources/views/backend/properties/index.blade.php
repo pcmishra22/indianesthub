@@ -4,7 +4,12 @@
 
 <div class="d-flex align-items-center justify-content-between mb-3">
     <h4 class="mb-0"><i data-feather="home" class="me-2 text-primary"></i>Properties</h4>
-    <span class="badge bg-primary fs-6">{{ $properties->total() }} total</span>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-primary fs-6">{{ $properties->total() }} total</span>
+        <a href="{{ route('admin.properties.create') }}" class="btn btn-primary btn-sm">
+            <i class="align-middle" data-feather="plus"></i> Add Property
+        </a>
+    </div>
 </div>
 
 {{-- Search --}}
@@ -97,7 +102,15 @@
 						<td>
 							<div class="d-flex align-items-center gap-2 flex-wrap">
 								<a href="{{ route('admin.properties.show', $property->id) }}" class="btn btn-sm btn-primary">View</a>
+								<a href="{{ route('admin.properties.edit', $property->id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
 								<a href="{{ route('admin.properties.viewers.index', $property->id) }}" class="btn btn-sm btn-outline-info">Viewers</a>
+								<a href="{{ route('admin.properties.marketing', $property->id) }}" class="btn btn-sm btn-outline-primary">Share</a>
+								<form method="POST" action="{{ route('admin.properties.destroy', $property->id) }}" class="d-inline"
+									  onsubmit="return confirm('Delete this property? This cannot be undone from the admin panel.')">
+									@csrf
+									@method('DELETE')
+									<button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+								</form>
 
 								<form method="POST" action="{{ route('admin.properties.toggle-status', $property->id) }}" class="d-inline">
 									@csrf

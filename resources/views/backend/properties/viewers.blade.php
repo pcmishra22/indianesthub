@@ -33,6 +33,14 @@
             </div>
         </div>
     </div>
+    <div class="col-6 col-md-3">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <div class="text-muted small">👤 Registered Viewers</div>
+                <div class="fs-4 fw-bold text-info">{{ number_format($registeredViewers) }}</div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="card shadow-sm mb-3">
@@ -93,8 +101,16 @@
                         </td>
                         <td class="text-muted" style="font-size:0.75rem;">{{ substr($v->session_id ?? '', 0, 16) }}{{ $v->session_id ? '…' : '' }}</td>
                         <td>
-                            @if($v->user_id)
+                            @if($v->user_id && $v->user)
+                                <span class="badge bg-success mb-1">Logged In</span>
+                                <div class="fw-medium small">{{ $v->user->name }}</div>
+                                <div class="small text-muted">{{ $v->user->email }}</div>
+                                @if($v->user->phone)
+                                    <div class="small text-muted">📞 {{ $v->user->phone }}</div>
+                                @endif
+                            @elseif($v->user_id)
                                 <span class="badge bg-success">Logged In</span>
+                                <div class="small text-muted">User #{{ $v->user_id }} (deleted)</div>
                             @else
                                 <span class="badge bg-secondary">Guest</span>
                             @endif

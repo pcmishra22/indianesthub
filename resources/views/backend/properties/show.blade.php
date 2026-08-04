@@ -16,6 +16,18 @@
                 {{ $property->status === 'inactive' ? 'Enable Property' : 'Disable Property' }}
             </button>
         </form>
+        <a href="{{ route('admin.properties.marketing', $property->id) }}" class="btn btn-sm btn-primary">
+            <i class="align-middle" data-feather="share-2" style="width:14px;height:14px;"></i> Marketing Studio
+        </a>
+        <a href="{{ route('admin.properties.edit', $property->id) }}" class="btn btn-sm btn-outline-secondary">
+            <i data-feather="edit-2" style="width:14px;height:14px;"></i> Edit
+        </a>
+        <form action="{{ route('admin.properties.destroy', $property->id) }}" method="POST" class="d-inline"
+              onsubmit="return confirm('Delete this property? This cannot be undone from the admin panel.')">
+            @csrf
+            @method('DELETE')
+            <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+        </form>
     </div>
 </div>
 

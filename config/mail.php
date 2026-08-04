@@ -39,7 +39,17 @@ return [
 
         'smtp' => [
             'transport' => 'smtp',
-            'scheme' => env('MAIL_SCHEME'),
+            // Symfony Mailer's EsmtpTransportFactory only accepts "smtp" (STARTTLS,
+            // typically port 587) or "smtps" (implicit TLS, typically port 465) as
+            // the scheme — it does NOT accept "ssl" or "tls", which were valid
+            // values for the old Laravel MAIL_ENCRYPTION setting. If .env still has
+            // MAIL_SCHEME=ssl or MAIL_SCHEME=tls left over from that older config
+            // style, normalize it here instead of throwing UnsupportedSchemeException.
+            'scheme' => match (env('MAIL_SCHEME')) {
+                'ssl' => 'smtps',
+                'tls' => null, // let the "smtp" scheme negotiate STARTTLS automatically
+                default => env('MAIL_SCHEME'),
+            },
             'url' => env('MAIL_URL'),
             'host' => env('MAIL_HOST', '127.0.0.1'),
             'port' => env('MAIL_PORT', 2525),

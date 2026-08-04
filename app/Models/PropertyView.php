@@ -18,6 +18,14 @@ class PropertyView extends Model
         return $this->belongsTo(\App\Models\Property::class);
     }
 
+    // Identifies the logged-in user who generated this view, when known.
+    // Guest/anonymous views (the majority) leave user_id null and are
+    // tracked instead via visitor_token — see the note below.
+    public function user()
+    {
+        return $this->belongsTo(\App\Models\User::class);
+    }
+
     // Link visitor identity for guest users
     // Note: there is no direct Eloquent relationship method here because
     // we match both property_id and visitor_token (composite identity).

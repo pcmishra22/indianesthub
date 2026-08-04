@@ -98,15 +98,15 @@ class PropertyController extends Controller
             'electricity_status' => 'nullable|string|max:50',
             'gas_pipeline' => 'nullable|boolean',
             'drainage' => 'nullable|boolean',
-            'title' => 'required|string|max:255',
+            'title' => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'property_type' => 'required|string|max:255',
-            'looking_for' => 'required|string|in:Rent,Sale,Renovate',
-            'address' => 'required|string|max:255',
+            'property_type' => 'nullable|string|max:255',
+            'looking_for' => 'nullable|string|in:Rent,Sale,Renovate',
+            'address' => 'nullable|string|max:255',
             'floor_plan_details' => 'nullable|string',
-            'city' => 'required|string|max:255',
-            'state' => 'required|string|max:255',
-            'country' => 'required|string|max:255',
+            'city' => 'nullable|string|max:255',
+            'state' => 'nullable|string|max:255',
+            'country' => 'nullable|string|max:255',
             'locality' => 'nullable|string|max:255',
             'sub_locality' => 'nullable|string|max:255',
             'society_name' => 'nullable|string|max:255',
@@ -115,7 +115,7 @@ class PropertyController extends Controller
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',
             'map_url' => 'nullable|string|max:255',
-            'price' => 'required|numeric',
+            'price' => 'nullable|numeric',
             'bedrooms' => 'nullable|integer',
             'bathrooms' => 'nullable|integer',
             'balconies' => 'nullable|integer',
@@ -133,14 +133,14 @@ class PropertyController extends Controller
             'price_range' => 'nullable|string|max:255',
             'bhk_type' => 'nullable|string|max:255',
             'option_type' => 'nullable|string|max:255',
-            'expected_price' => 'required|numeric',
+            'expected_price' => 'nullable|numeric',
             'price_per_sqft' => 'nullable|numeric',
-            'negotiable' => 'required|boolean',
+            'negotiable' => 'nullable|boolean',
             'maintenance_charges' => 'nullable|numeric',
             'booking_amount' => 'nullable|numeric',
             'monthly_rent' => 'nullable|numeric',
             'lease_duration' => 'nullable|string|max:255',
-            'possession_status' => 'required|string|max:255',
+            'possession_status' => 'nullable|string|max:255',
             'super_builtup_area' => 'nullable|numeric',
             'builtup_area' => 'nullable|numeric',
             'carpet_area' => 'nullable|numeric',
@@ -170,6 +170,19 @@ class PropertyController extends Controller
         $data['is_featured'] = $request->has('is_featured');
         $data['is_premium'] = $request->has('is_premium');
         $data['property_dealer_id'] = $dealerId;
+
+        // Validation above is intentionally lenient (dealers often don't have
+        // every field on hand at listing time and fill the rest in later via
+        // edit). But a handful of DB columns are NOT NULL with no default, so
+        // fall back to a placeholder rather than letting an empty submission
+        // crash with a SQL "cannot be null" error. These placeholders are
+        // obviously incomplete on purpose, to prompt the dealer to edit later.
+        $data['title'] = ($data['title'] ?? '') ?: 'Untitled Property (edit to add details)';
+        $data['property_type'] = ($data['property_type'] ?? '') ?: 'Residential';
+        $data['address'] = ($data['address'] ?? '') ?: 'Address not provided yet';
+        $data['city'] = ($data['city'] ?? '') ?: 'Not specified';
+        $data['state'] = ($data['state'] ?? '') ?: 'Not specified';
+        $data['price'] = $data['price'] ?? 0;
 
         // Compatibility sync: 'floor', 'furnishing' and 'featured' are older
         // columns some display views still read (e.g. dealer property show
@@ -311,15 +324,15 @@ class PropertyController extends Controller
             'electricity_status' => 'nullable|string|max:50',
             'gas_pipeline' => 'nullable|boolean',
             'drainage' => 'nullable|boolean',
-            'title' => 'required|string|max:255',
+            'title' => 'nullable|string|max:255',
             'description' => 'nullable|string',
-            'property_type' => 'required|string|max:255',
-            'looking_for' => 'required|string|in:Rent,Sale,Renovate',
-            'address' => 'required|string|max:255',
+            'property_type' => 'nullable|string|max:255',
+            'looking_for' => 'nullable|string|in:Rent,Sale,Renovate',
+            'address' => 'nullable|string|max:255',
             'floor_plan_details' => 'nullable|string',
-            'city' => 'required|string|max:255',
-            'state' => 'required|string|max:255',
-            'country' => 'required|string|max:255',
+            'city' => 'nullable|string|max:255',
+            'state' => 'nullable|string|max:255',
+            'country' => 'nullable|string|max:255',
             'locality' => 'nullable|string|max:255',
             'sub_locality' => 'nullable|string|max:255',
             'society_name' => 'nullable|string|max:255',
@@ -328,7 +341,7 @@ class PropertyController extends Controller
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',
             'map_url' => 'nullable|string|max:255',
-            'price' => 'required|numeric',
+            'price' => 'nullable|numeric',
             'bedrooms' => 'nullable|integer',
             'bathrooms' => 'nullable|integer',
             'balconies' => 'nullable|integer',
@@ -346,14 +359,14 @@ class PropertyController extends Controller
             'price_range' => 'nullable|string|max:255',
             'bhk_type' => 'nullable|string|max:255',
             'option_type' => 'nullable|string|max:255',
-            'expected_price' => 'required|numeric',
+            'expected_price' => 'nullable|numeric',
             'price_per_sqft' => 'nullable|numeric',
-            'negotiable' => 'required|boolean',
+            'negotiable' => 'nullable|boolean',
             'maintenance_charges' => 'nullable|numeric',
             'booking_amount' => 'nullable|numeric',
             'monthly_rent' => 'nullable|numeric',
             'lease_duration' => 'nullable|string|max:255',
-            'possession_status' => 'required|string|max:255',
+            'possession_status' => 'nullable|string|max:255',
             'super_builtup_area' => 'nullable|numeric',
             'builtup_area' => 'nullable|numeric',
             'carpet_area' => 'nullable|numeric',
