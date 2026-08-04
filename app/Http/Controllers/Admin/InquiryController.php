@@ -34,7 +34,7 @@ class InquiryController extends Controller
                                             : null,
                         'source'      => $inq->source ?? 'website',
                         'created_at'  => $inq->created_at,
-                        'detail_url'  => null, // no admin show page for property inquiries
+                        'detail_url'  => route('admin.inquiries.show', $inq->id),
                     ];
                 });
         }
@@ -86,12 +86,28 @@ class InquiryController extends Controller
 
     public function show($id)
     {
-        return view('backend.inquiries.show', compact('id'));
+        $inquiry = Inquiry::with('property', 'broker')->findOrFail($id);
+
+        return view('backend.inquiries.show', compact('inquiry'));
+    }
+
+    public function updateStatus(Request $request, $id)
+    {
+        $inquiry = Inquiry::findOrFail($id);
+
+        $request->validate([
+            'status' => 'required|in:new,contacted,converted,lost',
+        ]);
+
+        $inquiry->update(['status' => $request->status]);
+        $inquiry->recomputeHotScore();
+
+        return back()->with('success', 'Status updated.');
     }
 
     public function destroy($id)
     {
         Inquiry::findOrFail($id)->delete();
-        return back()->with('success', 'Inquiry deleted.');
+        return redirect()->route('admin.inquiries.index')->with('success', 'Inquiry deleted.');
     }
 }

@@ -28,8 +28,19 @@ class LeadReportController extends Controller
             'builder_leads_today' => BuilderLead::whereDate('created_at', today())->count(),
             'property_views'      => PropertyView::where('event_type', 'page_view')->whereBetween('viewed_at', [$from, $to])->count(),
             'property_views_today'=> PropertyView::where('event_type', 'page_view')->whereDate('viewed_at', today())->count(),
+            // NOTE: this counts distinct *people*, not distinct browser sessions.
+            // `session_id` is the PHP session ID, which is re-generated every
+            // time a guest's session expires (by default ~2 hours of
+            // inactivity) — so the same visitor coming back later in the day,
+            // or the next day, gets counted again and again. That made this
+            // number track almost 1:1 with total page views instead of actual
+            // unique people. `visitor_token` is a cookie set on first visit
+            // and kept for ~30 days specifically so we can recognise the same
+            // guest across separate sessions/days — that's what "unique
+            // visitors" should be measuring. We fall back to session_id only
+            // for old rows recorded before visitor_token existed.
             'unique_visitors'     => PropertyView::where('event_type', 'page_view')->whereBetween('viewed_at', [$from, $to])
-                                        ->distinct('session_id')->count('session_id'),
+                                        ->count(DB::raw("DISTINCT COALESCE(NULLIF(visitor_token, ''), session_id)")),
             'call_clicks'         => PropertyView::where('event_type', 'call_click')->whereBetween('viewed_at', [$from, $to])->count(),
             'whatsapp_clicks'     => PropertyView::where('event_type', 'whatsapp_click')->whereBetween('viewed_at', [$from, $to])->count(),
         ];
@@ -50,6 +61,11 @@ class LeadReportController extends Controller
         // IMPORTANT: MySQL ONLY_FULL_GROUP_BY requires that every selected non-aggregated
         // column is present in GROUP BY. Selecting properties.* with groupBy(properties.id)
         // breaks under ONLY_FULL_GROUP_BY.
+        // NOTE: the "Total Views" and "Inquiries" columns need the properties'
+        // own running-total counters (properties.views_count / .inquiries_count).
+        // Those must be selected explicitly and added to the GROUP BY below —
+        // otherwise they're not present on the returned rows and the blade
+        // silently displayed 0 for every property regardless of its real count.
         $topProperties = Property::select([
                 'properties.id',
                 'properties.slug',
@@ -57,6 +73,8 @@ class LeadReportController extends Controller
                 'properties.city',
                 'properties.property_type',
                 'properties.price',
+                'properties.views_count',
+                'properties.inquiries_count',
                 DB::raw('COUNT(property_views.id) as view_count'),
             ])
             ->join('property_views', 'properties.id', '=', 'property_views.property_id')
@@ -69,6 +87,8 @@ class LeadReportController extends Controller
                 'properties.city',
                 'properties.property_type',
                 'properties.price',
+                'properties.views_count',
+                'properties.inquiries_count',
             ])
             ->orderByDesc('view_count')
             ->limit(10)

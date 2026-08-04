@@ -38,15 +38,52 @@ class CityDataImportController extends Controller
             'type' => ['required', 'in:builder,agent,property'],
             'csv_file' => ['nullable', 'file', 'mimes:csv,txt', 'max:5120'],
             'builder_name' => ['nullable', 'string', 'max:120'],
+            'property_input' => ['nullable', 'in:csv,manual'],
+            'manual_title' => ['required_if:property_input,manual', 'nullable', 'string', 'max:255'],
+            'manual_property_type' => ['required_if:property_input,manual', 'nullable', 'string', 'max:100'],
+            'manual_looking_for' => ['required_if:property_input,manual', 'nullable', 'in:Sale,Rent,PG,Renovate'],
+            'manual_address' => ['required_if:property_input,manual', 'nullable', 'string', 'max:255'],
+            'manual_city' => ['nullable', 'string', 'max:120'],
+            'manual_state' => ['required_if:property_input,manual', 'nullable', 'string', 'max:120'],
+            'manual_price' => ['required_if:property_input,manual', 'nullable', 'numeric', 'min:0'],
+            'manual_description' => ['nullable', 'string'],
+            'manual_bedrooms' => ['nullable', 'integer', 'min:0'],
+            'manual_bathrooms' => ['nullable', 'integer', 'min:0'],
+            'manual_area' => ['nullable', 'integer', 'min:0'],
+            'manual_furnishing' => ['nullable', 'string', 'max:100'],
+            'manual_amenities' => ['nullable', 'string'],
         ]);
 
+        $manualProperty = null;
+        if ($validated['type'] === 'property' && ($validated['property_input'] ?? 'csv') === 'manual') {
+            $manualProperty = [
+                'source'        => 'manual_entry',
+                'title'         => $validated['manual_title'],
+                'description'   => $validated['manual_description'] ?? null,
+                'property_type' => $validated['manual_property_type'],
+                'looking_for'   => $validated['manual_looking_for'],
+                'address'       => $validated['manual_address'],
+                'city'          => $validated['manual_city'] ?: $validated['city'],
+                'state'         => $validated['manual_state'],
+                'country'       => 'India',
+                'price'         => (float) $validated['manual_price'],
+                'bedrooms'      => $validated['manual_bedrooms'] ?? null,
+                'bathrooms'     => $validated['manual_bathrooms'] ?? null,
+                'area'          => $validated['manual_area'] ?? null,
+                'furnishing'    => $validated['manual_furnishing'] ?? null,
+                'amenities'     => $validated['manual_amenities'] ?? null,
+            ];
+        }
+
         try {
-            $result = $service->discover(
-                $validated['type'],
-                $validated['city'],
-                $request->file('csv_file'),
-                $validated['builder_name'] ?? null
-            );
+            $result = $manualProperty
+                ? ['candidates' => [$manualProperty], 'notice' => null]
+                : $service->discover(
+                    $validated['type'],
+                    $validated['city'],
+                    $request->file('csv_file'),
+                    $validated['builder_name'] ?? null
+                );
         } catch (\RuntimeException $e) {
             return back()->withErrors(['discovery' => $e->getMessage()]);
         }
@@ -55,7 +92,7 @@ class CityDataImportController extends Controller
             'admin_id' => optional($request->user())->id,
             'city'     => $validated['city'],
             'type'     => $validated['type'],
-            'source'   => $validated['type'] === 'property' ? 'manual_csv' : 'openstreetmap',
+            'source'   => $manualProperty ? 'manual_entry' : ($validated['type'] === 'property' ? 'manual_csv' : 'openstreetmap'),
             'status'   => 'pending',
             'payload'  => $result['candidates'],
         ]);

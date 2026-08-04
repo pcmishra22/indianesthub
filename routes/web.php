@@ -784,6 +784,9 @@ require __DIR__ . '/admin_properties.php';
 
     // Manage Inquiries & Contacts
     Route::get('/inquiries', [AdminInquiryController::class, 'index'])->name('inquiries.index');
+    Route::get('/inquiries/{inquiry}', [AdminInquiryController::class, 'show'])->name('inquiries.show');
+    Route::post('/inquiries/{inquiry}/update-status', [AdminInquiryController::class, 'updateStatus'])->name('inquiries.update-status');
+    Route::delete('/inquiries/{inquiry}', [AdminInquiryController::class, 'destroy'])->name('inquiries.destroy');
     Route::get('/contacts', [AdminContactController::class, 'index'])->name('contacts.index');
     Route::get('/contacts/{contact}', [AdminContactController::class, 'show'])->name('contacts.show');
     Route::delete('/contacts/{contact}', [AdminContactController::class, 'destroy'])->name('contacts.destroy');

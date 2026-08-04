@@ -347,13 +347,16 @@
                                 <th>Source</th>
                                 <th>Status</th>
                                 <th>Date</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
                         @forelse($inquiries as $inq)
                             <tr>
                                 <td>{{ $inq->id }}</td>
-                                <td class="fw-medium">{{ $inq->name }}</td>
+                                <td class="fw-medium">
+                                    <a href="{{ route('admin.inquiries.show', $inq->id) }}" class="text-decoration-none">{{ $inq->name }}</a>
+                                </td>
                                 <td>{{ $inq->phone ?: '–' }}</td>
                                 <td>{{ $inq->email }}</td>
                                 <td>
@@ -377,9 +380,10 @@
                                     @endif
                                 </td>
                                 <td class="text-nowrap">{{ $inq->created_at?->format('d M Y H:i') }}</td>
+                                <td><a href="{{ route('admin.inquiries.show', $inq->id) }}" class="btn btn-sm btn-outline-primary">View</a></td>
                             </tr>
                         @empty
-                            <tr><td colspan="10" class="text-center text-muted">No inquiries found.</td></tr>
+                            <tr><td colspan="11" class="text-center text-muted">No inquiries found.</td></tr>
                         @endforelse
                         </tbody>
                     </table>
@@ -404,17 +408,28 @@
                                 <th>IP</th>
                                 <th>Status</th>
                                 <th>Date</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
                         @forelse($builderLeads as $lead)
                             <tr>
                                 <td>{{ $lead->id }}</td>
-                                <td class="fw-medium">{{ $lead->name }}</td>
+                                <td class="fw-medium">
+                                    <a href="{{ route('admin.builder-leads.show', $lead->id) }}" class="text-decoration-none">{{ $lead->name }}</a>
+                                </td>
                                 <td>{{ $lead->phone }}</td>
                                 <td>{{ $lead->email ?: '–' }}</td>
-                                <td>{{ $lead->project?->title ?? '–' }}</td>
-                                <td>{{ $lead->builder?->company_name ?? $lead->builder?->name ?? '–' }}</td>
+                                <td>
+                                    @if($lead->project)
+                                        <a href="{{ route('admin.builder-projects.show', $lead->builder_project_id) }}" class="text-decoration-none">{{ $lead->project->title }}</a>
+                                    @else – @endif
+                                </td>
+                                <td>
+                                    @if($lead->builder)
+                                        <a href="{{ route('admin.builders.show', $lead->builder_id) }}" class="text-decoration-none">{{ $lead->builder->company_name ?? $lead->builder->name }}</a>
+                                    @else – @endif
+                                </td>
                                 <td>
                                     @php $ltColors = ['general'=>'primary','visit'=>'success','callback'=>'warning','brochure'=>'info','whatsapp'=>'secondary']; @endphp
                                     <span class="badge bg-{{ $ltColors[$lead->lead_type] ?? 'secondary' }}">{{ ucfirst($lead->lead_type) }}</span>
@@ -430,9 +445,10 @@
                                     @endif
                                 </td>
                                 <td class="text-nowrap">{{ $lead->created_at?->format('d M Y H:i') }}</td>
+                                <td><a href="{{ route('admin.builder-leads.show', $lead->id) }}" class="btn btn-sm btn-outline-primary">View</a></td>
                             </tr>
                         @empty
-                            <tr><td colspan="11" class="text-center text-muted">No builder leads found.</td></tr>
+                            <tr><td colspan="12" class="text-center text-muted">No builder leads found.</td></tr>
                         @endforelse
                         </tbody>
                     </table>

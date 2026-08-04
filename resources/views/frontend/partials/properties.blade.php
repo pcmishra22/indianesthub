@@ -34,6 +34,30 @@
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('assets/css/frontend/properties.css') }}">
+    <style>
+      /* Make the whole property card clickable (image, title, everything)
+         while keeping the wishlist heart and list-view action buttons
+         (Call / WhatsApp / View Details) independently clickable. */
+      .prop-card { position: relative; cursor: pointer; }
+      .prop-card-stretched-link {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        /* no visible outline; text/label is for screen readers only */
+      }
+      /* Don't touch position here — it's already absolutely positioned
+         in the corner by properties.css; we only need it to sit above
+         the new overlay link. */
+      .prop-wishlist-btn { z-index: 2; }
+
+      .prop-list-card { position: relative; cursor: pointer; }
+      .prop-list-card-stretched-link {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+      }
+      .prop-list-actions { position: relative; z-index: 2; }
+    </style>
 @endpush
 
 {{-- ═══════════════════════════════════════════════════════ --}}
@@ -318,6 +342,11 @@
 
         <div class="col-lg-4 col-md-6">
           <div class="prop-card h-100">
+            {{-- Full-card clickable overlay (image, title, everything -> property details) --}}
+            <a href="{{ route('property-details', $property) }}"
+               class="prop-card-stretched-link"
+               aria-label="View details for {{ $property->title }}"></a>
+
             {{-- Image --}}
             <div class="prop-card-img">
               <img src="{{ $imgUrl }}" alt="{{ $property->title }}" loading="lazy">
@@ -424,6 +453,12 @@
           $agentPhone = config('app.contact_phone','7340753780');
         @endphp
         <div class="prop-list-card mb-3">
+          {{-- Full-card clickable overlay (image, title, everything -> property details).
+               prop-list-actions (Call/WhatsApp/View Details) sits above this via z-index. --}}
+          <a href="{{ route('property-details', $property) }}"
+             class="prop-list-card-stretched-link"
+             aria-label="View details for {{ $property->title }}"></a>
+
           <div class="prop-list-img">
             <img src="{{ $imgUrl }}" alt="{{ $property->title }}" loading="lazy">
             <div class="prop-badges" style="position:absolute;top:10px;left:10px;">
