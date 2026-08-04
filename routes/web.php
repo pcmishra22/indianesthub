@@ -384,6 +384,13 @@ Route::get('/investors', function () {
     return view('frontend.investors');
 })->name('investors');
 
+// The complete real estate journey — ties together every step (property,
+// loan, legal, registration, interior design, furniture, movers, insurance,
+// property management) into one visual page.
+Route::get('/journey', function () {
+    return view('frontend.journey');
+})->name('journey');
+
 // Property actions (public)
 Route::post('/property/inquiry/submit', [PropertyDetailsController::class, 'submitInquiry'])->name('property.inquiry.submit');
 Route::post('/property/schedule-viewing', [ScheduleViewingController::class, 'submit'])->name('property.schedule.viewing');

@@ -68,6 +68,7 @@
       <nav id="navmenu" class="navmenu">
         <ul>
           <li><a href="{{ url('/') }}" class="{{ request()->is('/') ? 'active' : '' }}">Home</a></li>
+          <li><a href="{{ route('journey') }}" class="{{ request()->is('journey') ? 'active' : '' }}" style="{{ request()->is('journey') ? '' : 'color:#0078d4!important;font-weight:700;' }}"><i class="bi bi-signpost-split-fill me-1" style="font-size:.75rem;"></i>Your Journey</a></li>
           <li><a href="{{ url('/properties') }}" class="{{ request()->is('properties') ? 'active' : '' }}">Properties</a></li>
           <li><a href="{{ url('/properties?looking_for=Sale') }}" class="{{ request()->is('properties') && request('looking_for') == 'Sale' ? 'active' : '' }}">Buy</a></li>
           <li><a href="{{ url('/properties?looking_for=Rent') }}" class="{{ request()->is('properties') && request('looking_for') == 'Rent' ? 'active' : '' }}">Rent</a></li>
