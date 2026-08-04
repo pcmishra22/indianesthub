@@ -9,7 +9,7 @@ class BuilderLead extends Model
     protected $table = 'builder_leads';
 
     protected $fillable = [
-        'builder_id', 'builder_project_id',
+        'builder_id', 'builder_project_id', 'property_id',
         'name', 'email', 'phone', 'message',
         'lead_type', 'source', 'status',
         'notes', 'follow_up_at', 'hot_score',
@@ -35,6 +35,11 @@ class BuilderLead extends Model
         return $this->belongsTo(BuilderProject::class, 'builder_project_id');
     }
 
+    public function property()
+    {
+        return $this->belongsTo(Property::class);
+    }
+
     // ── Computed: hot score ───────────────────────────────────────────────
     // Call after create/update to recompute the score automatically.
     public function recomputeHotScore(): void
@@ -43,12 +48,14 @@ class BuilderLead extends Model
 
         // Lead type weight
         $score += match ($this->lead_type) {
-            'visit'         => 40,
-            'callback'      => 30,
-            'facebook_lead' => 35,
-            'general'       => 20,
-            'brochure'      => 10,
-            default         => 10,
+            'visit'          => 40,
+            'call_click'     => 35, // they tapped Call — high intent, but we don't yet know if the call connected
+            'whatsapp_click' => 35,
+            'callback'       => 30,
+            'facebook_lead'  => 35,
+            'general'        => 20,
+            'brochure'       => 10,
+            default          => 10,
         };
 
         // Freshness (created in last 24h → +30, last 72h → +15)
@@ -56,7 +63,8 @@ class BuilderLead extends Model
         if ($ageHours <= 24)  $score += 30;
         elseif ($ageHours <= 72) $score += 15;
 
-        // Has phone (already required, always true → +10)
+        // Has phone → +10 (no longer guaranteed: click-tracked leads start
+        // with no captured identity until staff logs the call)
         if ($this->phone) $score += 10;
 
         // Has email → +10

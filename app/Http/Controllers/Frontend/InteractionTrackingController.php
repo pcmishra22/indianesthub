@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Frontend;
 
 use App\Http\Controllers\Controller;
 use App\Models\BuilderView;
+use App\Models\BuilderLead;
+use App\Models\Property;
 use App\Models\ProjectView;
 use App\Models\PropertyView;
 use Illuminate\Http\Request;
@@ -49,6 +51,47 @@ class InteractionTrackingController extends Controller
             'builder'  => BuilderView::create(['builder_id' => $validated['entity_id']] + $common),
             'project'  => ProjectView::create(['builder_project_id' => $validated['entity_id']] + $common),
         };
+
+        // Every call/WhatsApp tap on a builder-owned property becomes a real,
+        // timestamped BuilderLead the instant it happens — not just an
+        // anonymous row buried in property_views. Staff then have something
+        // to work from in the "Live Call Clicks" queue when the phone rings,
+        // and can fill in the caller's name/phone once they've actually
+        // spoken, rather than having no record at all unless they remember
+        // to create one manually.
+        if ($validated['entity_type'] === 'property') {
+            $property = Property::find($validated['entity_id']);
+
+            if ($property && $property->builder_id) {
+                $user = Auth::user();
+
+                $recentDuplicate = $visitorToken && BuilderLead::where('property_id', $property->id)
+                    ->where('lead_type', $validated['event_type'])
+                    ->where('visitor_token', $visitorToken)
+                    ->where('created_at', '>=', now()->subMinutes(30))
+                    ->exists();
+
+                if (!$recentDuplicate) {
+                    $lead = BuilderLead::create([
+                        'builder_id'         => $property->builder_id,
+                        'builder_project_id' => $property->builder_project_id,
+                        'property_id'        => $property->id,
+                        'name'               => $user->name ?? null,
+                        'email'              => $user->email ?? null,
+                        'phone'              => $user->phone ?? null,
+                        'message'            => "Auto-logged from a {$validated['event_type']} on \"{$property->title}\".",
+                        'lead_type'          => $validated['event_type'], // call_click | whatsapp_click
+                        'source'             => 'website',
+                        'status'             => 'new',
+                        'ip_address'         => $request->ip(),
+                        'user_agent'         => $request->userAgent(),
+                        'visitor_token'      => $visitorToken,
+                    ]);
+
+                    $lead->recomputeHotScore();
+                }
+            }
+        }
 
         return response()->json(['success' => true]);
     }

@@ -4,7 +4,12 @@
 
 <div class="d-flex align-items-center justify-content-between mb-3">
     <h4 class="mb-0"><i data-feather="user-plus" class="me-2 text-primary"></i>Builder Leads</h4>
-    <span class="badge bg-primary fs-6">{{ $leads->total() }} total</span>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-primary fs-6">{{ $leads->total() }} total</span>
+        <a href="{{ route('admin.builder-leads.live-clicks') }}" class="btn btn-danger btn-sm">
+            <i class="align-middle" data-feather="phone-call"></i> Live Call Clicks
+        </a>
+    </div>
 </div>
 
 @if(session('success'))
@@ -31,7 +36,7 @@
                 <label class="form-label mb-0 small fw-semibold">Lead Type</label>
                 <select name="lead_type" class="form-select form-select-sm">
                     <option value="">All Types</option>
-                    @foreach(['general','visit','callback','brochure','whatsapp'] as $t)
+                    @foreach(['general','visit','callback','brochure','whatsapp','call_click','whatsapp_click'] as $t)
                         <option value="{{ $t }}" {{ request('lead_type') === $t ? 'selected' : '' }}>{{ ucfirst($t) }}</option>
                     @endforeach
                 </select>
@@ -54,6 +59,7 @@
                         <th>Name</th>
                         <th>Phone</th>
                         <th>Email</th>
+                        <th>Property</th>
                         <th>Project</th>
                         <th>Builder</th>
                         <th>Type</th>
@@ -66,12 +72,19 @@
                 </thead>
                 <tbody>
                 @forelse($leads as $lead)
-                    @php $ltColors = ['general'=>'primary','visit'=>'success','callback'=>'warning','brochure'=>'info','whatsapp'=>'secondary']; @endphp
+                    @php $ltColors = ['general'=>'primary','visit'=>'success','callback'=>'warning','brochure'=>'info','whatsapp'=>'secondary','call_click'=>'danger','whatsapp_click'=>'success']; @endphp
                     <tr>
                         <td class="text-muted">{{ $lead->id }}</td>
-                        <td class="fw-medium">{{ $lead->name }}</td>
-                        <td>{{ $lead->phone }}</td>
+                        <td class="fw-medium">{{ $lead->name ?: '— not captured —' }}</td>
+                        <td>{{ $lead->phone ?: '–' }}</td>
                         <td>{{ $lead->email ?: '–' }}</td>
+                        <td>
+                            @if($lead->property)
+                                <a href="{{ route('admin.properties.show', $lead->property_id) }}" class="text-decoration-none small">
+                                    {{ \Str::limit($lead->property->title, 25) }}
+                                </a>
+                            @else – @endif
+                        </td>
                         <td>
                             @if($lead->project)
                                 <a href="{{ route('admin.builder-projects.show', $lead->builder_project_id) }}" class="text-decoration-none small">
@@ -114,7 +127,7 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="12" class="text-center text-muted py-4">No builder leads found.</td></tr>
+                    <tr><td colspan="13" class="text-center text-muted py-4">No builder leads found.</td></tr>
                 @endforelse
                 </tbody>
             </table>

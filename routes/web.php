@@ -813,7 +813,12 @@ require __DIR__ . '/admin_properties.php';
             ->name('builder-projects.viewers.index');
 
         // Builder Leads
-        Route::resource('builder-leads', AdminBuilderLeadController::class)->only(['index', 'show', 'destroy']);
+        // Literal path registered BEFORE the resource below — otherwise the
+        // resource's GET /builder-leads/{lead} (show) route matches first and
+        // treats "live-clicks" as a lead ID (same class of bug fixed earlier
+        // for /admin/users/bulk-email).
+        Route::get('/builder-leads/live-clicks', [AdminBuilderLeadController::class, 'liveClicks'])->name('builder-leads.live-clicks');
+        Route::resource('builder-leads', AdminBuilderLeadController::class)->only(['index', 'show', 'update', 'destroy']);
         Route::post('/builder-leads/{lead}/update-status', [AdminBuilderLeadController::class, 'updateStatus'])->name('builder-leads.update-status');
 
         // Loan Leads
