@@ -130,6 +130,7 @@ function apiWatchlist(): array
         $stoch   = stochastic($history);
         $obvData = obv($history);
         $pivots  = pivotPoints($history);
+        $levels  = keyLevels($history, (float)($quote['regularMarketPrice'] ?? 0));
 
         $price   = $quote['regularMarketPrice'] ?? 0;
         $rsiLast = lastNonNull($rsiArr) ?: 50;
@@ -203,6 +204,17 @@ function apiWatchlist(): array
             'pivot_pp'      => $pivots['PP'] ?? null,
             'pivot_r1'      => $pivots['R1'] ?? null,
             'pivot_s1'      => $pivots['S1'] ?? null,
+            // Nearest real swing-based support/resistance (see
+            // keyLevels() in indicators.php) — distinct from the daily
+            // floor pivots above: these are levels the stock has actually
+            // reversed at before, over its whole fetched history, used by
+            // the "Near Support / Near Resistance" watch list.
+            'support'             => $levels['support'],
+            'support_touches'     => $levels['support_touches'],
+            'support_dist_pct'    => $levels['support_dist_pct'],
+            'resistance'          => $levels['resistance'],
+            'resistance_touches'  => $levels['resistance_touches'],
+            'resistance_dist_pct' => $levels['resistance_dist_pct'],
         ];
         usleep(200000);
     }
@@ -231,10 +243,33 @@ function apiWatchlist(): array
     $moodScore = $total > 0 ? array_sum(array_column($stocks, 'momentum_score')) / $total : 0;
     $mood = $moodScore > 10 ? 'Bullish' : ($moodScore < -10 ? 'Bearish' : 'Neutral');
 
+    // ── Near Support / Near Resistance watch lists ──────────────────
+    // "Near" = within NEAR_LEVEL_PCT of a real swing-based level (see
+    // keyLevels()), not just anywhere inside the 20-day range — this is
+    // what makes it a bounce/reversal *watch* list instead of just
+    // re-showing the whole table. A stock that has already run far past
+    // its support (e.g. up 500%+ off an old low) has a support_dist_pct
+    // way outside this window and correctly does not show up here, which
+    // is the exact "Torrent Pharma bounced off 770, now near 4,948, so
+    // it's NOT near support anymore" case this list is meant to capture.
+    $supportWatch = array_values(array_filter($stocks, fn($s) =>
+        $s['support'] !== null && $s['support_dist_pct'] !== null
+        && $s['support_dist_pct'] >= 0 && $s['support_dist_pct'] <= NEAR_LEVEL_PCT
+    ));
+    usort($supportWatch, fn($a, $b) => $a['support_dist_pct'] <=> $b['support_dist_pct']);
+
+    $resistanceWatch = array_values(array_filter($stocks, fn($s) =>
+        $s['resistance'] !== null && $s['resistance_dist_pct'] !== null
+        && $s['resistance_dist_pct'] >= 0 && $s['resistance_dist_pct'] <= NEAR_LEVEL_PCT
+    ));
+    usort($resistanceWatch, fn($a, $b) => $a['resistance_dist_pct'] <=> $b['resistance_dist_pct']);
+
     $result = [
         'stocks'           => $stocks,
         'buy_list'         => $buyList,
         'sell_list'        => $sellList,
+        'support_watch'    => $supportWatch,
+        'resistance_watch' => $resistanceWatch,
         'market_mood'      => $mood,
         'mood_score'       => round($moodScore, 1),
         'nifty_view'       => "Buy: {$buys} | Sell: {$sells} | Hold: " . ($total - $buys - $sells) . " of {$total}",
@@ -1137,6 +1172,7 @@ function analyzeSymbolsBatch(array $syms, array $allQuotes): array
             $sig  = generateSignalFull($quote, $history, $indicators);
             $mom  = momentumScore($quote, $history, $indicators);
             $volA = volumeAnalysis($history);
+            $levels = keyLevels($history, (float)($quote['regularMarketPrice'] ?? 0));
 
             $price    = (float)($quote['regularMarketPrice'] ?? 0);
             $chg      = (float)($quote['regularMarketChangePercent'] ?? 0);
@@ -1187,6 +1223,15 @@ function analyzeSymbolsBatch(array $syms, array $allQuotes): array
                 'bull_factors'  => $sig['bullFactors'] ?? [],
                 'bear_factors'  => $sig['bearFactors'] ?? [],
                 '_source'       => $quote['_source'] ?? null,
+                // Nearest real swing-based support/resistance (see
+                // keyLevels() in indicators.php) — used to build the
+                // "Near Support" / "Near Resistance" watch lists.
+                'support'             => $levels['support'],
+                'support_touches'     => $levels['support_touches'],
+                'support_dist_pct'    => $levels['support_dist_pct'],
+                'resistance'          => $levels['resistance'],
+                'resistance_touches'  => $levels['resistance_touches'],
+                'resistance_dist_pct' => $levels['resistance_dist_pct'],
             ];
         } catch (\Throwable $e) {
             continue;
@@ -1276,10 +1321,34 @@ function apiWatchlistPage(int $page = 1, string $sector = '', string $search = '
     closePrakashDailyIfNeeded(getCurrentUser());
     closeAiDailyIfNeeded(getCurrentUser());
 
+    // ── Near Support / Near Resistance watch lists ──────────────────
+    // Built from $allStocks (the full watchlist, same as the momentum
+    // box/leaderboard above) rather than $stocks so a sector/search filter
+    // on the main table never hides these. "Near" = within NEAR_LEVEL_PCT
+    // of a real swing-based level the stock has actually reversed at
+    // before (see keyLevels()) — not just anywhere inside its recent
+    // range. A stock that has already run far past its support (e.g.
+    // Torrent Pharma up ~540% off its ~770 low, now near 4,948) has a
+    // support_dist_pct way outside this window and correctly stays off
+    // this list.
+    $supportWatch = array_values(array_filter($allStocks, fn($s) =>
+        ($s['support'] ?? null) !== null && ($s['support_dist_pct'] ?? null) !== null
+        && $s['support_dist_pct'] >= 0 && $s['support_dist_pct'] <= NEAR_LEVEL_PCT
+    ));
+    usort($supportWatch, fn($a, $b) => $a['support_dist_pct'] <=> $b['support_dist_pct']);
+
+    $resistanceWatch = array_values(array_filter($allStocks, fn($s) =>
+        ($s['resistance'] ?? null) !== null && ($s['resistance_dist_pct'] ?? null) !== null
+        && $s['resistance_dist_pct'] >= 0 && $s['resistance_dist_pct'] <= NEAR_LEVEL_PCT
+    ));
+    usort($resistanceWatch, fn($a, $b) => $a['resistance_dist_pct'] <=> $b['resistance_dist_pct']);
+
     return [
         'stocks'          => $stocks,
         'buy_list'        => $buys,
         'sell_list'       => $sells,
+        'support_watch'   => $supportWatch,
+        'resistance_watch'=> $resistanceWatch,
         'market_mood'     => $mood,
         // Pagination fields kept (value 1) only for backward compatibility
         // with any old cached frontend — the API no longer paginates.

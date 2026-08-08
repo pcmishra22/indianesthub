@@ -56,7 +56,15 @@ function apiNews(): array
             // to the very top or bottom.
             $pubDateRaw = (string)($item->pubDate ?? '');
             $pubTs = $pubDateRaw ? strtotime($pubDateRaw) : false;
-            if ($pubTs === false) $pubTs = time();
+            // Sanity clamp: a malformed/unparseable pubDate (or a feed
+            // quirk strtotime mis-reads) should never silently produce a
+            // wildly wrong timestamp that then renders as e.g. "3593d
+            // ago" on the frontend. Treat anything outside "up to 3 days
+            // old, or a few minutes into the future" as unparseable and
+            // fall back to "now" rather than trust a bogus value.
+            if ($pubTs === false || $pubTs > time() + 300 || $pubTs < time() - 3 * 86400) {
+                $pubTs = time();
+            }
 
             $link = trim((string)($item->link ?? ''));
 

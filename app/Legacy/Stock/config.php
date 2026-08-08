@@ -160,6 +160,13 @@ define('WATCHLIST_SYMBOLS', [
 
 // ─── Reliable fallback symbols ────────────────────────────────
 define('WATCHLIST_LARGE_THRESHOLD', (int)(getenv('WATCHLIST_LARGE_THRESHOLD') ?: 50));
+
+// How close (in %) current price must be to a real swing support/resistance
+// level (see keyLevels() in indicators.php) to show up in the "Near
+// Support" / "Near Resistance" watch lists. Kept generous enough to catch
+// a stock approaching a level, tight enough that "already ran away from
+// it" stocks (e.g. up 500% off an old low) correctly don't qualify.
+define('NEAR_LEVEL_PCT', (float)(getenv('NEAR_LEVEL_PCT') ?: 5.0));
 define('RELIABLE_FALLBACK_SYMBOLS', [
     'RELIANCE.NS','TCS.NS','HDFCBANK.NS','BHARTIARTL.NS','ICICIBANK.NS',
     'INFY.NS','SBIN.NS','HINDUNILVR.NS','ITC.NS','LT.NS',

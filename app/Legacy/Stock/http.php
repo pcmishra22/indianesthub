@@ -164,12 +164,33 @@ function httpGet(string $url, int $timeout = 15): string|false
  */
 function httpGetDebug(string $url, int $timeout = 15): array
 {
-    $crumbData = yahooGetCrumb();
-    $crumb     = $crumbData['crumb'] ?? '';
-    $cookie    = $crumbData['cookie'] ?? '';
+    // BUG FIX: this used to call yahooGetCrumb() unconditionally for every
+    // single httpGet() call, including completely unrelated targets like
+    // the ET/Moneycontrol RSS feeds in api/news.php. yahooGetCrumb() does
+    // its OWN two curl round-trips first (finance.yahoo.com, up to 15s,
+    // then query1.finance.yahoo.com, up to 10s) before this function's
+    // actual request even starts — and per the note at the top of this
+    // file, Yahoo's crumb endpoint is confirmed dead, so those ~25s are
+    // wasted on *every* uncached call (the crumb cache file is only ever
+    // written on success, which per that same note never happens anymore,
+    // so it was never actually caching anything here). On a shared host
+    // with a ~30s max_execution_time, that alone was enough to make the
+    // real request (e.g. the RSS fetch) time out before it ever ran,
+    // leaving news_cache.json stuck on whatever was last fetched
+    // successfully — which is exactly the "news won't update / shows a
+    // days-old item" symptom. Only pay the crumb cost for requests that
+    // are actually going to Yahoo Finance.
+    $isYahoo = (bool) preg_match('/(^|\.)finance\.yahoo\.com$/i', (string) parse_url($url, PHP_URL_HOST));
 
-    if ($crumb && str_contains($url, 'finance.yahoo.com')) {
-        $url .= (str_contains($url, '?') ? '&' : '?') . 'crumb=' . urlencode($crumb);
+    $crumb = ''; $cookie = '';
+    if ($isYahoo) {
+        $crumbData = yahooGetCrumb();
+        $crumb     = $crumbData['crumb'] ?? '';
+        $cookie    = $crumbData['cookie'] ?? '';
+
+        if ($crumb) {
+            $url .= (str_contains($url, '?') ? '&' : '?') . 'crumb=' . urlencode($crumb);
+        }
     }
 
     $urls = [$url];

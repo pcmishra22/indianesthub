@@ -539,4 +539,94 @@ function swingStructure(array $history, int $look = 2): array
     ];
 }
 
+/**
+ * keyLevels($history, $price) — the nearest real support (below) and
+ * resistance (above) the current price, in the sense a chart-reading
+ * trader means it: a swing low/high the stock has actually turned at
+ * before, not just "yesterday's low" (that's pivotPoints()'s S1, a same-week floor
+ * level) and not just "the lowest close in the window" (a single spike
+ * doesn't make a level).
+ *
+ * Method:
+ *  1. Find every confirmed fractal swing high/low over the full history
+ *     (a bar whose high/low is the extreme within $look candles on each
+ *     side — same definition swingStructure() already uses elsewhere in
+ *     this codebase, just applied to the whole series instead of only the
+ *     last two).
+ *  2. Cluster swing points that sit within $clusterPct of each other —
+ *     price rarely reverses at the exact same paisa twice, it reverses in
+ *     a zone. Each cluster's level is the average of its members; its
+ *     "touches" count is how many times price actually reacted there,
+ *     which is what makes a level meaningful rather than incidental.
+ *  3. Support = the highest support-cluster level still below price
+ *     (i.e. the nearest one underneath); Resistance = the lowest
+ *     resistance-cluster level still above price. Both null if the stock
+ *     has never printed a swing on the relevant side (e.g. straight-line
+ *     new listing).
+ *
+ * Returns support/resistance price, distance from current price as a %
+ * (always positive — "how far away", not signed), and touch count so the
+ * caller can prefer well-tested levels over one-off ones.
+ */
+function keyLevels(array $history, float $price, int $look = 3, float $clusterPct = 2.0): array
+{
+    $n = count($history);
+    $swingHighs = []; $swingLows = [];
+    for ($i = $look; $i < $n - $look; $i++) {
+        $isHigh = true; $isLow = true;
+        for ($j = $i - $look; $j <= $i + $look; $j++) {
+            if ($j === $i) continue;
+            if ($history[$j]['high'] >= $history[$i]['high']) $isHigh = false;
+            if ($history[$j]['low']  <= $history[$i]['low'])  $isLow  = false;
+        }
+        if ($isHigh) $swingHighs[] = $history[$i]['high'];
+        if ($isLow)  $swingLows[]  = $history[$i]['low'];
+    }
+
+    $cluster = function (array $points) use ($clusterPct): array {
+        if (!$points) return [];
+        sort($points);
+        $clusters = [];
+        $cur = [$points[0]];
+        for ($i = 1; $i < count($points); $i++) {
+            $prevAvg = array_sum($cur) / count($cur);
+            if ($points[$i] <= $prevAvg * (1 + $clusterPct / 100)) {
+                $cur[] = $points[$i];
+            } else {
+                $clusters[] = ['level' => round(array_sum($cur) / count($cur), 2), 'touches' => count($cur)];
+                $cur = [$points[$i]];
+            }
+        }
+        $clusters[] = ['level' => round(array_sum($cur) / count($cur), 2), 'touches' => count($cur)];
+        return $clusters;
+    };
+
+    $supportClusters    = $cluster($swingLows);
+    $resistanceClusters = $cluster($swingHighs);
+
+    // Nearest support: highest support level still below price.
+    $support = null; $supportTouches = 0;
+    foreach ($supportClusters as $c) {
+        if ($c['level'] < $price && ($support === null || $c['level'] > $support)) {
+            $support = $c['level']; $supportTouches = $c['touches'];
+        }
+    }
+    // Nearest resistance: lowest resistance level still above price.
+    $resistance = null; $resistanceTouches = 0;
+    foreach ($resistanceClusters as $c) {
+        if ($c['level'] > $price && ($resistance === null || $c['level'] < $resistance)) {
+            $resistance = $c['level']; $resistanceTouches = $c['touches'];
+        }
+    }
+
+    return [
+        'support'              => $support,
+        'support_touches'      => $supportTouches,
+        'support_dist_pct'     => ($support !== null && $support > 0) ? round(($price - $support) / $support * 100, 2) : null,
+        'resistance'           => $resistance,
+        'resistance_touches'   => $resistanceTouches,
+        'resistance_dist_pct'  => ($resistance !== null && $price > 0) ? round(($resistance - $price) / $price * 100, 2) : null,
+    ];
+}
+
 

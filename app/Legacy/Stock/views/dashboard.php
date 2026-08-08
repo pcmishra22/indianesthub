@@ -285,6 +285,7 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div class="logo"><div class="logo-icon">📈</div><?= htmlspecialchars($appName) ?></div>
     <nav class="nav">
       <button class="nb active" onclick="showTab('watchlist',this)">📊 Watchlist</button>
+      <button class="nb" onclick="showTab('levels',this)">🎯 Levels</button>
       <button class="nb" onclick="showTab('analyze',this)">🔍 Analyze</button>
       <button class="nb" onclick="showTab('news',this)">📰 News</button>
       <button class="nb" onclick="showTab('leaders',this)">🏆 Leaders</button>
@@ -394,6 +395,20 @@ tr:hover td{background:rgba(255,255,255,.02)}
     <div id="watchTable" style="display:none"></div>
     <!-- Pagination -->
     <div id="wlPagination" style="padding:0 16px;border-top:1px solid var(--border)"></div>
+  </div>
+</div>
+
+<!-- LEVELS TAB (Near Support / Near Resistance) -->
+<div class="tab-pane" id="tab-levels">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:10px">
+    <div>
+      <h2 style="font-size:1.1rem;font-weight:700;color:#fff">🎯 Near Support / Near Resistance</h2>
+      <div style="font-size:14px;color:var(--muted);margin-top:3px">Stocks currently trading close to a real swing-based support or resistance level — not just anywhere in their recent range. A stock that already ran far away from an old level (e.g. up 500%+ off it) won't show up here.</div>
+    </div>
+    <button class="btn btn-outline" onclick="loadWatchlist(true)" style="padding:6px 14px;font-size:14px">🔄 Refresh</button>
+  </div>
+  <div id="levelsContainer">
+    <div class="loading-card"><div class="spin"></div><div>Loading — this shares data with the Watchlist tab, open that tab first if this looks empty.</div></div>
   </div>
 </div>
 
@@ -756,6 +771,10 @@ function showTab(name,btn){
   document.getElementById('tab-'+name).classList.add('active');
   if(btn) btn.classList.add('active');
   if(name==='news'&&!newsLoaded) loadNews();
+  if(name==='levels'){
+    if(wlLastData) renderSupportResistance(wlLastData);
+    else if(!wlLoading) loadWatchlist();
+  }
   if(name==='leaders'){
     if(!leaderLoaded) loadLeaders();
     if(!prakashRollupLoaded) loadPrakashRollup();
@@ -1694,6 +1713,66 @@ function renderWatchlist(d, preserveWlPage){
     </div>
     <div style="padding:8px;font-size:12px;color:var(--muted)">Score = Price×Volume + RSI + MACD + EMA + ADX + Supertrend · Live NSE Data · Educational only · Buy/Sell recommendations always use the full ${total}-stock watchlist regardless of the page shown here</div>`;
   document.getElementById('watchTable').style.display='block';
+  renderSupportResistance(d);
+}
+
+// ══ NEAR SUPPORT / NEAR RESISTANCE ═══════════════════════════
+// Reuses the same /api/watchlist/page payload the Watchlist tab already
+// fetched — d.support_watch / d.resistance_watch are pre-computed
+// server-side (see keyLevels() in indicators.php) from the FULL
+// watchlist, so this never needs its own network round-trip.
+function levelRow(s, mode){
+  const price = parseFloat(s.price)||0;
+  const level = mode==='support' ? parseFloat(s.support)||0 : parseFloat(s.resistance)||0;
+  const dist  = mode==='support' ? parseFloat(s.support_dist_pct)||0 : parseFloat(s.resistance_dist_pct)||0;
+  const touches = mode==='support' ? (s.support_touches||0) : (s.resistance_touches||0);
+  const color = mode==='support' ? 'var(--green)' : 'var(--red)';
+  const sig=s.signal||'Hold';
+  const bc=sig==='Buy'||sig==='Strong Buy'?'badge-buy':sig==='Sell'||sig==='Strong Sell'?'badge-sell':'badge-hold';
+  return `<tr>
+    <td><div class="sym">${escHtml(s.symbol||'')}</div><div class="co-name">${escHtml(s.name||'')}</div></td>
+    <td class="price" style="font-weight:700;font-size:15px">₹${fmtNum(price)}</td>
+    <td style="font-weight:700;color:${color}">₹${fmtNum(level)}</td>
+    <td style="font-weight:600;color:${color}">${dist.toFixed(2)}%</td>
+    <td style="font-size:13px;color:var(--muted)">${touches} touch${touches===1?'':'es'}</td>
+    <td><span class="badge ${bc}">${escHtml(sig)}</span></td>
+    <td>
+      <button class="action-btn" onclick="analyzeFromWatch('${escHtml(s.symbol||'')}')" style="display:block;margin-bottom:3px">Analyze →</button>
+      <button class="action-btn" onclick="setAlert('${escHtml(s.symbol||'')}',${price})" style="font-size:12px">🔔 Alert</button>
+    </td>
+  </tr>`;
+}
+
+function levelTable(list, mode, title, color, icon){
+  if(!list.length) return `<div style="padding:20px;color:var(--muted);font-size:15px">No stocks currently within ${NEAR_LEVEL_PCT_JS}% of their ${mode==='support'?'support':'resistance'} level.</div>`;
+  const levelHead = mode==='support' ? 'Support' : 'Resistance';
+  const distHead  = mode==='support' ? 'Above Support' : 'Below Resistance';
+  return `<div style="padding:12px 18px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:18px">${icon}</span>
+      <span style="font-weight:700;color:${color};font-size:16px">${title}</span>
+      <span style="font-size:13px;color:var(--muted)">${list.length} stocks</span>
+    </div>
+    <div style="overflow-x:auto"><table><thead><tr>
+      <th>Symbol</th><th>Current Price</th><th>${levelHead}</th><th>${distHead}</th><th>Touches</th><th>Signal</th><th>Action</th>
+    </tr></thead><tbody>${list.map(s=>levelRow(s,mode)).join('')}</tbody></table></div>`;
+}
+
+// Kept as a JS-side mirror of config.php's NEAR_LEVEL_PCT purely for the
+// "no stocks" empty-state copy — the actual filtering already happened
+// server-side, this never re-filters.
+const NEAR_LEVEL_PCT_JS = 5;
+
+function renderSupportResistance(d){
+  const el = document.getElementById('levelsContainer');
+  if(!el) return;
+  const supportWatch = d.support_watch || [];
+  const resistanceWatch = d.resistance_watch || [];
+  el.innerHTML = `
+    <div style="margin-bottom:16px">
+      <div style="background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);border-radius:var(--r);margin-bottom:12px">${levelTable(supportWatch,'support','🟢 Near Support — possible bounce','var(--green)','🎯')}</div>
+      <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:var(--r)">${levelTable(resistanceWatch,'resistance','🔴 Near Resistance — possible reversal/breakout','var(--red)','🎯')}</div>
+    </div>
+    <div style="padding:8px;font-size:12px;color:var(--muted)">Support/Resistance = a real swing high/low the stock has actually reversed at before (clustered from its full price history), not just today's range. "Near" = within ${NEAR_LEVEL_PCT_JS}% of that level. Educational only — always confirm with your own risk management.</div>`;
 }
 
 // Change which page of the Buy or Sell table is shown. Purely local —
