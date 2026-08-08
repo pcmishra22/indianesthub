@@ -11,11 +11,14 @@ class Payment extends Model
 
     protected $fillable = [
         'dealer_id',
+        'user_id',
         'property_id',
+        'auction_id',
         'plan_type',
         'plan_name',
         'amount',
         'status',
+        'refunded_at',
         'transaction_id',
         'payment_method',
         'payment_data',
@@ -26,6 +29,20 @@ class Payment extends Model
         'card_last_four',
         'card_brand',
     ];
+
+    protected $casts = [
+        'refunded_at' => 'datetime',
+    ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function auction()
+    {
+        return $this->belongsTo(Auction::class, 'auction_id');
+    }
 
     public function dealer()
     {

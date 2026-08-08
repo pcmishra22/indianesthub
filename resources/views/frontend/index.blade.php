@@ -2,12 +2,12 @@
 @extends('frontend.layout')
 
 {{-- ════════════════════════ SEO META ════════════════════════ --}}
-@section('title', config('app.name') . ' – India\'s Complete Real Estate Ecosystem')
-@section('meta_description', 'IndianEstHub is India\'s complete real estate ecosystem — verified properties for sale & rent, new projects, home loans, property insurance, legal help, service providers & a home marketplace across Chandigarh, Mohali, Zirakpur, Panchkula, Pune, Bangalore, Hyderabad & Delhi NCR.')
-@section('meta_keywords', 'property in chandigarh, flats in mohali, property in zirakpur, real estate tricity, buy flat chandigarh, rent flat mohali, new projects zirakpur, 3bhk flats mohali, villas chandigarh, plots panchkula, home loan, property insurance, legal help, interior designers, home marketplace')
+@section('title', config('app.name') . ' – India\'s Real Asset Investment Marketplace')
+@section('meta_description', 'IndianEstHub is India\'s real asset investment marketplace — verified property, commercial, agricultural land, industrial & new-launch investment opportunities, home loans, legal help and expert advice, all in one place.')
+@section('meta_keywords', 'real estate investment india, property investment, commercial property investment, farmland investment, warehouse investment, investment score, new launch projects, home loan, property insurance, legal help, chandigarh mohali zirakpur property')
 @section('canonical', url('/'))
-@section('og_title', config('app.name') . ' – India\'s Complete Real Estate Ecosystem')
-@section('og_description', 'Explore ' . config('app.name') . ' — India\'s complete real estate ecosystem. Verified properties, new projects, home loans, insurance, legal help, service providers & a home marketplace in one place.')
+@section('og_title', config('app.name') . ' – India\'s Real Asset Investment Marketplace')
+@section('og_description', 'Explore ' . config('app.name') . ' — India\'s real asset investment marketplace. Verified property, commercial, agriculture & industrial investment opportunities in one place.')
 
 @section('schema')
 <script type="application/ld+json">
@@ -79,61 +79,57 @@
 ])
 
 {{-- ════════════════════════════════════════════════════════
-     BROWSE BY PROPERTY TYPE
+     INVESTMENT CATEGORIES
 ════════════════════════════════════════════════════════ --}}
-<section class="hs-section white">
+<section class="hs-section white" id="investment-categories">
   <div class="container">
-    <!--<div class="col-12 mb-4">
-      <img
-        src="{{ asset('assets/img/loan_and_properties_banner.png') }}"
-        alt="Loans & Properties"
-        class="img-fluid rounded"
-        loading="lazy"
-      >
-    </div>-->
-
     <div class="hs-section-title">
-      <span class="hs-badge">Browse by Category</span>
-      <h2>What Are You Looking For?</h2>
-      <p>Find properties by type across Chandigarh Tricity</p>
+      <span class="hs-badge">Investment Categories</span>
+      <h2>Where Do You Want to Invest?</h2>
+      <p>Every real, verifiable asset class — in one marketplace</p>
     </div>
     <div class="prop-type-grid">
       @php
-        $typeConfig = [
-          'Apartment'   => ['icon'=>'bi-building','color'=>'#dbeafe','text'=>'#1d4ed8','label'=>'Apartment / Flat'],
-          'Villa'       => ['icon'=>'bi-house','color'=>'#dcfce7','text'=>'#15803d','label'=>'Villa / House'],
-          'Plot'        => ['icon'=>'bi-map','color'=>'#fef3c7','text'=>'#b45309','label'=>'Plot / Land'],
-          'Commercial'  => ['icon'=>'bi-shop','color'=>'#fce7f3','text'=>'#be185d','label'=>'Commercial'],
-          'Penthouse'   => ['icon'=>'bi-building-up','color'=>'#ede9fe','text'=>'#7c3aed','label'=>'Penthouse'],
-          'Residential' => ['icon'=>'bi-house-door','color'=>'#ecfdf5','text'=>'#065f46','label'=>'Residential'],
+        // Investment categories mapped to real, deliverable listing types.
+        // Stocks / Mutual Funds / tradeable REIT units are intentionally
+        // excluded — those require SEBI/AMFI broking or distributor licenses.
+        $invCategories = [
+          ['label'=>'Property','sub'=>'Residential homes & flats','icon'=>'bi-house-door','color'=>'#dbeafe','text'=>'#1d4ed8',
+            'href'=>route('properties', ['property_type' => 'Residential']),
+            'count'=>($propertyTypes['Residential'] ?? 0) + ($propertyTypes['Apartment'] ?? 0) + ($propertyTypes['Villa'] ?? 0)],
+          ['label'=>'Commercial','sub'=>'Offices, shops, showrooms','icon'=>'bi-shop','color'=>'#fce7f3','text'=>'#be185d',
+            'href'=>route('properties', ['property_type' => 'Commercial']),
+            'count'=>$propertyTypes['Commercial'] ?? 0],
+          ['label'=>'Agriculture','sub'=>'Farm houses & farmland','icon'=>'bi-tree','color'=>'#dcfce7','text'=>'#15803d',
+            'href'=>route('properties', ['property_type' => 'Farm House']),
+            'count'=>$propertyTypes['Farm House'] ?? 0],
+          ['label'=>'Industrial','sub'=>'Warehouses & godowns','icon'=>'bi-building-gear','color'=>'#fef3c7','text'=>'#b45309',
+            'href'=>route('properties', ['property_type' => 'Warehouse']),
+            'count'=>$propertyTypes['Warehouse'] ?? 0],
+          ['label'=>'Under Construction','sub'=>'New launches & pre-bookings','icon'=>'bi-building-add','color'=>'#ede9fe','text'=>'#7c3aed',
+            'href'=>route('builders.index'),
+            'count'=>$newLaunches->count(), 'suffix'=>' projects'],
+          ['label'=>'Gold','sub'=>'Coming soon','icon'=>'bi-gem','color'=>'#fff7ed','text'=>'#ea580c',
+            'href'=>'#','count'=>null,'badge'=>'Coming Soon'],
         ];
       @endphp
-      @foreach($typeConfig as $type => $cfg)
-        @php $cnt = $propertyTypes[$type] ?? 0; @endphp
-        <a href="{{ route('properties', ['property_type' => $type]) }}" class="prop-type-chip">
-          <div class="icon" style="background:{{ $cfg['color'] }};color:{{ $cfg['text'] }};">
-            <i class="bi {{ $cfg['icon'] }}"></i>
+      @foreach($invCategories as $cat)
+        <a href="{{ $cat['href'] }}" class="prop-type-chip" @if($cat['href']==='#') onclick="return false;" style="cursor:default;opacity:.85;" @endif>
+          <div class="icon" style="background:{{ $cat['color'] }};color:{{ $cat['text'] }};">
+            <i class="bi {{ $cat['icon'] }}"></i>
           </div>
-          <div class="label">{{ $cfg['label'] }}</div>
-          <div class="cnt">{{ $cnt > 0 ? $cnt.' listings' : 'Available' }}</div>
+          <div class="label">{{ $cat['label'] }}</div>
+          <div class="cnt">
+            @if(!empty($cat['badge']))
+              {{ $cat['badge'] }}
+            @elseif(($cat['count'] ?? 0) > 0)
+              {{ $cat['count'] }}{{ $cat['suffix'] ?? '' }}{{ empty($cat['suffix']) ? ' listings' : '' }}
+            @else
+              {{ $cat['sub'] }}
+            @endif
+          </div>
         </a>
       @endforeach
-      {{-- Extra static types --}}
-      <a href="{{ route('properties', ['looking_for' => 'PG']) }}" class="prop-type-chip">
-        <div class="icon" style="background:#fff7ed;color:#ea580c;"><i class="bi bi-people"></i></div>
-        <div class="label">PG / Co-living</div>
-        <div class="cnt">Available</div>
-      </a>
-      <a href="{{ route('properties', ['looking_for' => 'Renovate']) }}" class="prop-type-chip">
-        <div class="icon" style="background:#fef2f2;color:#dc2626;"><i class="bi bi-tools"></i></div>
-        <div class="label">Renovate</div>
-        <div class="cnt">Available</div>
-      </a>
-      <a href="{{ route('builders.index') }}" class="prop-type-chip">
-        <div class="icon" style="background:#f0fdf4;color:#16a34a;"><i class="bi bi-building-add"></i></div>
-        <div class="label">New Projects</div>
-        <div class="cnt">{{ $newLaunches->count() }}+ projects</div>
-      </a>
     </div>
   </div>
 </section>
@@ -167,12 +163,22 @@
   <div class="container">
     <div class="hs-section-title">
       <span class="hs-badge">Top Picks</span>
-      <h2>Featured Properties</h2>
-      <p>Handpicked premium listings across Chandigarh, Mohali &amp; Zirakpur</p>
+      <h2>Featured Investment Opportunities</h2>
+      <p>Handpicked properties, commercial spaces, farmland &amp; industrial listings across India</p>
     </div>
     <div class="row g-4">
 
-
+      @php
+        // Maps raw property_type values to an investor-facing asset-class label
+        $assetClassMap = [
+          'Commercial'=>'Commercial','Office'=>'Commercial','Retail Shop'=>'Commercial','Showroom'=>'Commercial',
+          'Warehouse'=>'Industrial',
+          'Farm House'=>'Agriculture Land','Plot'=>'Land',
+        ];
+        function assetClassLabel($property, $assetClassMap) {
+          return $assetClassMap[$property->property_type ?? ''] ?? 'Property';
+        }
+      @endphp
 
       @forelse($featuredProperties->take(6) as $property)
         @php
@@ -180,6 +186,7 @@
           $lf     = strtolower($property->looking_for ?? '');
           $agentName  = $property->dealer?->name ?? ($property->builder?->company_name ?? $property->builder?->name ?? config('app.name'));
           $agentAvatar = asset('assets/img/real-estate/agent-' . (($property->id % 10) + 1) . '.webp');
+          $assetClass = assetClassLabel($property, $assetClassMap);
         @endphp
         <div class="col-lg-4 col-md-6">
           <div class="prop-card h-100">
@@ -187,6 +194,7 @@
               <img src="{{ $imgUrl }}" alt="{{ $property->title }}" loading="lazy">
               <div class="prop-img-overlay"></div>
               <div class="prop-badges">
+                <span class="prop-badge badge-sale" style="background:#0a2d5e;">{{ $assetClass }}</span>
                 @if(in_array($lf,['sale','sell','buy'])) <span class="prop-badge badge-sale">For Sale</span>
                 @elseif($lf==='rent') <span class="prop-badge badge-rent">For Rent</span>
                 @elseif($lf==='pg') <span class="prop-badge badge-pg">PG</span>
@@ -506,8 +514,8 @@
     <div class="row align-items-center g-5">
       <div class="col-lg-5">
         <span class="hs-badge">Why Us</span>
-        <h2 class="fw-800 mt-2 mb-4" style="font-size:2rem;color:var(--text-dark);font-weight:800;">Why Choose <span style="color:#0078d4;">{{ config('app.name') }}?</span></h2>
-        <p style="color:#64748b;line-height:1.8;margin-bottom:24px;">We started as Chandigarh Tricity's dedicated real estate platform and now connect home seekers with verified dealers and top builders across Chandigarh, Mohali, Zirakpur, Panchkula and expanding into Pune, Bangalore, Hyderabad & Delhi NCR. Our commitment to transparency and quality ensures you make informed decisions.</p>
+        <h2 class="fw-800 mt-2 mb-4" style="font-size:2rem;color:var(--text-dark);font-weight:800;">Why Invest With <span style="color:#0078d4;">{{ config('app.name') }}?</span></h2>
+        <p style="color:#64748b;line-height:1.8;margin-bottom:24px;">We're not just a property listing site — we're building India's trust layer for real-asset investing. From verified builders and legal due-diligence to home loans and ROI insight on every listing, we help you invest with confidence, not guesswork.</p>
         <div class="d-flex gap-4 flex-wrap" style="margin-bottom:28px;">
           <div class="text-center">
             <div style="font-size:1.8rem;font-weight:900;color:#0078d4;">{{ number_format($totalProperties) }}+</div>
@@ -528,26 +536,152 @@
         <div class="row g-3">
           @php
             $whyItems = [
-              ['icon'=>'bi-patch-check','color'=>'#dbeafe','text'=>'#1d4ed8','title'=>'100% Verified Listings','desc'=>'Every property is physically verified by our team before listing. No fake listings, ever.'],
-              ['icon'=>'bi-shield-lock','color'=>'#dcfce7','text'=>'#15803d','title'=>'Secure Transactions','desc'=>'Your data and transactions are protected with bank-grade security and RERA compliance.'],
-              ['icon'=>'bi-headset','color'=>'#fce7f3','text'=>'#be185d','title'=>'24/7 Expert Support','desc'=>'Our dedicated team is always available to guide you through the entire buying/renting process.'],
-              ['icon'=>'bi-graph-up-arrow','color'=>'#fef3c7','text'=>'#b45309','title'=>'Best Price Guarantee','desc'=>'We help you get the best deal with transparent pricing, market insights, and negotiation support.'],
-              ['icon'=>'bi-building-check','color'=>'#ede9fe','text'=>'#7c3aed','title'=>'Top Builders Network','desc'=>'Access to '.($totalBuilders ?? 6).'+ verified builders and their exclusive new launch projects.'],
-              ['icon'=>'bi-phone','color'=>'#ecfdf5','text'=>'#065f46','title'=>'Easy Mobile Access','desc'=>'Find, save and compare properties on the go. Our platform works seamlessly on all devices.'],
+              ['icon'=>'bi-patch-check','color'=>'#dbeafe','text'=>'#1d4ed8','title'=>'Verified Builders','desc'=>'Every builder & dealer is background-checked and physically verified before listing. No fake projects, ever.'],
+              ['icon'=>'bi-calculator','color'=>'#dcfce7','text'=>'#15803d','title'=>'Investment Calculator','desc'=>'Instantly estimate fair market value and pricing trends with our AI-powered price estimator.', 'href'=>route('price-estimator')],
+              ['icon'=>'bi-graph-up-arrow','color'=>'#fef3c7','text'=>'#b45309','title'=>'ROI Prediction','desc'=>'Every listing is moving toward a built-in Investment Score — rental yield, appreciation & risk at a glance.', 'href'=>'#investment-score'],
+              ['icon'=>'bi-headset','color'=>'#fce7f3','text'=>'#be185d','title'=>'Expert Advice','desc'=>'Our dedicated team is always available to guide you through the entire investing process, free of cost.', 'href'=>url('/contact')],
+              ['icon'=>'bi-bank','color'=>'#ede9fe','text'=>'#7c3aed','title'=>'Home Loan Assistance','desc'=>'Compare and apply for home loans from partner banks & NBFCs with the best rates, right from the platform.', 'href'=>route('seo.loan')],
+              ['icon'=>'bi-file-earmark-check','color'=>'#ecfdf5','text'=>'#065f46','title'=>'Legal Verification','desc'=>'Title checks, sale-deed registration and dispute due-diligence handled by our legal partner network.', 'href'=>route('seo.legal')],
+              ['icon'=>'bi-shield-check','color'=>'#fef2f2','text'=>'#dc2626','title'=>'Property Insurance','desc'=>'Protect your investment against fire, theft and natural disasters with partner insurance plans.', 'href'=>route('seo.insurance')],
+              ['icon'=>'bi-receipt','color'=>'#fff7ed','text'=>'#ea580c','title'=>'Tax Planning','desc'=>'Guidance on capital gains, TDS on property purchase and tax-saving structures for real asset investors.', 'href'=>url('/contact')],
             ];
           @endphp
           @foreach($whyItems as $item)
             <div class="col-md-6">
-              <div class="why-card">
+              <a href="{{ $item['href'] ?? '#' }}" class="why-card" style="text-decoration:none;">
                 <div class="why-icon" style="background:{{ $item['color'] }};color:{{ $item['text'] }};"><i class="bi {{ $item['icon'] }}"></i></div>
                 <div>
                   <div class="why-title">{{ $item['title'] }}</div>
                   <p class="why-desc">{{ $item['desc'] }}</p>
                 </div>
-              </div>
+              </a>
             </div>
           @endforeach
         </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{-- ════════════════════════════════════════════════════════
+     INVESTMENT SCORE — flagship feature
+════════════════════════════════════════════════════════ --}}
+<section class="hs-section" id="investment-score">
+  <div class="container">
+    <div class="hs-section-title">
+      <span class="hs-badge" style="background:#fef3c7;color:#b45309;">Coming Soon · Flagship Feature</span>
+      <h2>Every Listing Gets an <span style="color:#0078d4;">Investment Score</span></h2>
+      <p>One number that tells you if this is a smart investment — rental yield, appreciation, risk, liquidity & builder trust, combined.</p>
+    </div>
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <div style="background:#fff;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,.08);padding:32px;display:flex;flex-wrap:wrap;align-items:center;gap:32px;">
+          <div style="flex:0 0 auto;text-align:center;min-width:150px;">
+            <div style="width:130px;height:130px;border-radius:50%;background:conic-gradient(#16a34a 0% 92%, #e5e7eb 92% 100%);display:flex;align-items:center;justify-content:center;margin:0 auto;">
+              <div style="width:104px;height:104px;border-radius:50%;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+                <div style="font-size:1.9rem;font-weight:900;color:#16a34a;line-height:1;">92</div>
+                <div style="font-size:.7rem;color:#94a3b8;font-weight:700;">/ 100</div>
+              </div>
+            </div>
+            <div style="margin-top:10px;font-weight:800;color:#16a34a;font-size:.85rem;letter-spacing:.3px;">EXCELLENT</div>
+          </div>
+          <div style="flex:1 1 320px;">
+            <div class="row g-3">
+              @php
+                $scoreMetrics = [
+                  ['label'=>'Rental Yield','value'=>'8%','icon'=>'bi-cash-coin','color'=>'#15803d'],
+                  ['label'=>'Expected Appreciation','value'=>'12% / yr','icon'=>'bi-graph-up-arrow','color'=>'#1d4ed8'],
+                  ['label'=>'Risk','value'=>'Low','icon'=>'bi-shield-check','color'=>'#15803d'],
+                  ['label'=>'Liquidity','value'=>'High','icon'=>'bi-arrow-left-right','color'=>'#7c3aed'],
+                  ['label'=>'Builder Rating','value'=>'4.8 / 5','icon'=>'bi-star-fill','color'=>'#b45309'],
+                  ['label'=>'Possession','value'=>'2027','icon'=>'bi-calendar-check','color'=>'#be185d'],
+                ];
+              @endphp
+              @foreach($scoreMetrics as $m)
+                <div class="col-6 col-md-4">
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <i class="bi {{ $m['icon'] }}" style="color:{{ $m['color'] }};font-size:1.1rem;"></i>
+                    <div>
+                      <div style="font-size:.7rem;color:#94a3b8;font-weight:600;">{{ $m['label'] }}</div>
+                      <div style="font-size:.95rem;font-weight:800;color:#1e293b;">{{ $m['value'] }}</div>
+                    </div>
+                  </div>
+                </div>
+              @endforeach
+            </div>
+          </div>
+        </div>
+        <p class="text-center mt-4" style="color:#94a3b8;font-size:.85rem;">
+          <i class="bi bi-info-circle me-1"></i>Sample score shown for illustration — we're rolling this out across every listing.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+{{-- ════════════════════════════════════════════════════════
+     INVESTORS PORTAL — amount-based discovery
+════════════════════════════════════════════════════════ --}}
+<section class="hs-section white" id="investors">
+  <div class="container">
+    <div class="hs-section-title">
+      <span class="hs-badge">For Investors</span>
+      <h2>How Much Do You Want to Invest?</h2>
+      <p>Tell us your budget — we'll show you what it can buy across property, commercial & land</p>
+    </div>
+    <div class="row g-3 justify-content-center">
+      @php
+        $budgets = [
+          ['label'=>'₹5 Lakh',   'min'=>0,        'max'=>500000],
+          ['label'=>'₹10 Lakh',  'min'=>500000,   'max'=>1000000],
+          ['label'=>'₹25 Lakh',  'min'=>1000000,  'max'=>2500000],
+          ['label'=>'₹50 Lakh',  'min'=>2500000,  'max'=>5000000],
+          ['label'=>'₹1 Crore',  'min'=>5000000,  'max'=>10000000],
+          ['label'=>'₹5 Crore',  'min'=>10000000, 'max'=>50000000],
+        ];
+      @endphp
+      @foreach($budgets as $b)
+        <div class="col-6 col-md-4 col-lg-2">
+          <a href="{{ route('properties', ['min_price' => $b['min'], 'max_price' => $b['max']]) }}"
+             class="d-block text-center text-decoration-none"
+             style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:14px;padding:22px 10px;font-weight:800;color:#0a2d5e;transition:.2s;"
+             onmouseover="this.style.borderColor='#0078d4';this.style.background='#eff6ff';"
+             onmouseout="this.style.borderColor='#e2e8f0';this.style.background='#f8fafc';">
+            <i class="bi bi-wallet2 d-block mb-2" style="font-size:1.4rem;color:#0078d4;"></i>
+            {{ $b['label'] }}
+          </a>
+        </div>
+      @endforeach
+    </div>
+    <div class="text-center mt-4">
+      <span style="color:#94a3b8;font-size:.9rem;">Every budget shows real, verified investment opportunities — updated live.</span>
+    </div>
+  </div>
+</section>
+
+{{-- ════════════════════════════════════════════════════════
+     PROPERTY AUCTIONS — fair-price teaser banner
+════════════════════════════════════════════════════════ --}}
+<section class="hs-section" style="background:linear-gradient(135deg,#0a2340,#0a2d5e);padding:56px 0;">
+  <div class="container">
+    <div class="row align-items-center g-4">
+      <div class="col-lg-7 text-white">
+        <span class="badge mb-2" style="background:rgba(255,255,255,.15);color:#fff;font-size:.75rem;padding:6px 14px;border-radius:20px;">
+          <i class="bi bi-hammer me-1"></i> New
+        </span>
+        <h2 class="fw-bold mb-2" style="font-size:1.6rem;">Selling Urgently? Don't Let a Dealer Lowball You.</h2>
+        <p class="text-white-50 mb-0" style="max-width:520px;">
+          List your property in a document-verified, transparent auction. KYC-checked bidders compete openly —
+          you get the market's real price, not one dealer's rushed offer.
+        </p>
+      </div>
+      <div class="col-lg-5 text-lg-end">
+        <a href="{{ route('auctions.submit.create') }}" class="btn btn-light fw-semibold px-4 py-2 me-2 mb-2" style="border-radius:10px;">
+          List for Auction
+        </a>
+        <a href="{{ route('auctions.index') }}" class="btn fw-semibold px-4 py-2 mb-2" style="border-radius:10px;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.4);color:#fff;">
+          Browse Live Auctions
+        </a>
       </div>
     </div>
   </div>

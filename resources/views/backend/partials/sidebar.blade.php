@@ -151,6 +151,16 @@
                     <i class="align-middle" data-feather="credit-card"></i> <span class="align-middle">Payments</span>
                 </a>
             </li>
+            <li class="sidebar-item {{ request()->routeIs('admin.auctions.*') ? 'active' : '' }}">
+                <a class="sidebar-link" href="{{ route('admin.auctions.index') }}">
+                    <i class="align-middle" data-feather="award"></i> <span class="align-middle">Auctions</span>
+                </a>
+            </li>
+            <li class="sidebar-item {{ request()->routeIs('admin.auction-kyc.*') ? 'active' : '' }}">
+                <a class="sidebar-link" href="{{ route('admin.auction-kyc.index') }}">
+                    <i class="align-middle" data-feather="user-check"></i> <span class="align-middle">Bidder KYC</span>
+                </a>
+            </li>
             <li class="sidebar-item {{ request()->routeIs('admin.blog.*') ? 'active' : '' }}">
                 <a class="sidebar-link" href="{{ route('admin.blog.index') }}">
                     <i class="align-middle" data-feather="book-open"></i> <span class="align-middle">Blog</span>

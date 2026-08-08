@@ -11,6 +11,7 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command('properties:send-renewal-reminders')->daily();
         $schedule->command('properties:send-new-listing-alerts')->daily();
+        $schedule->command('auctions:process')->everyMinute()->withoutOverlapping();
     }
 
     protected function commands()

@@ -490,6 +490,7 @@ class SeoLandingController extends Controller
 
             $newProjects = BuilderProject::where('is_active', true)
                 ->whereIn('status', $statuses)
+                ->whereNotNull('slug')
                 ->where(function ($q) use ($cityLabel) {
                     $q->where('city', 'like', "%{$cityLabel}%")
                       ->orWhere('address', 'like', "%{$cityLabel}%");

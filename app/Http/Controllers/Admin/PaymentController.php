@@ -10,7 +10,7 @@ use App\Models\Payment;
 class PaymentController extends Controller
 {
     public function index() {
-        $payments = Payment::with('dealer')->latest()->paginate(20);
+        $payments = Payment::with(['dealer', 'user', 'auction.property'])->latest()->paginate(20);
         return view('backend.payments.index', compact('payments'));
     }
 
@@ -34,6 +34,21 @@ class PaymentController extends Controller
 
         $payment->save();
 
+        // Auction deposits don't need a listing window — the moment this is
+        // marked completed, User::hasVerifiedDepositFor() unlocks bidding on
+        // that specific auction for that user.
+        if ($payment->payment_type === 'auction_deposit') {
+            return back()->with('success', 'Auction deposit verified — bidder can now place bids.');
+        }
+
         return back()->with('success', 'Payment approved successfully.');
+    }
+
+    public function reject($id) {
+        $payment = Payment::findOrFail($id);
+        $payment->status = 'failed';
+        $payment->save();
+
+        return back()->with('success', 'Payment marked as failed/rejected.');
     }
 }

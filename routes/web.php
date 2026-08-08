@@ -38,6 +38,9 @@ use App\Http\Controllers\Frontend\TermsController;
 use App\Http\Controllers\Frontend\NotFoundController;
 use App\Http\Controllers\Frontend\StarterPageController;
 use App\Http\Controllers\Frontend\ScheduleViewingController;
+use App\Http\Controllers\Frontend\AuctionController;
+use App\Http\Controllers\Frontend\AuctionSubmissionController;
+use App\Http\Controllers\Frontend\AuctionKycController;
 use App\Http\Controllers\Frontend\WishlistController;
 use App\Http\Controllers\Frontend\UserDashboardController;
 use App\Http\Controllers\Frontend\CompareController;
@@ -411,6 +414,33 @@ Route::post('/marketplace/vendor/{vendor:slug}/contact-click', [\App\Http\Contro
 Route::post('/marketplace/lead', [\App\Http\Controllers\Frontend\MarketplaceLeadController::class, 'submit'])
     ->name('marketplace.lead.submit');
 
+// ─────────────────────────────────────────────────────────
+// Property Auctions — public browsing + bidding
+// ─────────────────────────────────────────────────────────
+Route::get('/auctions', [AuctionController::class, 'index'])->name('auctions.index');
+Route::get('/auctions/{auction}', [AuctionController::class, 'show'])->name('auctions.show');
+
+Route::middleware('auth')->group(function () {
+    Route::post('/auctions/{auction}/bid', [AuctionController::class, 'placeBid'])->name('auctions.bid');
+
+    // Bidder KYC (one-time)
+    Route::get('/auctions/kyc', [AuctionKycController::class, 'create'])->name('auctions.kyc');
+    Route::post('/auctions/kyc', [AuctionKycController::class, 'store'])->name('auctions.kyc.store');
+
+    // Refundable per-auction bid deposit
+    Route::get('/auctions/{auction}/deposit', [AuctionKycController::class, 'depositForm'])->name('auctions.deposit');
+    Route::post('/auctions/{auction}/deposit', [AuctionKycController::class, 'depositSubmit'])->name('auctions.deposit.store');
+
+    // Seller flow — submit a property you own for auction
+    Route::get('/sell-by-auction', [AuctionSubmissionController::class, 'create'])->name('auctions.submit.create');
+    Route::post('/sell-by-auction', [AuctionSubmissionController::class, 'store'])->name('auctions.submit.store');
+    Route::get('/sell-by-auction/{auction}/documents', [AuctionSubmissionController::class, 'documents'])->name('auctions.submit.documents');
+    Route::post('/sell-by-auction/{auction}/documents', [AuctionSubmissionController::class, 'storeDocument'])->name('auctions.submit.documents.store');
+    Route::get('/my/auctions', [AuctionSubmissionController::class, 'mine'])->name('auctions.mine');
+    Route::get('/my/auctions/{auction}/decision', [AuctionSubmissionController::class, 'decision'])->name('auctions.decision');
+    Route::post('/my/auctions/{auction}/decision', [AuctionSubmissionController::class, 'submitDecision'])->name('auctions.decision.store');
+});
+
 // Visitor interaction tracking (public, fire-and-forget beacon from call/whatsapp buttons)
 Route::post('/track/interaction', [\App\Http\Controllers\Frontend\InteractionTrackingController::class, 'track'])->name('track.interaction');
 
@@ -757,6 +787,26 @@ require __DIR__ . '/admin_properties.php';
     // Manage Payments
     Route::get('/payments', [AdminPaymentController::class, 'index'])->name('payments.index');
     Route::post('/payments/{payment}/approve', [AdminPaymentController::class, 'approve'])->name('payments.approve');
+    Route::post('/payments/{payment}/reject', [AdminPaymentController::class, 'reject'])->name('payments.reject');
+
+    // ─────────────────────────────────────────────────────
+    // Auctions
+    // ─────────────────────────────────────────────────────
+    Route::get('/auctions', [\App\Http\Controllers\Admin\AuctionController::class, 'index'])->name('auctions.index');
+    Route::get('/auctions/{auction}', [\App\Http\Controllers\Admin\AuctionController::class, 'show'])->name('auctions.show');
+    Route::post('/auctions/{auction}/approve', [\App\Http\Controllers\Admin\AuctionController::class, 'approve'])->name('auctions.approve');
+    Route::post('/auctions/{auction}/reject', [\App\Http\Controllers\Admin\AuctionController::class, 'reject'])->name('auctions.reject');
+    Route::post('/auctions/{auction}/force-end', [\App\Http\Controllers\Admin\AuctionController::class, 'forceEnd'])->name('auctions.force-end');
+    Route::post('/auctions/{auction}/cancel', [\App\Http\Controllers\Admin\AuctionController::class, 'cancel'])->name('auctions.cancel');
+    Route::post('/auctions/{auction}/verification', [\App\Http\Controllers\Admin\AuctionController::class, 'updateVerification'])->name('auctions.verification');
+    Route::post('/auctions/{auction}/mark-completed', [\App\Http\Controllers\Admin\AuctionController::class, 'markCompleted'])->name('auctions.mark-completed');
+    Route::post('/auction-documents/{document}/approve', [\App\Http\Controllers\Admin\AuctionController::class, 'approveDocument'])->name('auction-documents.approve');
+    Route::post('/auction-documents/{document}/reject', [\App\Http\Controllers\Admin\AuctionController::class, 'rejectDocument'])->name('auction-documents.reject');
+
+    // Bidder KYC review
+    Route::get('/auction-kyc', [\App\Http\Controllers\Admin\AuctionKycController::class, 'index'])->name('auction-kyc.index');
+    Route::post('/auction-kyc/{user}/approve', [\App\Http\Controllers\Admin\AuctionKycController::class, 'approve'])->name('auction-kyc.approve');
+    Route::post('/auction-kyc/{user}/reject', [\App\Http\Controllers\Admin\AuctionKycController::class, 'reject'])->name('auction-kyc.reject');
 
     // Manage Blog
     Route::resource('blog', AdminBlogController::class);

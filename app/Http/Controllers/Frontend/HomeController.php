@@ -32,6 +32,7 @@ class HomeController extends Controller
         $newLaunches = BuilderProject::with('builder')
             ->where('is_active', true)
             ->whereIn('status', ['Upcoming', 'Under Construction'])
+            ->whereNotNull('slug')
             ->latest()
             ->limit(4)
             ->get();
@@ -57,8 +58,11 @@ class HomeController extends Controller
 
 
         // Top builders
-        $topBuilders = Builder::where('status', 'active')
-            ->orWhereNull('status')
+        $topBuilders = Builder::where(function ($q) {
+                $q->where('status', 'active')->orWhereNull('status');
+            })
+            ->whereNotNull('slug')
+            ->where('slug', '!=', '')
             ->limit(6)
             ->get();
 

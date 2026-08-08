@@ -25,6 +25,12 @@ class User extends Authenticatable
         'status',
         'phone_verified_at',
         'two_factor_verified_at',
+        'pan_number',
+        'kyc_id_proof_path',
+        'kyc_status',
+        'kyc_submitted_at',
+        'kyc_verified_at',
+        'kyc_rejection_reason',
     ];
 
     /**
@@ -68,5 +74,28 @@ class User extends Authenticatable
     public function recentlyViewed()
     {
         return $this->hasMany(\App\Models\RecentlyViewed::class);
+    }
+
+    public function auctionBids()
+    {
+        return $this->hasMany(\App\Models\AuctionBid::class);
+    }
+
+    public function auctionDeposits()
+    {
+        return $this->hasMany(\App\Models\Payment::class, 'user_id')->where('payment_type', 'auction_deposit');
+    }
+
+    public function hasVerifiedKyc(): bool
+    {
+        return $this->kyc_status === 'verified';
+    }
+
+    public function hasVerifiedDepositFor(int $auctionId): bool
+    {
+        return $this->auctionDeposits()
+            ->where('auction_id', $auctionId)
+            ->where('status', 'completed')
+            ->exists();
     }
 }

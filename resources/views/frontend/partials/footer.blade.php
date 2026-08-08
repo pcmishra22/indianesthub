@@ -382,6 +382,7 @@
         <h4>Quick Links</h4>
         <ul>
           <li><i class="bi bi-chevron-right"></i><a href="{{ url('/') }}">Home</a></li>
+          <li><i class="bi bi-signpost-split-fill"></i><a href="{{ route('journey') }}" style="color:#50e6ff!important;">Your Journey</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ route('about') }}">About Us</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ route('properties') }}">Properties</a></li>
           <li><i class="bi bi-chevron-right"></i><a href="{{ url('/agents') }}">Agents</a></li>
@@ -424,10 +425,12 @@
     </div>
   </div>{{-- /footer-top --}}
 
-  <div class="container copyright text-center mt-4">
-    <p>© {{ date('Y') }} <strong class="sitename">{{ config('app.name') }}</strong>. All Rights Reserved.</p>
-    <div class="credits">
-      Designed by <a href="https://bootstrapmade.com/">BootstrapMade</a>
+  <div style="width:100%;background:#0a2340;">
+    <div class="container copyright text-center mt-4" style="margin-top:0!important;padding:20px 15px;">
+      <p>© {{ date('Y') }} <strong class="sitename">{{ config('app.name') }}</strong>. All Rights Reserved.</p>
+      <div class="credits">
+        Designed by <a href="https://bootstrapmade.com/">BootstrapMade</a>
+      </div>
     </div>
   </div>
 

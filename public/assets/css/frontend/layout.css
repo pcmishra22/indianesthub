@@ -313,7 +313,7 @@
 
 /* ── Footer Blue Theme Override ─────────────────────────── */
 .footer.accent-background {
-  background: linear-gradient(160deg, #061830 0%, #0a2d5e 50%, #0f4c81 100%) !important;
+  background: #0a2d5e !important;
   color: rgba(255,255,255,0.85);
 }
 .footer.accent-background .sitename {
@@ -362,7 +362,7 @@
   color: rgba(255,255,255,0.9);
 }
 .footer.accent-background .copyright {
-  background: rgba(0,0,0,0.25);
+  background: transparent;
   border-top: 1px solid rgba(255,255,255,0.08);
   border-radius: 0;
   padding: 18px 0;
@@ -384,7 +384,7 @@
 }
 /* ── Properties by Location standalone strip ──────────────── */
 .footer-locations {
-  background: rgba(0,0,0,0.18);
+  background: transparent;
   border-top: 1px solid rgba(255,255,255,0.07);
   border-bottom: 1px solid rgba(255,255,255,0.07);
   padding: 28px 0 20px;
@@ -431,7 +431,7 @@
 }
 /* Footer brand highlight strip */
 .footer-brand-strip {
-  background: rgba(255,255,255,0.04);
+  background: transparent;
   border-bottom: 1px solid rgba(255,255,255,0.08);
   padding: 14px 0;
   margin-bottom: 0;

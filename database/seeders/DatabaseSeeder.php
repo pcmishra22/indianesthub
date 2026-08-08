@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             AdminSeeder::class,
+            UserSeeder::class,
             AgentSeeder::class,
             AmenitySeeder::class,
             BangaloreBuilderProjectsBatch1::class,
@@ -91,7 +92,6 @@ class DatabaseSeeder extends Seeder
             TricityRealDataSeederBatch2::class,
             TricityRealDataSeederBatch3::class,
             UserEngagementSeeder::class,
-            UserSeeder::class,
             WalletSeeder::class,
             // Real Tricity Data (run these to populate live data)
             ZirakpurProximitySeeder::class,

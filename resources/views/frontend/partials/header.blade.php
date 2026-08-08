@@ -44,6 +44,15 @@
 </div>
 
   <header id="header" class="header d-flex align-items-center sticky-top" style="overflow: visible;">
+    <style>
+      /* Keep nav from overflowing and pushing the Login/Register buttons out
+         of the visible header bar on medium-wide desktop screens. */
+      #header .container-fluid { flex-wrap: nowrap; }
+      #navmenu { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+      #navmenu::-webkit-scrollbar { display: none; }
+      #navmenu > ul { flex-wrap: nowrap; white-space: nowrap; }
+      #header .d-none.d-xl-flex { flex-shrink: 0; margin-left: 12px; }
+    </style>
     <div class="container-fluid container-xl position-relative d-flex align-items-center justify-content-between">
 
       <a href="{{ url('/') }}" class="logo d-flex align-items-center">
@@ -68,12 +77,13 @@
       <nav id="navmenu" class="navmenu">
         <ul>
           <li><a href="{{ url('/') }}" class="{{ request()->is('/') ? 'active' : '' }}">Home</a></li>
-          <li><a href="{{ route('journey') }}" class="{{ request()->is('journey') ? 'active' : '' }}" style="{{ request()->is('journey') ? '' : 'color:#0078d4!important;font-weight:700;' }}"><i class="bi bi-signpost-split-fill me-1" style="font-size:.75rem;"></i>Your Journey</a></li>
           <li><a href="{{ url('/properties') }}" class="{{ request()->is('properties') ? 'active' : '' }}">Properties</a></li>
+          <li><a href="{{ route('auctions.index') }}" class="{{ request()->is('auctions*') ? 'active' : '' }}"><i class="bi bi-hammer me-1" style="font-size:.75rem;"></i>Auctions</a></li>
           <li><a href="{{ url('/properties?looking_for=Sale') }}" class="{{ request()->is('properties') && request('looking_for') == 'Sale' ? 'active' : '' }}">Buy</a></li>
           <li><a href="{{ url('/properties?looking_for=Rent') }}" class="{{ request()->is('properties') && request('looking_for') == 'Rent' ? 'active' : '' }}">Rent</a></li>
           <li><a href="{{ url('/properties?looking_for=Renovate') }}" class="{{ request()->is('properties') && request('looking_for') == 'Renovate' ? 'active' : '' }}">Renovate</a></li>
           <li><a href="{{ url('/services') }}" class="{{ request()->is('services') ? 'active' : '' }}">Services</a></li>
+          <li><a href="{{ url('/#investors') }}" style="color:#0078d4!important;font-weight:700;"><i class="bi bi-cash-coin me-1" style="font-size:.75rem;"></i>Investors</a></li>
           <li><a href="{{ url('/agents') }}" class="{{ request()->is('agents') ? 'active' : '' }}">Agents</a></li>
           <li><a href="{{ route('builders.index') }}" class="{{ request()->is('builders*') ? 'active' : '' }}">Builders</a></li>
           <li><a href="{{ url('/blog') }}" class="{{ request()->is('blog') ? 'active' : '' }}">Blog</a></li>

@@ -34,7 +34,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->index(['connectable_type', 'connectable_id']);
-            $table->unique(['connectable_type', 'connectable_id', 'page_id']);
+            $table->unique(['connectable_type', 'connectable_id', 'page_id'], 'smc_connectable_page_unique');
             $table->index('page_id');
         });
     }

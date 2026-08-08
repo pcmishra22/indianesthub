@@ -7,9 +7,18 @@
 
       {{-- LEFT --}}
       <div class="col-lg-7">
-        <div class="hero-label"><i class="bi bi-geo-alt-fill"></i> India's Complete Real Estate Ecosystem</div>
-        <h1>India's <span>Complete Real Estate</span> Ecosystem</h1>
-        <p class="hero-sub">Explore <strong style="color:#50e6ff;">{{ number_format($totalProperties ?? 323) }}+</strong> verified properties, new projects, home loans, insurance, legal help, service providers & a home marketplace — all in one place.</p>
+        <div class="hero-label"><i class="bi bi-graph-up-arrow"></i> Property, Commercial, Agriculture, Warehousing & More</div>
+        <h1>India's <span>Real Asset Investment</span> Marketplace</h1>
+        <p class="hero-sub">Discover Real Estate, Commercial Spaces, Agricultural Land, Warehousing, New Launches and Gold-backed opportunities — <strong style="color:#50e6ff;">{{ number_format($totalProperties ?? 323) }}+</strong> verified investment options across India, all in one place.</p>
+
+        <div class="d-flex flex-wrap gap-3 mb-4">
+          <a href="#investment-categories" class="btn-hero-search" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:14px 28px;border-radius:12px;">
+            <i class="bi bi-graph-up-arrow me-2"></i> Start Investing
+          </a>
+          <a href="{{ route('builder.register') }}" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center;padding:14px 28px;border-radius:12px;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.4);color:#fff;font-weight:700;">
+            <i class="bi bi-building-add me-2"></i> List Your Project
+          </a>
+        </div>
 
         {{-- Search Card --}}
         <div class="hero-search-card">

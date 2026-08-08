@@ -179,6 +179,11 @@ protected $fillable = [
         return $this->hasMany(\App\Models\Payment::class, 'property_id');
     }
 
+    public function auction()
+    {
+        return $this->hasOne(\App\Models\Auction::class);
+    }
+
     public function scopePaidAndValid($query, $dealerId = null)
     {
         $query->whereHas('payments', function ($q) use ($dealerId) {

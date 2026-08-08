@@ -131,6 +131,7 @@ class BuilderController extends Controller
         // Other projects by same builder (exclude current)
         $relatedProjects = BuilderProject::where('builder_id', $project->builder_id)
             ->where('id', '!=', $project->id)
+            ->whereNotNull('slug')
             ->withCount('properties')
             ->latest()
             ->limit(3)
